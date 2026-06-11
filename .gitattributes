@@ -1,0 +1,4 @@
+# CI(Linux)とローカル(Windows)で追記される状態ファイルのEOL差分を防ぐため全てLFに統一
+* text=auto eol=lf
+*.png binary
+*.svg text eol=lf

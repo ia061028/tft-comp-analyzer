@@ -1,0 +1,81 @@
+// 収集側（collector/）とフロントエンド（src/）の両方から参照される型定義
+
+/** data/state/records/{route}.ndjson の1行 ＝ 参加者1人分の収集レコード */
+export interface ParticipantRecord {
+  /** マッチID（例: "SG2_88412345"） */
+  m: string
+  /** パッチ（例: "16.11"） */
+  v: string
+  /** 順位 1-8 */
+  p: number
+  /** 発動トレイト（tier_current>=1）→ style（1=ブロンズ,2=シルバー,3=ゴールド,4=プリズム） */
+  t: Record<string, number>
+  /** 装備された紋章アイテムの apiName（重複保持・発動フィルタは集計時に適用） */
+  e: string[]
+  /** 盤面ユニットの character_id */
+  u: string[]
+  /** プレイヤーレベル */
+  lv: number
+  /** game_datetime（epoch秒） */
+  ts: number
+}
+
+export interface TraitInfo {
+  api: string
+  name: string
+  icon: string
+}
+
+export interface EmblemInfo {
+  api: string
+  name: string
+  /** traits 配列へのインデックス */
+  trait: number
+  icon: string
+}
+
+export interface UnitInfo {
+  api: string
+  name: string
+  cost: number
+  icon: string
+}
+
+/** 構成クラスタ内の紋章マルチセットごとの成績 */
+export interface EmblemRow {
+  /** emblems 配列インデックスのソート済みマルチセット（空=紋章なし） */
+  e: number[]
+  n: number
+  top4: number
+  win: number
+}
+
+export interface CompStats {
+  /** クラスタキー: [traitIdx, 最頻style] のソート済みペア（style>=minStyle のトレイトのみ） */
+  traits: [number, number][]
+  label: string
+  /** クラスタ内最頻ユニット（units 配列インデックス、コスト順） */
+  units: number[]
+  n: number
+  top4: number
+  win: number
+  rows: EmblemRow[]
+}
+
+/** public/data/stats.json 全体 */
+export interface StatsFile {
+  schemaVersion: 1
+  generatedAt: string
+  patch: string
+  setNumber: number
+  config: { minStyle: number; minSampleDefault: number }
+  totals: {
+    matches: number
+    participants: number
+    byRoute: Record<string, number>
+  }
+  traits: TraitInfo[]
+  emblems: EmblemInfo[]
+  units: UnitInfo[]
+  comps: CompStats[]
+}
