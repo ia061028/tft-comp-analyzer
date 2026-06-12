@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "collect": "tsx collector/collect.ts",
-    "aggregate": "tsx collector/aggregate.ts"
+    "aggregate": "tsx collector/aggregate.ts",
+    "test": "tsx --test collector/*.test.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",

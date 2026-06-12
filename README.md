@@ -20,6 +20,20 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 | `npm run collect` | Riot APIからマッチ収集 → `data/state/` に追記 |
 | `npm run aggregate` | `data/state/` → `public/data/stats.json` 集計（Phase 3で実装） |
 
+## デプロイ（Phase 6・初回のみの手動作業）
+
+1. **GitHubパブリックリポジトリ**を作成して push（パブリックなのはActions無制限のため。キーはSecretsで保護）
+   ```sh
+   gh repo create tft-comp-analyzer --public --source . --push
+   ```
+2. **Secret登録**: リポジトリの Settings → Secrets and variables → Actions に `RIOT_API_KEY` を登録
+   ```sh
+   gh secret set RIOT_API_KEY
+   ```
+   ⚠️ 開発キーは**24時間で失効**する。毎日 https://developer.riotgames.com で再発行し、`gh secret set RIOT_API_KEY` で更新すること（失効するとcollectワークフローが赤失敗し、GitHubからメール通知が来る。サイトは旧データの配信を継続する）。
+3. **Netlify連携**: Netlifyダッシュボード → Add new site → Import an existing project → GitHubリポジトリを選択。ビルド設定は `netlify.toml`（build: `npm run build`, publish: `dist`）が自動適用される。
+4. 動作確認: Actionsタブから `collect` を手動実行（workflow_dispatch）→ state＋stats.json の更新コミット → Netlifyが自動デプロイ。
+
 ## 計測メモ
 
 ### stateサイズ（Phase 2 実測, 2026-06-12, SEAルート）

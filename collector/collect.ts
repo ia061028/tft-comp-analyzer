@@ -6,14 +6,19 @@ import 'dotenv/config'
 import { config, PLATFORM_TO_ROUTE, type RegionalRoute } from './config.ts'
 import { RiotClient, AuthError } from './riot.ts'
 import { getEmblemContext, type EmblemContext } from './cdragon.ts'
+import { patchesToKeep } from './patches.ts'
 import {
   loadMeta,
   saveMeta,
   loadSeen,
   appendSeen,
   appendRecords,
+  pruneRecords,
   type Meta,
 } from './state.ts'
+import { readFileSync, existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { ParticipantRecord } from '../shared/types.ts'
 
 const apiKey = process.env.RIOT_API_KEY
@@ -63,6 +68,28 @@ interface MatchDetail {
     game_datetime: number
     participants: MatchParticipant[]
   }
+}
+
+const here = dirname(fileURLToPath(import.meta.url))
+const RECORDS_DIR = join(here, '..', 'data', 'state', 'records')
+
+/** route の records ファイルに出現するパッチ（v）の一覧を集める。 */
+function presentPatches(route: RegionalRoute): string[] {
+  const path = join(RECORDS_DIR, `${route}.ndjson`)
+  if (!existsSync(path)) return []
+  const raw = readFileSync(path, 'utf8')
+  const set = new Set<string>()
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    try {
+      const v = (JSON.parse(trimmed) as { v?: unknown }).v
+      if (typeof v === 'string') set.add(v)
+    } catch {
+      // パース不能行は無視（prune 側で保持される）。
+    }
+  }
+  return [...set]
 }
 
 // ---- ホスト構築ヘルパ ----
@@ -329,31 +356,73 @@ async function main(): Promise<void> {
 
   const meta = loadMeta()
 
-  for (const route of config.enabledRoutes) {
-    console.log(`\n=== ルート ${route} 収集開始 ===`)
-    const result = await collectRoute(route, deadlineMs, meta, emblemCtx, preloaded)
+  // ルート並列実行。RiotClient はホスト別リミッタを持つため1インスタンス共有で安全。
+  // 1ルートが例外で落ちても他ルートの結果を失わないよう allSettled を使う。
+  console.log(`\n=== ルート並列収集開始: ${config.enabledRoutes.join(', ')} ===`)
+  const settled = await Promise.allSettled(
+    config.enabledRoutes.map((route) =>
+      collectRoute(route, deadlineMs, meta, emblemCtx, preloaded).then(
+        (result) => ({ route, result }),
+      ),
+    ),
+  )
 
-    // ルート正常終了（打ち切り含む）→ meta 更新。
-    meta.routes[route] = { lastRunStartedAt: runStartedAt }
-    saveMeta(meta)
-
-    const elapsedSec = ((Date.now() - startWallMs) / 1000).toFixed(1)
-    const stats = client.stats()
-    console.log(`--- ルート ${route} サマリ ---`)
-    console.log(`  新規記録マッチ: ${result.newMatches}`)
-    console.log(`  フィルタ破棄: ${result.filteredOut}`)
-    console.log(`  dedupeスキップ: ${result.dedupeSkipped}`)
-    console.log(`  経過時間: ${elapsedSec}s`)
-    console.log(`  Riot統計(全体): req=${stats.total.requests} 429retry=${stats.total.retries429}`)
-    console.log(`  ステータス別: ${JSON.stringify(stats.total.byStatus)}`)
-    for (const [host, hs] of Object.entries(stats.byHost)) {
-      console.log(
-        `    [${host}] req=${hs.requests} 429retry=${hs.retries429} status=${JSON.stringify(hs.byStatus)}`,
-      )
+  // 成功ルートのみ meta 更新。saveMeta は全ルート完了後に1回だけ呼ぶ。
+  const routeResults: { route: RegionalRoute; result: RouteResult }[] = []
+  let anyRouteFailed = false
+  for (let i = 0; i < settled.length; i++) {
+    const route = config.enabledRoutes[i]
+    const s = settled[i]
+    if (s.status === 'fulfilled') {
+      routeResults.push(s.value)
+      meta.routes[route] = { lastRunStartedAt: runStartedAt }
+    } else {
+      anyRouteFailed = true
+      console.error(`[${route}] 収集中に例外: ${s.reason}`)
     }
+  }
+  saveMeta(meta)
+
+  // prune: ルートごとに records に出現するパッチを集め、上位2パッチのみ保持。
+  console.log('\n=== prune（旧パッチ削除） ===')
+  for (const route of config.enabledRoutes) {
+    const keep = patchesToKeep(presentPatches(route))
+    const { kept, dropped } = pruneRecords(route, keep)
+    console.log(
+      `  [${route}] 保持パッチ={${[...keep].join(', ')}} kept=${kept} dropped=${dropped}`,
+    )
+  }
+
+  // 最終サマリ（全ルート分まとめ）。
+  const elapsedSec = ((Date.now() - startWallMs) / 1000).toFixed(1)
+  const stats = client.stats()
+  console.log('\n=== 最終サマリ ===')
+  let totalNew = 0
+  let totalFiltered = 0
+  let totalDedupe = 0
+  for (const { route, result } of routeResults) {
+    totalNew += result.newMatches
+    totalFiltered += result.filteredOut
+    totalDedupe += result.dedupeSkipped
+    console.log(
+      `  [${route}] 新規=${result.newMatches} 破棄=${result.filteredOut} dedupe=${result.dedupeSkipped}`,
+    )
+  }
+  console.log(`  合計: 新規=${totalNew} 破棄=${totalFiltered} dedupe=${totalDedupe}`)
+  console.log(`  経過時間: ${elapsedSec}s`)
+  console.log(`  Riot統計(全体): req=${stats.total.requests} 429retry=${stats.total.retries429}`)
+  console.log(`  ステータス別: ${JSON.stringify(stats.total.byStatus)}`)
+  for (const [host, hs] of Object.entries(stats.byHost)) {
+    console.log(
+      `    [${host}] req=${hs.requests} 429retry=${hs.retries429} status=${JSON.stringify(hs.byStatus)}`,
+    )
   }
 
   console.log('\n収集完了。')
+  if (anyRouteFailed) {
+    console.error('一部ルートが失敗しました（成功ルートの meta は保存済み）。exit 1。')
+    process.exit(1)
+  }
 }
 
 await main()
