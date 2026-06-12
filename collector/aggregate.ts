@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSy
 import { dirname, join, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { config } from './config.ts'
+import { pickTargetPatch, compareVersions } from './patches.ts'
 import { getStaticData, type StaticData } from './cdragon.ts'
 import type {
   ParticipantRecord,
@@ -87,14 +88,37 @@ async function main(): Promise<void> {
   }
   console.log(`重複ガード: ${dupSkipped} 件スキップ → ${deduped.length} レコード`)
 
-  // 3. パッチ選定（最多レコード数のパッチ）
-  const patchCounts = new Map<string, number>()
-  for (const lr of deduped) patchCounts.set(lr.rec.v, (patchCounts.get(lr.rec.v) ?? 0) + 1)
-  const patchEntries = [...patchCounts.entries()].sort((a, b) => b[1] - a[1])
-  console.log('パッチ分布:')
-  for (const [v, c] of patchEntries) console.log(`  ${v}: ${c}`)
-  const targetPatch = patchEntries[0][0]
-  console.log(`対象パッチ: ${targetPatch}`)
+  // 3. パッチ選定（ヒステリシス: ユニークマッチ数 >= threshold の最新パッチ）
+  // マッチ数はレコード数ではなくユニークマッチID数で数える。
+  const patchRecordCounts = new Map<string, number>()
+  const patchMatchSets = new Map<string, Set<string>>()
+  for (const lr of deduped) {
+    patchRecordCounts.set(lr.rec.v, (patchRecordCounts.get(lr.rec.v) ?? 0) + 1)
+    let set = patchMatchSets.get(lr.rec.v)
+    if (!set) {
+      set = new Set<string>()
+      patchMatchSets.set(lr.rec.v, set)
+    }
+    set.add(lr.rec.m)
+  }
+  const matchCountByPatch = new Map<string, number>()
+  for (const [v, set] of patchMatchSets) matchCountByPatch.set(v, set.size)
+
+  const patchEntries = [...patchRecordCounts.entries()].sort((a, b) =>
+    compareVersions(b[0], a[0]),
+  )
+  console.log(`パッチ分布（ヒステリシス閾値=${config.patchSwitchThreshold} ユニークマッチ）:`)
+  for (const [v, recCount] of patchEntries) {
+    const matches = matchCountByPatch.get(v) ?? 0
+    const meets = matches >= config.patchSwitchThreshold ? '達' : '未達'
+    console.log(`  ${v}: ユニークマッチ=${matches} (${meets}) / レコード=${recCount}`)
+  }
+  const targetPatch = pickTargetPatch(matchCountByPatch, config.patchSwitchThreshold)
+  if (targetPatch === null) {
+    console.error('対象パッチを選定できません（レコードが空）。')
+    process.exit(1)
+  }
+  console.log(`対象パッチ（ヒステリシス選定）: ${targetPatch}`)
 
   const target = deduped.filter((lr) => lr.rec.v === targetPatch)
 

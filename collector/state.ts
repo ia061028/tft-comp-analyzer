@@ -77,3 +77,52 @@ export function appendRecords(route: string, records: ParticipantRecord[]): void
   ensureDirs()
   appendFileSync(recordsPath(route), records.map((r) => JSON.stringify(r) + '\n').join(''))
 }
+
+/**
+ * NDJSON 内容を `v`（パッチ）が keep に含まれる行だけ残してフィルタする純関数。
+ * - パース不能行は保持（安全側）。
+ * - `v` が無い／keep 外の行は dropped としてカウント。
+ * 末尾の改行有無は元コンテンツに合わせる（dropped が 0 ならそもそも書き換えない方針）。
+ */
+export function filterNdjsonByPatch(
+  content: string,
+  keep: Set<string>,
+): { out: string; kept: number; dropped: number } {
+  let kept = 0
+  let dropped = 0
+  const keptLines: string[] = []
+  for (const line of content.split('\n')) {
+    if (line.trim() === '') continue
+    let v: unknown
+    try {
+      v = (JSON.parse(line) as { v?: unknown }).v
+    } catch {
+      // パース不能行は保持（安全側）。
+      keptLines.push(line)
+      kept++
+      continue
+    }
+    if (typeof v === 'string' && keep.has(v)) {
+      keptLines.push(line)
+      kept++
+    } else {
+      dropped++
+    }
+  }
+  const out = keptLines.length > 0 ? keptLines.join('\n') + '\n' : ''
+  return { out, kept, dropped }
+}
+
+/**
+ * records/{route}.ndjson を読み、`v` が keep に含まれる行だけ残して書き換える。
+ * dropped が 0 ならファイルに触らない（append-only を維持し git delta を保つ）。
+ * ファイルが存在しなければ何もしない。
+ */
+export function pruneRecords(route: string, keep: Set<string>): { kept: number; dropped: number } {
+  const path = recordsPath(route)
+  if (!existsSync(path)) return { kept: 0, dropped: 0 }
+  const content = readFileSync(path, 'utf8')
+  const { out, kept, dropped } = filterNdjsonByPatch(content, keep)
+  if (dropped > 0) writeFileSync(path, out)
+  return { kept, dropped }
+}

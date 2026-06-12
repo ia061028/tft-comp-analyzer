@@ -20,8 +20,8 @@ export const PLATFORM_TO_ROUTE: Record<string, RegionalRoute> = {
 }
 
 export const config = {
-  /** 有効なリージョナルルート。Phase 2 は sea のみ、Phase 5 で4ルートに拡大 */
-  enabledRoutes: ['sea'] as RegionalRoute[],
+  /** 有効なリージョナルルート。Phase 5 で全4ルート（全15プラットフォーム）に拡大。 */
+  enabledRoutes: ['americas', 'asia', 'europe', 'sea'] as RegionalRoute[],
   /** マッチID取得時の count パラメータ */
   matchIdsPerPlayer: 20,
   /** 1ルート1実行あたりの新規マッチ詳細取得の上限 */

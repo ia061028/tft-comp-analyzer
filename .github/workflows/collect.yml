@@ -1,0 +1,57 @@
+name: collect
+
+on:
+  schedule:
+    # 6時間ごと（自分のコミットでは再発火しない: schedule + workflow_dispatch のみ）
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # collect は冒頭に認証プリフライトを行い、キー失効（401/403）なら
+      # state に触れる前に exit 1 → このジョブが赤失敗し、コミットは発生しない。
+      - name: collect
+        run: npm run collect
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+
+      - name: aggregate
+        run: npm run aggregate
+
+      - name: commit & push（rebaseリトライ付き）
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/state public/data/stats.json
+          if git diff --cached --quiet; then
+            echo "変更なし。コミットをスキップ。"
+            exit 0
+          fi
+          git commit -m "chore: collect $(date -u +%FT%TZ)"
+          for i in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            echo "push 失敗（$i 回目）。pull --rebase して再試行。"
+            git pull --rebase
+          done
+          exit 1
