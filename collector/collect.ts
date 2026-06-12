@@ -21,7 +21,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ParticipantRecord } from '../shared/types.ts'
 
-const apiKey = process.env.RIOT_API_KEY
+// trim はBOM（U+FEFF）や末尾改行も除去する。CI Secret 経由の混入への防御。
+const apiKey = process.env.RIOT_API_KEY?.trim()
 if (!apiKey) {
   console.error('RIOT_API_KEY が未設定です。.env を確認してください（.env.example 参照）')
   process.exit(1)
