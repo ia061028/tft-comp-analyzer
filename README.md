@@ -1,73 +1,29 @@
-# React + TypeScript + Vite
+# TFT 紋章構成アナライザー
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+TFT（Teamfight Tactics）のプレイ支援用Webアプリ。Riot APIから高ランク帯（Master以上）の戦績を6時間ごとに自動収集し、紋章を複数選択（重複可）→ その紋章セットを使った構成を Top4率/1位率でランキング表示する自分専用ツール。
 
-Currently, two official plugins are available:
+設計・フェーズ計画の詳細は [PLAN.md](PLAN.md) を参照。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## セットアップ
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+npm install
+cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.com、開発キーは24hで失効）
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## コマンド
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| コマンド | 内容 |
+|---|---|
+| `npm run dev` | フロントエンド開発サーバー |
+| `npm run build` | 本番ビルド（tsc + vite） |
+| `npm run collect` | Riot APIからマッチ収集 → `data/state/` に追記 |
+| `npm run aggregate` | `data/state/` → `public/data/stats.json` 集計（Phase 3で実装） |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 計測メモ
+
+### stateサイズ（Phase 2 実測, 2026-06-12, SEAルート）
+
+- 1,000マッチ（=8,000参加者レコード）あたり: `records/sea.ndjson` 約3.1MB、`seen/sea.ndjson` 約17KB
+- 1回のフルラン（25分・上限1000マッチ）の実績: リクエスト1,242件・429ゼロ・実効約49req/分（リージョナルルート）
+- **注意**: PLAN.md の見積り（10〜30MB/パッチ）より大きい。全4ルート×4回/日のフル稼働だと約50MB/日 → 1パッチ（約2週間）で数百MB規模になりうる。Phase 5 で `maxNewMatchesPerRoutePerRun` の調整またはレコード圧縮（apiNameのセットプレフィックス除去など）を検討すること。
