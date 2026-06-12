@@ -178,7 +178,7 @@ async function buildPuuidPool(
   }
 
   const pool = shuffle([...puuids])
-  console.log(`  プールサイズ（重複排除後・シャッフル済み）: ${pool.length}`)
+  console.log(`  [${route}] プールサイズ（重複排除後・シャッフル済み）: ${pool.length}`)
   return pool
 }
 

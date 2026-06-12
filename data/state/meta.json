@@ -2,7 +2,16 @@
   "schemaVersion": 1,
   "routes": {
     "sea": {
-      "lastRunStartedAt": 1781271824
+      "lastRunStartedAt": 1781276883
+    },
+    "americas": {
+      "lastRunStartedAt": 1781276883
+    },
+    "asia": {
+      "lastRunStartedAt": 1781276883
+    },
+    "europe": {
+      "lastRunStartedAt": 1781276883
     }
   }
 }
