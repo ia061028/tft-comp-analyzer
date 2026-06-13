@@ -29,7 +29,7 @@ function App() {
       .then((stats) => {
         if (cancelled) return
         setLoad({ status: 'ready', stats })
-        setMinSample((cur) => (cur === null ? stats.config.minSampleDefault : cur))
+        setMinSample((cur) => (cur === null ? (stats.config.emblemMinSample ?? 5) : cur))
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -69,12 +69,12 @@ function App() {
   }
 
   const stats = load.stats
-  // スライダー基準値。紋章選択中は対象サンプルが小さくなるため実効閾値を緩和する。
-  // emblemMinSample は古い stats.json には無い場合があるためフォールバックを置く。
-  const baseMinSample = minSample ?? stats.config.minSampleDefault
+  // 構成一覧は紋章選択時のみ表示（emblem-gated）なので、スライダー値を直接しきい値(n>=値)に使う。
+  // 範囲は 1〜emblemMinSample+1（=6）。それ以上は紋章フィルタ下では意味が無いため上限を絞る。
   const emblemMinSample = stats.config.emblemMinSample ?? 5
-  const appliedMinSample =
-    selection.length > 0 ? Math.min(baseMinSample, emblemMinSample) : baseMinSample
+  const freqMin = 1
+  const freqMax = emblemMinSample + 1
+  const minSampleVal = Math.min(Math.max(minSample ?? emblemMinSample, freqMin), freqMax)
 
   // 表示する構成: 全体 or レベル別（古い stats.json に compsByLevel が無い場合は空配列）。
   const selectedComps =
@@ -180,20 +180,13 @@ function App() {
             <span className="shrink-0">{t(lang, 'frequency')}</span>
             <input
               type="range"
-              min={0}
-              max={100}
-              value={baseMinSample}
+              min={freqMin}
+              max={freqMax}
+              value={minSampleVal}
               onChange={(e) => setMinSample(Number(e.target.value))}
-              className="w-48 accent-amber-400"
+              className="w-32 accent-amber-400"
             />
-            <span className="w-8 text-right tabular-nums text-zinc-100">
-              {baseMinSample}
-            </span>
-            {selection.length > 0 && appliedMinSample !== baseMinSample && (
-              <span className="text-xs text-amber-300/80">
-                {t(lang, 'emblemSelectedFreq', { x: appliedMinSample })}
-              </span>
-            )}
+            <span className="w-6 text-right tabular-nums text-zinc-100">{minSampleVal}</span>
           </label>
         </div>
       </header>
@@ -217,7 +210,7 @@ function App() {
             comps={selectedComps}
             sel={selection}
             sortKey={sortKey}
-            minSample={appliedMinSample}
+            minSample={minSampleVal}
             lang={lang}
           />
         </main>
