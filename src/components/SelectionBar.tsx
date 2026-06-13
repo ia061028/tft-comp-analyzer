@@ -1,5 +1,5 @@
 import type { EmblemInfo } from '../../shared/types'
-import { pickName, type Lang } from '../lib/i18n'
+import { pickName, t, type Lang } from '../lib/i18n'
 
 interface SelectionBarProps {
   emblems: EmblemInfo[]
@@ -17,7 +17,7 @@ export function SelectionBar({ emblems, counts, lang, onClear }: SelectionBarPro
   if (selected.length === 0) {
     return (
       <div className="rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-400">
-        紋章を選択すると、その紋章を使う構成が表示されます
+        {t(lang, 'selectEmblemHint')}
       </div>
     )
   }
@@ -50,7 +50,7 @@ export function SelectionBar({ emblems, counts, lang, onClear }: SelectionBarPro
         onClick={onClear}
         className="ml-auto shrink-0 rounded border border-zinc-700 px-2 py-1 text-sm text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800"
       >
-        クリア
+        {t(lang, 'clear')}
       </button>
     </div>
   )

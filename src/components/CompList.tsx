@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { CompStats, StatsFile, UnitInfo } from '../../shared/types'
 import { aggregateComp } from '../lib/multiset'
-import { pickName, type Lang } from '../lib/i18n'
+import { pickName, t, type Lang } from '../lib/i18n'
 
 type SortKey = 'place' | 'top4' | 'win' | 'pick'
 
@@ -96,7 +96,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
   if (sel.length === 0) {
     return (
       <div className="rounded-md border border-zinc-800 bg-zinc-900/40 px-4 py-12 text-center text-sm text-zinc-400">
-        左の紋章を選択すると、その紋章を使う構成が表示されます
+        {t(lang, 'selectEmblemHintLeft')}
       </div>
     )
   }
@@ -131,7 +131,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
   if (rows.length === 0) {
     return (
       <div className="rounded-md border border-zinc-800 bg-zinc-900/40 px-4 py-8 text-center text-sm text-zinc-400">
-        条件に一致する構成がありません（頻度 {minSample} 以上）
+        {t(lang, 'noComps', { x: minSample })}
       </div>
     )
   }
@@ -174,7 +174,11 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
             {/* ティアバッジ */}
             <div
               className={`flex w-12 shrink-0 items-center justify-center rounded-md text-2xl font-black ${tier.classes}`}
-              title={hasPlace ? `平均順位 ${avgPlace.toFixed(2)}` : '平均順位データなし'}
+              title={
+                hasPlace
+                  ? t(lang, 'tierTitle', { x: avgPlace.toFixed(2) })
+                  : t(lang, 'tierNoData')
+              }
             >
               {tier.label}
             </div>
@@ -184,6 +188,9 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
                 <span className="mr-1 truncate text-base font-semibold text-zinc-100">
                   {compName}
+                </span>
+                <span className="shrink-0 rounded bg-zinc-700/70 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-200">
+                  {t(lang, 'activeTraits', { n: (comp.synergies ?? comp.traits).length })}
                 </span>
                 {(comp.synergies ?? comp.traits).map(([traitIdx, style]) => {
                   const trait = traits[traitIdx]
@@ -279,7 +286,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
             {/* 指標ブロック */}
             <div className="flex w-36 shrink-0 flex-col justify-center gap-0.5">
               <div className="mb-0.5 flex items-baseline justify-between gap-2 px-1.5">
-                <span className="text-[11px] text-zinc-400">平均</span>
+                <span className="text-[11px] text-zinc-400">{t(lang, 'avg')}</span>
                 <span
                   className={`text-2xl font-bold tabular-nums ${
                     sortKey === 'place' ? 'text-amber-300' : 'text-zinc-100'
@@ -288,17 +295,17 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
                   {hasPlace ? avgPlace.toFixed(2) : '—'}
                 </span>
               </div>
-              {metricCell(sortKey === 'top4', 'Top4', pct(agg.top4, agg.n))}
-              {metricCell(sortKey === 'win', '1位', pct(agg.win, agg.n))}
-              {metricCell(sortKey === 'pick', 'Pick', `${(pickRate * 100).toFixed(2)}%`)}
+              {metricCell(sortKey === 'top4', t(lang, 'metricTop4'), pct(agg.top4, agg.n))}
+              {metricCell(sortKey === 'win', t(lang, 'metricWin'), pct(agg.win, agg.n))}
+              {metricCell(sortKey === 'pick', t(lang, 'metricPick'), `${(pickRate * 100).toFixed(2)}%`)}
               <div className="px-1.5 text-right text-[11px] text-zinc-500">n={agg.n}</div>
               <button
                 type="button"
                 onClick={() => copy(key, code)}
                 className="mt-0.5 rounded border border-zinc-700 px-1.5 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800"
-                title="チームプランナーに貼り付けるコードをコピー"
+                title={t(lang, 'copyCodeTitle')}
               >
-                {copiedKey === key ? 'コピーしました' : '構成コードをコピー'}
+                {copiedKey === key ? t(lang, 'copied') : t(lang, 'copyCode')}
               </button>
             </div>
           </div>

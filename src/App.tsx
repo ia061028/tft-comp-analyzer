@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { StatsFile } from '../shared/types'
-import type { Lang } from './lib/i18n'
+import { t, type Lang } from './lib/i18n'
 import { loadStats } from './lib/data'
 import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
@@ -44,7 +44,7 @@ function App() {
   if (load.status === 'loading') {
     return (
       <div className="flex h-screen items-center justify-center text-zinc-400">
-        読み込み中…
+        {t(lang, 'loading')}
       </div>
     )
   }
@@ -52,7 +52,8 @@ function App() {
   if (load.status === 'error') {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 text-zinc-300">
-        <p className="text-sm text-red-400">{load.message}</p>
+        <p className="text-sm font-semibold text-zinc-200">{t(lang, 'loadFailed')}</p>
+        <p className="text-xs text-red-400">{load.message}</p>
         <button
           type="button"
           onClick={() => {
@@ -61,7 +62,7 @@ function App() {
           }}
           className="rounded border border-zinc-600 px-3 py-1.5 text-sm hover:bg-zinc-800"
         >
-          再試行
+          {t(lang, 'retry')}
         </button>
       </div>
     )
@@ -100,31 +101,32 @@ function App() {
     <div className="flex h-screen flex-col">
       <header className="border-b border-zinc-800 px-4 py-3">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h1 className="text-xl font-bold text-zinc-100">TFT 紋章構成アナライザー</h1>
+          <h1 className="text-xl font-bold text-zinc-100">{t(lang, 'title')}</h1>
           <span className="text-sm text-zinc-400">
             Set {stats.setNumber} ・ TFT {stats.tftPatch ?? stats.patch}
           </span>
           <span className="text-sm text-zinc-400">
-            {stats.totals.matches.toLocaleString()} マッチ
+            {t(lang, 'matchesCount', { n: stats.totals.matches.toLocaleString() })}
           </span>
-          <span className="text-xs text-zinc-500">生成 {generatedAt}</span>
+          <span className="text-xs text-zinc-500">{t(lang, 'generated', { time: generatedAt })}</span>
           <button
             type="button"
             onClick={() => setLang((l) => (l === 'ja' ? 'en' : 'ja'))}
-            className="ml-auto rounded border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-800"
-            title="表示言語を切替"
+            className="ml-auto inline-flex items-center gap-1 rounded border border-zinc-600 bg-zinc-800/60 px-2.5 py-1 text-xs font-semibold text-zinc-200 hover:border-zinc-400 hover:bg-zinc-800"
+            title={t(lang, 'langSwitchTitle')}
           >
-            {lang === 'ja' ? '日本語' : 'EN'}
+            <span aria-hidden>🌐</span>
+            {lang === 'ja' ? 'EN' : 'JP'}
           </button>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-6">
           <div className="flex items-center gap-2 text-sm text-zinc-300">
-            <span className="shrink-0">レベル</span>
+            <span className="shrink-0">{t(lang, 'level')}</span>
             <div className="inline-flex overflow-hidden rounded border border-zinc-700">
               {(
                 [
-                  ['all', '全体'],
+                  ['all', t(lang, 'all')],
                   ['7', 'Lv7'],
                   ['8', 'Lv8'],
                   ['9', 'Lv9'],
@@ -148,14 +150,14 @@ function App() {
           </div>
 
           <div className="flex items-center gap-2 text-sm text-zinc-300">
-            <span className="shrink-0">並び替え</span>
+            <span className="shrink-0">{t(lang, 'sort')}</span>
             <div className="inline-flex overflow-hidden rounded border border-zinc-700">
               {(
                 [
-                  ['place', '平均順位'],
-                  ['top4', 'Top4率'],
-                  ['win', '1位率'],
-                  ['pick', 'Pick率'],
+                  ['place', t(lang, 'sortPlace')],
+                  ['top4', t(lang, 'sortTop4')],
+                  ['win', t(lang, 'sortWin')],
+                  ['pick', t(lang, 'sortPick')],
                 ] as const
               ).map(([key, label]) => (
                 <button
@@ -175,7 +177,7 @@ function App() {
           </div>
 
           <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <span className="shrink-0">頻度</span>
+            <span className="shrink-0">{t(lang, 'frequency')}</span>
             <input
               type="range"
               min={0}
@@ -189,7 +191,7 @@ function App() {
             </span>
             {selection.length > 0 && appliedMinSample !== baseMinSample && (
               <span className="text-xs text-amber-300/80">
-                紋章選択中: 頻度 {appliedMinSample}
+                {t(lang, 'emblemSelectedFreq', { x: appliedMinSample })}
               </span>
             )}
           </label>
@@ -198,7 +200,7 @@ function App() {
 
       <div className="flex min-h-0 flex-1">
         <aside className="w-[400px] shrink-0 overflow-y-auto border-r border-zinc-800 p-3">
-          <h2 className="mb-2 text-sm font-semibold text-zinc-400">紋章</h2>
+          <h2 className="mb-2 text-sm font-semibold text-zinc-400">{t(lang, 'emblems')}</h2>
           <EmblemGrid
             emblems={stats.emblems}
             counts={counts}
