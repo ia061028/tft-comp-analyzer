@@ -5,7 +5,7 @@ import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
 import { CompList } from './components/CompList'
 
-type Metric = 'top4' | 'win'
+type SortKey = 'place' | 'top4' | 'win' | 'pick'
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
@@ -16,7 +16,7 @@ function App() {
   const [reloadKey, setReloadKey] = useState(0)
 
   const [selection, setSelection] = useState<number[]>([])
-  const [metric, setMetric] = useState<Metric>('top4')
+  const [sortKey, setSortKey] = useState<SortKey>('place')
   const [minSample, setMinSample] = useState<number | null>(null)
 
   useEffect(() => {
@@ -103,21 +103,31 @@ function App() {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-6">
-          <div className="inline-flex overflow-hidden rounded border border-zinc-700">
-            {(['top4', 'win'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMetric(m)}
-                className={`px-3 py-1 text-sm ${
-                  metric === m
-                    ? 'bg-amber-400 font-semibold text-zinc-950'
-                    : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
-                }`}
-              >
-                {m === 'top4' ? 'Top4率' : '1位率'}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 text-sm text-zinc-300">
+            <span className="shrink-0">並び替え</span>
+            <div className="inline-flex overflow-hidden rounded border border-zinc-700">
+              {(
+                [
+                  ['place', '平均順位'],
+                  ['top4', 'Top4率'],
+                  ['win', '1位率'],
+                  ['pick', 'Pick率'],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSortKey(key)}
+                  className={`px-3 py-1 text-sm ${
+                    sortKey === key
+                      ? 'bg-amber-400 font-semibold text-zinc-950'
+                      : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -158,7 +168,7 @@ function App() {
           <CompList
             stats={stats}
             sel={selection}
-            metric={metric}
+            sortKey={sortKey}
             minSample={appliedMinSample}
           />
         </main>

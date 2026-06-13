@@ -50,6 +50,8 @@ export interface EmblemRow {
   n: number
   top4: number
   win: number
+  /** この行の順位(placement)合計。平均順位 = p / n */
+  p: number
 }
 
 export interface CompStats {

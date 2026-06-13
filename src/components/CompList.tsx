@@ -1,12 +1,12 @@
 import type { StatsFile } from '../../shared/types'
 import { aggregateComp } from '../lib/multiset'
 
-type Metric = 'top4' | 'win'
+type SortKey = 'place' | 'top4' | 'win' | 'pick'
 
 interface CompListProps {
   stats: StatsFile
   sel: number[]
-  metric: Metric
+  sortKey: SortKey
   minSample: number
 }
 
@@ -40,24 +40,49 @@ function costBorder(cost: number): string {
   }
 }
 
+/**
+ * 平均順位 → ティア。しきい値は現行データの分布（中央値≈4.3, p10≈3.3, p90≈5.7）に
+ * 合わせて各ティアが偏らないよう設定（後で調整可）。
+ */
+function tierOf(avgPlace: number): { label: string; classes: string } {
+  if (avgPlace <= 3.5) return { label: 'S', classes: 'bg-amber-400 text-zinc-950' }
+  if (avgPlace <= 4.0) return { label: 'A', classes: 'bg-fuchsia-400 text-zinc-950' }
+  if (avgPlace <= 4.5) return { label: 'B', classes: 'bg-sky-400 text-zinc-950' }
+  if (avgPlace <= 5.2) return { label: 'C', classes: 'bg-green-400 text-zinc-950' }
+  return { label: 'D', classes: 'bg-zinc-600 text-zinc-100' }
+}
+
 function pct(num: number, den: number): string {
   if (den === 0) return '0.0%'
   return `${((num / den) * 100).toFixed(1)}%`
 }
 
-export function CompList({ stats, sel, metric, minSample }: CompListProps) {
-  const { comps, traits, units, emblems } = stats
+export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
+  const { comps, traits, units, emblems, totals } = stats
 
   // 選択中の紋章（重複を除いた登場順）。装備者表示に使う。
   const selectedEmblems = [...new Set(sel)]
 
   const rows = comps
-    .map((comp) => ({ comp, agg: aggregateComp(comp, sel) }))
+    .map((comp) => {
+      const agg = aggregateComp(comp, sel)
+      const avgPlace = agg.n > 0 ? agg.p / agg.n : 0
+      const pickRate = totals.participants > 0 ? agg.n / totals.participants : 0
+      return { comp, agg, avgPlace, pickRate }
+    })
     .filter(({ agg }) => agg.n > 0 && agg.n >= minSample)
     .sort((a, b) => {
-      const av = a.agg[metric] / a.agg.n
-      const bv = b.agg[metric] / b.agg.n
-      return bv - av
+      switch (sortKey) {
+        case 'place':
+          return a.avgPlace - b.avgPlace // 昇順（小さいほど良い）
+        case 'win':
+          return b.agg.win / b.agg.n - a.agg.win / a.agg.n
+        case 'pick':
+          return b.pickRate - a.pickRate
+        case 'top4':
+        default:
+          return b.agg.top4 / b.agg.n - a.agg.top4 / a.agg.n
+      }
     })
 
   if (rows.length === 0) {
@@ -70,22 +95,37 @@ export function CompList({ stats, sel, metric, minSample }: CompListProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      {rows.map(({ comp, agg }, rank) => {
-        const primary = pct(agg[metric], agg.n)
-        const secondaryMetric: Metric = metric === 'top4' ? 'win' : 'top4'
-        const secondary = pct(agg[secondaryMetric], agg.n)
-        const secondaryLabel = secondaryMetric === 'top4' ? 'Top4' : '1位'
+      {rows.map(({ comp, agg, avgPlace, pickRate }) => {
+        const tier = tierOf(avgPlace)
+        const metricCell = (active: boolean, label: string, value: string) => (
+          <div
+            className={`flex items-baseline justify-between gap-2 rounded px-1.5 py-0.5 ${
+              active ? 'bg-amber-400/10 text-amber-200' : 'text-zinc-400'
+            }`}
+          >
+            <span className="text-[11px]">{label}</span>
+            <span className="text-xs font-semibold tabular-nums text-zinc-100">{value}</span>
+          </div>
+        )
         return (
           <div
             key={comp.label + '|' + comp.traits.map((t) => t[0]).join(',')}
-            className="flex items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2"
+            className="flex items-stretch gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2"
           >
-            <div className="w-8 shrink-0 text-center text-lg font-bold text-zinc-500">
-              {rank + 1}
+            {/* ティアバッジ */}
+            <div
+              className={`flex w-9 shrink-0 items-center justify-center rounded-md text-xl font-black ${tier.classes}`}
+              title={`平均順位 ${avgPlace.toFixed(2)}`}
+            >
+              {tier.label}
             </div>
 
+            {/* 構成本体 */}
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex flex-wrap items-center gap-1">
+                <span className="mr-1 truncate text-sm font-semibold text-zinc-100">
+                  {comp.label}
+                </span>
                 {comp.traits.map(([traitIdx, style]) => {
                   const trait = traits[traitIdx]
                   return (
@@ -164,12 +204,22 @@ export function CompList({ stats, sel, metric, minSample }: CompListProps) {
               )}
             </div>
 
-            <div className="shrink-0 text-right">
-              <div className="text-2xl font-bold text-zinc-100">{primary}</div>
-              <div className="text-xs text-zinc-400">
-                {secondaryLabel} {secondary}
+            {/* 指標ブロック */}
+            <div className="flex w-32 shrink-0 flex-col justify-center gap-0.5">
+              <div className="mb-0.5 flex items-baseline justify-between gap-2 px-1.5">
+                <span className="text-[11px] text-zinc-400">平均</span>
+                <span
+                  className={`text-2xl font-bold tabular-nums ${
+                    sortKey === 'place' ? 'text-amber-300' : 'text-zinc-100'
+                  }`}
+                >
+                  {avgPlace.toFixed(2)}
+                </span>
               </div>
-              <div className="text-xs text-zinc-500">n={agg.n}</div>
+              {metricCell(sortKey === 'top4', 'Top4', pct(agg.top4, agg.n))}
+              {metricCell(sortKey === 'win', '1位', pct(agg.win, agg.n))}
+              {metricCell(sortKey === 'pick', 'Pick', `${(pickRate * 100).toFixed(2)}%`)}
+              <div className="px-1.5 text-right text-[11px] text-zinc-500">n={agg.n}</div>
             </div>
           </div>
         )

@@ -154,8 +154,8 @@ async function main(): Promise<void> {
     styleLists: Map<string, number[]>
     // unit apiName → 出現回数
     unitCounts: Map<string, number>
-    // 紋章マルチセット（emblem apiName ソート済み JSON）→ 集計
-    rows: Map<string, { emblems: string[]; n: number; top4: number; win: number }>
+    // 紋章マルチセット（emblem apiName ソート済み JSON）→ 集計（p=順位合計）
+    rows: Map<string, { emblems: string[]; n: number; top4: number; win: number; p: number }>
     // 紋章 apiName → 装備ユニット(character_id) → 回数（holder 集計用、eh ありレコードのみ）
     holderCounts: Map<string, Map<string, number>>
   }
@@ -255,12 +255,13 @@ async function main(): Promise<void> {
     const rowKey = activeEmblems.join('|')
     let row = acc.rows.get(rowKey)
     if (!row) {
-      row = { emblems: activeEmblems, n: 0, top4: 0, win: 0 }
+      row = { emblems: activeEmblems, n: 0, top4: 0, win: 0, p: 0 }
       acc.rows.set(rowKey, row)
     }
     row.n++
     if (rec.p <= 4) row.top4++
     if (rec.p === 1) row.win++
+    row.p += rec.p
   }
 
   console.log(`クラスタ数: ${clusters.size}`)
@@ -281,7 +282,7 @@ async function main(): Promise<void> {
     win: number
     traitModeStyle: Map<string, number>
     unitApis: string[] // 上位8（コスト/名前順は後で）
-    rows: { emblems: string[]; n: number; top4: number; win: number }[]
+    rows: { emblems: string[]; n: number; top4: number; win: number; p: number }[]
     // 紋章ごとの最頻装備ユニット: [emblemApi, holderApi, count]
     holders: [string, string, number][]
   }
@@ -440,7 +441,7 @@ async function main(): Promise<void> {
     const rows: EmblemRow[] = pc.rows
       .map((r): EmblemRow => {
         const e = r.emblems.map((api) => emblemIndex.get(api)!).sort((x, y) => x - y)
-        return { e, n: r.n, top4: r.top4, win: r.win }
+        return { e, n: r.n, top4: r.top4, win: r.win, p: r.p }
       })
       .sort((a, b) => {
         // 決定的順序: 空マルチセット先頭、その後 e の辞書順。
