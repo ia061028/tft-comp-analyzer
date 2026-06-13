@@ -65,11 +65,11 @@ function App() {
 
   const stats = load.stats
   // スライダー基準値。紋章選択中は対象サンプルが小さくなるため実効閾値を緩和する。
+  // emblemMinSample は古い stats.json には無い場合があるためフォールバックを置く。
   const baseMinSample = minSample ?? stats.config.minSampleDefault
+  const emblemMinSample = stats.config.emblemMinSample ?? 5
   const appliedMinSample =
-    selection.length > 0
-      ? Math.min(baseMinSample, stats.config.emblemMinSample)
-      : baseMinSample
+    selection.length > 0 ? Math.min(baseMinSample, emblemMinSample) : baseMinSample
 
   // selection は emblems 配列インデックスのマルチセット。counts[index] = 個数。
   const counts = stats.emblems.map(() => 0)
