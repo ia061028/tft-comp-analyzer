@@ -6,6 +6,7 @@ const CDRAGON_URL = 'https://raw.communitydragon.org/latest/cdragon/tft/en_us.js
 interface CDragonItem {
   apiName?: string
   associatedTraits?: string[]
+  incompatibleTraits?: string[]
   name?: string
   icon?: string
 }
@@ -37,7 +38,7 @@ interface CDragonData {
 }
 
 export interface EmblemContext {
-  /** associatedTraits が非空のアイテム（＝紋章）の apiName 集合。 */
+  /** incompatibleTraits が非空のアイテム（＝紋章/スパチュラ系）の apiName 集合。 */
   emblemSet: Set<string>
   /** items 全体の apiName 集合（CDragon が知っている全アイテム）。 */
   knownItems: Set<string>
@@ -46,7 +47,10 @@ export interface EmblemContext {
 /**
  * 紋章判定用コンテキストを取得する。
  * 名前の正規表現マッチは禁止（紋章 apiName はセット固有で不規則）。
- * associatedTraits が非空配列のアイテムのみを紋章とみなす。
+ * 紋章は「装備者にトレイトを付与する」アイテムで、その付与トレイトは
+ * incompatibleTraits（同トレイト重複防止のため記載）に入る。associatedTraits は
+ * オーグメントや Anima Squad 系アイテム等にも付くため紋章判定には使えない。
+ * よって incompatibleTraits が非空のアイテムのみを紋章とみなす。
  */
 export async function getEmblemContext(): Promise<EmblemContext> {
   const res = await fetch(CDRAGON_URL)
@@ -61,7 +65,7 @@ export async function getEmblemContext(): Promise<EmblemContext> {
   for (const item of items) {
     if (!item.apiName) continue
     knownItems.add(item.apiName)
-    if (Array.isArray(item.associatedTraits) && item.associatedTraits.length > 0) {
+    if (Array.isArray(item.incompatibleTraits) && item.incompatibleTraits.length > 0) {
       emblemSet.add(item.apiName)
     }
   }
@@ -85,7 +89,7 @@ export interface StaticData {
   traits: Map<string, { name: string; icon: string }>
   /** champions apiName → 表示名・コスト・アイコンURL */
   units: Map<string, { name: string; cost: number; icon: string }>
-  /** 紋章(associatedTraits 非空のアイテム) apiName → 表示名・解決済み traitApi・アイコンURL */
+  /** 紋章(incompatibleTraits で付与トレイトを示すアイテム) apiName → 表示名・解決済み traitApi・アイコンURL */
   emblems: Map<string, { name: string; traitApi: string; icon: string }>
   warnings: string[]
 }
@@ -150,20 +154,31 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
     units.set(c.apiName, { name: c.name ?? c.apiName, cost: c.cost ?? 0, icon })
   }
 
-  // emblems（associatedTraits 非空のアイテム）
+  // emblems（incompatibleTraits で付与トレイトを示すアイテム）
+  // 付与トレイトが選定セットのトレイトに解決できるものだけを紋章として採用する。
+  // これにより他セットのスパチュラ系アイテムや、別機構（オーグメント/Anima 系）は自然に除外される。
   const emblems = new Map<string, { name: string; traitApi: string; icon: string }>()
-  const unresolvedEmblems: string[] = []
+  let unresolvedEmblemCount = 0
   for (const item of data.items ?? []) {
     if (!item.apiName) continue
-    const at = item.associatedTraits
-    if (!Array.isArray(at) || at.length === 0) continue
-    const raw = at[0]
-    // apiName 完全一致 → 表示名一致 の順で解決。
+    const incompat = item.incompatibleTraits
+    if (!Array.isArray(incompat) || incompat.length === 0) continue
+    // incompatibleTraits は付与トレイトの apiName（Stargazer 等は先頭が基底トレイト）。
+    // apiName 完全一致 → 表示名一致 の順で、選定セットのトレイトに解決する。
     let traitApi: string | undefined
-    if (traits.has(raw)) traitApi = raw
-    else if (traitNameToApi.has(raw)) traitApi = traitNameToApi.get(raw)
+    for (const raw of incompat) {
+      if (traits.has(raw)) {
+        traitApi = raw
+        break
+      }
+      if (traitNameToApi.has(raw)) {
+        traitApi = traitNameToApi.get(raw)
+        break
+      }
+    }
     if (!traitApi) {
-      unresolvedEmblems.push(item.apiName)
+      // 選定セットのトレイトに解決できない＝他セットのアイテム。紋章ではないので静かに除外。
+      unresolvedEmblemCount++
       continue
     }
     emblems.set(item.apiName, {
@@ -172,9 +187,9 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
       icon: iconUrl(item.icon),
     })
   }
-  if (unresolvedEmblems.length > 0) {
+  if (unresolvedEmblemCount > 0) {
     warnings.push(
-      `traitApi 解決不能な紋章 ${unresolvedEmblems.length} 種（選定セット外トレイト紐付け、Map除外）`,
+      `付与トレイトが選定セット外のため除外したアイテム ${unresolvedEmblemCount} 種（他セットのスパチュラ系等）`,
     )
   }
 
