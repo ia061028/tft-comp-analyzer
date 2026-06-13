@@ -89,8 +89,12 @@ export interface StaticData {
   traits: Map<string, { name: string; icon: string }>
   /** champions apiName → 表示名・コスト・アイコンURL */
   units: Map<string, { name: string; cost: number; icon: string }>
-  /** 紋章(incompatibleTraits で付与トレイトを示すアイテム) apiName → 表示名・解決済み traitApi・アイコンURL */
-  emblems: Map<string, { name: string; traitApi: string; icon: string }>
+  /**
+   * 紋章(incompatibleTraits で付与トレイトを示すアイテム) apiName → 表示名・解決済み traitApi・アイコンURL。
+   * traitApi は表示/クラスタ参照用の単一トレイト（先頭の解決トレイト）。
+   * traitApis は発動判定用の全付与トレイト集合（Stargazer 等は基底＋変種が全て入る）。
+   */
+  emblems: Map<string, { name: string; traitApi: string; traitApis: string[]; icon: string }>
   warnings: string[]
 }
 
@@ -157,33 +161,29 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
   // emblems（incompatibleTraits で付与トレイトを示すアイテム）
   // 付与トレイトが選定セットのトレイトに解決できるものだけを紋章として採用する。
   // これにより他セットのスパチュラ系アイテムや、別機構（オーグメント/Anima 系）は自然に除外される。
-  const emblems = new Map<string, { name: string; traitApi: string; icon: string }>()
+  const emblems = new Map<string, { name: string; traitApi: string; traitApis: string[]; icon: string }>()
   let unresolvedEmblemCount = 0
   for (const item of data.items ?? []) {
     if (!item.apiName) continue
     const incompat = item.incompatibleTraits
     if (!Array.isArray(incompat) || incompat.length === 0) continue
-    // incompatibleTraits は付与トレイトの apiName（Stargazer 等は先頭が基底トレイト）。
+    // incompatibleTraits は付与トレイトの apiName 群（Stargazer 等は基底＋変種が列挙される）。
     // apiName 完全一致 → 表示名一致 の順で、選定セットのトレイトに解決する。
-    let traitApi: string | undefined
+    // 解決できた全 apiName を発動判定用の集合 traitApis とし、先頭を表示/クラスタ用 traitApi とする。
+    const traitApis: string[] = []
     for (const raw of incompat) {
-      if (traits.has(raw)) {
-        traitApi = raw
-        break
-      }
-      if (traitNameToApi.has(raw)) {
-        traitApi = traitNameToApi.get(raw)
-        break
-      }
+      if (traits.has(raw)) traitApis.push(raw)
+      else if (traitNameToApi.has(raw)) traitApis.push(traitNameToApi.get(raw)!)
     }
-    if (!traitApi) {
+    if (traitApis.length === 0) {
       // 選定セットのトレイトに解決できない＝他セットのアイテム。紋章ではないので静かに除外。
       unresolvedEmblemCount++
       continue
     }
     emblems.set(item.apiName, {
       name: item.name ?? item.apiName,
-      traitApi,
+      traitApi: traitApis[0],
+      traitApis,
       icon: iconUrl(item.icon),
     })
   }
