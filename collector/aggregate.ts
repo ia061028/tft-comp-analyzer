@@ -159,6 +159,8 @@ async function main(): Promise<void> {
     holderCounts: Map<string, Map<string, number>>
     // unit apiName → item apiName → 回数（推奨アイテム集計用、ui ありレコードのみ）
     itemCounts: Map<string, Map<string, number>>
+    // unit apiName → スターレベル値リスト（代表スター算出用、us ありレコードのみ）
+    unitStarLists: Map<string, number[]>
   }
 
   /** レコード集合をクラスタリングして ClusterAcc 群を返す（全体/レベル別で共用）。 */
@@ -211,6 +213,7 @@ async function main(): Promise<void> {
           rows: new Map(),
           holderCounts: new Map(),
           itemCounts: new Map(),
+          unitStarLists: new Map(),
         }
         map.set(clusterKey, acc)
       }
@@ -245,6 +248,12 @@ async function main(): Promise<void> {
           for (const it of unitItemList) {
             if (staticData.items.has(it)) im.set(it, (im.get(it) ?? 0) + 1)
           }
+        }
+        const star = rec.us?.[i]
+        if (star && star > 0) {
+          const list = acc.unitStarLists.get(uApi) ?? []
+          list.push(star)
+          acc.unitStarLists.set(uApi, list)
         }
       }
 
@@ -301,6 +310,8 @@ async function main(): Promise<void> {
     traitModeStyle: Map<string, number>
     synergies: [string, number][] // [traitApi, modeStyle] 過半数で発動の代表シナジー
     unitApis: string[]
+    unitStarByApi: Map<string, number> // unitApi → 代表スター(mode)
+
     rows: { emblems: string[]; n: number; top4: number; win: number; p: number }[]
     holders: [string, string, number][] // [emblemApi, holderApi, count]
     unitItems: [string, string, number][] // [unitApi, itemApi, count]
@@ -338,6 +349,13 @@ async function main(): Promise<void> {
       .slice(0, repUnitCount)
       .map((e) => e[0])
     for (const u of topUnits) usedUnitApis.add(u)
+
+    // 代表ユニットの代表スターレベル（mode）。
+    const unitStarByApi = new Map<string, number>()
+    for (const uApi of topUnits) {
+      const ms = modeMaxNumber(acc.unitStarLists.get(uApi) ?? [])
+      if (ms) unitStarByApi.set(uApi, ms)
+    }
 
     // 紋章ごとの最頻装備ユニット。
     const holders: [string, string, number][] = []
@@ -394,6 +412,7 @@ async function main(): Promise<void> {
       traitModeStyle,
       synergies,
       unitApis: topUnits,
+      unitStarByApi,
       rows: [...acc.rows.values()],
       holders,
       unitItems,
@@ -532,6 +551,8 @@ async function main(): Promise<void> {
         if (ua.cost !== ub.cost) return ua.cost - ub.cost
         return ua.name < ub.name ? -1 : ua.name > ub.name ? 1 : a - b
       })
+    // units と同順の代表スター。
+    const unitStars = unitIdxs.map((idx) => pc.unitStarByApi.get(unitsOut[idx].api) ?? 0)
 
     const rows: EmblemRow[] = pc.rows
       .map((r): EmblemRow => {
@@ -566,6 +587,7 @@ async function main(): Promise<void> {
       label,
       labelJa,
       units: unitIdxs,
+      unitStars,
       n: pc.n,
       top4: pc.top4,
       win: pc.win,

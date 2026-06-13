@@ -51,6 +51,8 @@ interface MatchTrait {
 interface MatchUnit {
   character_id: string
   itemNames?: string[]
+  /** スターレベル(1-3) */
+  tier?: number
 }
 
 interface MatchParticipant {
@@ -243,6 +245,9 @@ function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemCon
       (unit.itemNames ?? []).filter((it) => emblemCtx.completedItems.has(it)),
     )
 
+    // ユニット別のスターレベル（u と同インデックス）。
+    const us: number[] = part.units.map((unit) => unit.tier ?? 0)
+
     records.push({
       m: matchId,
       v,
@@ -252,6 +257,7 @@ function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemCon
       eh,
       u,
       ui,
+      us,
       lv: part.level,
       ts,
     })

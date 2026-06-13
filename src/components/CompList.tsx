@@ -29,6 +29,18 @@ function styleClasses(style: number): string {
   }
 }
 
+/** スターレベル → ★の配色（3=金,2=銀,1=銅） */
+function starColor(star: number): string {
+  switch (star) {
+    case 3:
+      return 'text-amber-300'
+    case 2:
+      return 'text-zinc-200'
+    default:
+      return 'text-orange-400'
+  }
+}
+
 /** コスト → ユニットアイコン枠の配色（1=グレー,2=緑,3=青,4=紫,5=金） */
 function costBorder(cost: number): string {
   switch (cost) {
@@ -198,10 +210,11 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
 
               {/* ユニット（下に推奨アイテム・装備紋章） */}
               <div className="flex flex-wrap gap-2">
-                {comp.units.map((unitIdx) => {
+                {comp.units.map((unitIdx, pos) => {
                   const unit = units[unitIdx]
                   if (!unit) return null
                   const unitName = pickName(lang, unit)
+                  const star = comp.unitStars?.[pos] ?? 0
                   const unitItemIdxs = comp.unitItems
                     .filter((ui) => ui[0] === unitIdx)
                     .map((ui) => ui[1])
@@ -210,13 +223,18 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
                     .map((h) => h[0])
                   const hasUnder = unitItemIdxs.length > 0 || unitEmblemIdxs.length > 0
                   return (
-                    <div key={unitIdx} className="flex w-14 flex-col items-center gap-1">
+                    <div key={unitIdx} className="flex w-14 flex-col items-center gap-0.5">
+                      <div className={`h-3 text-[11px] leading-3 ${starColor(star)}`}>
+                        {star > 0 ? '★'.repeat(star) : ''}
+                      </div>
                       <img
                         src={unit.icon}
                         alt={unitName}
-                        title={unitName}
+                        title={star > 0 ? `${unitName} ★${star}` : unitName}
                         loading="lazy"
-                        className={`h-14 w-14 rounded border-2 object-cover ${costBorder(unit.cost)}`}
+                        className={`h-14 w-14 rounded border-2 object-cover ${
+                          star === 3 ? 'border-amber-300 ring-1 ring-amber-300/60' : costBorder(unit.cost)
+                        }`}
                       />
                       {hasUnder && (
                         <div className="flex flex-wrap justify-center gap-0.5">
