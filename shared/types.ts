@@ -16,6 +16,8 @@ export interface ParticipantRecord {
   eh?: string[]
   /** 盤面ユニットの character_id */
   u: string[]
+  /** u と同インデックスで対応する、そのユニットの完成アイテム apiName 群（旧レコードは欠落） */
+  ui?: string[][]
   /** プレイヤーレベル */
   lv: number
   /** game_datetime（epoch秒） */
@@ -25,12 +27,16 @@ export interface ParticipantRecord {
 export interface TraitInfo {
   api: string
   name: string
+  /** 日本語表示名 */
+  nameJa: string
   icon: string
 }
 
 export interface EmblemInfo {
   api: string
   name: string
+  /** 日本語表示名 */
+  nameJa: string
   /** traits 配列へのインデックス */
   trait: number
   icon: string
@@ -39,7 +45,19 @@ export interface EmblemInfo {
 export interface UnitInfo {
   api: string
   name: string
+  /** 日本語表示名 */
+  nameJa: string
   cost: number
+  icon: string
+  /** チームプランナーのチャンピオンバイト値（ロスター内 apiName 昇順の1始まり位置。非ロスターは0） */
+  code: number
+}
+
+export interface ItemInfo {
+  api: string
+  name: string
+  /** 日本語表示名 */
+  nameJa: string
   icon: string
 }
 
@@ -58,6 +76,8 @@ export interface CompStats {
   /** クラスタキー: [traitIdx, 最頻style] のソート済みペア（スタイル上位 clusterMaxKeyTraits 件） */
   traits: [number, number][]
   label: string
+  /** 日本語の構成名（traits の日本語名で構築） */
+  labelJa: string
   /** クラスタ内最頻ユニット（units 配列インデックス、コスト順） */
   units: number[]
   n: number
@@ -69,13 +89,21 @@ export interface CompStats {
    * [emblemIdx, unitIdx, count]。holder が分かるレコード（eh あり）からのみ集計。
    */
   holders: [number, number, number][]
+  /**
+   * キャリー中心の上位ユニットの推奨完成アイテム。
+   * [unitIdx, itemIdx, count]。ui が分かるレコードからのみ集計。
+   */
+  unitItems: [number, number, number][]
 }
 
 /** public/data/stats.json 全体 */
 export interface StatsFile {
   schemaVersion: 1
   generatedAt: string
+  /** 内部パッチキー（game_version 由来、例 "16.12"） */
   patch: string
+  /** 表示用 TFT バージョン（例 "17.5"。未マップ時は patch にフォールバック） */
+  tftPatch: string
   setNumber: number
   config: { minStyle: number; minSampleDefault: number; emblemMinSample: number }
   totals: {
@@ -86,5 +114,8 @@ export interface StatsFile {
   traits: TraitInfo[]
   emblems: EmblemInfo[]
   units: UnitInfo[]
+  items: ItemInfo[]
   comps: CompStats[]
+  /** レベル別の構成（キー "7".."10"）。全体は comps。 */
+  compsByLevel: Record<string, CompStats[]>
 }

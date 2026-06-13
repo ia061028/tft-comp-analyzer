@@ -28,6 +28,8 @@ export const config = {
   maxNewMatchesPerRoutePerRun: 1000,
   /** Master帯からプラットフォームごとに抽選する人数の上限 */
   masterSamplePerPlatform: 100,
+  /** Diamond帯からプラットフォーム×ディビジョンごとに抽選する人数の上限 */
+  diamondSamplePerDivision: 50,
   /** 構成クラスタキーに含めるトレイトの最小style（3=ゴールド以上） */
   clusterMinStyle: 3,
   /** クラスタキーに含める上位トレイト数（スタイル降順で上位N件のみをキー化） */
@@ -42,4 +44,12 @@ export const config = {
   runBudgetMinutes: 30,
   /** ランク戦TFTの queue_id */
   rankedQueueId: 1100,
+  /**
+   * 内部パッチキー（game_version 由来）→ 表示用 TFT バージョン。
+   * 計算で導けないため手動マップ。新パッチごとに1行追加。未登録は素のパッチ表示にフォールバック。
+   */
+  tftPatchLabels: {
+    '16.12': '17.5',
+    '16.11': '17.4',
+  } as Record<string, string>,
 }

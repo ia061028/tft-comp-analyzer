@@ -1,13 +1,18 @@
-import type { StatsFile } from '../../shared/types'
+import { useState } from 'react'
+import type { CompStats, StatsFile, UnitInfo } from '../../shared/types'
 import { aggregateComp } from '../lib/multiset'
+import { pickName, type Lang } from '../lib/i18n'
 
 type SortKey = 'place' | 'top4' | 'win' | 'pick'
 
 interface CompListProps {
   stats: StatsFile
+  /** 表示する構成（全体 or レベル別。App で選択済み） */
+  comps: CompStats[]
   sel: number[]
   sortKey: SortKey
   minSample: number
+  lang: Lang
 }
 
 /** style 値 → バッジ配色（3=ゴールド系, 4=プリズム系, 1-2は念のため銅/銀） */
@@ -57,11 +62,23 @@ function pct(num: number, den: number): string {
   return `${((num / den) * 100).toFixed(1)}%`
 }
 
-export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
-  const { comps, traits, units, emblems, totals } = stats
+/** チームプランナーの貼付コード: 01 + 各チャンピオン1バイト(hex) + 10枠まで00 + TFTSet{N}。 */
+function buildPlannerCode(unitIdxs: number[], units: UnitInfo[], setNumber: number): string {
+  const slots: string[] = []
+  for (const idx of unitIdxs) {
+    const code = units[idx]?.code ?? 0
+    if (code > 0) slots.push(code.toString(16).padStart(2, '0'))
+  }
+  while (slots.length < 10) slots.push('00')
+  return '01' + slots.slice(0, 10).join('') + 'TFTSet' + setNumber
+}
 
-  // 選択中の紋章（重複を除いた登場順）。装備者表示に使う。
-  const selectedEmblems = [...new Set(sel)]
+export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompListProps) {
+  const { traits, units, emblems, items, totals } = stats
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+
+  // 選択中の紋章（重複を除いた登場順）。装備者ハイライトに使う。
+  const selectedEmblemSet = new Set(sel)
 
   const rows = comps
     .map((comp) => {
@@ -98,13 +115,26 @@ export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
     )
   }
 
+  const copy = async (key: string, code: string) => {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedKey(key)
+      setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500)
+    } catch {
+      // クリップボード不可（権限等）の場合は無視。
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
       {rows.map(({ comp, agg, avgPlace, pickRate }) => {
+        const key = comp.label + '|' + comp.traits.map((t) => t[0]).join(',')
         const hasPlace = Number.isFinite(avgPlace)
         const tier = hasPlace
           ? tierOf(avgPlace)
           : { label: '?', classes: 'bg-zinc-700 text-zinc-300' }
+        const compName = (lang === 'ja' ? comp.labelJa : comp.label) || comp.label
+        const code = buildPlannerCode(comp.units, units, stats.setNumber)
         const metricCell = (active: boolean, label: string, value: string) => (
           <div
             className={`flex items-baseline justify-between gap-2 rounded px-1.5 py-0.5 ${
@@ -117,7 +147,7 @@ export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
         )
         return (
           <div
-            key={comp.label + '|' + comp.traits.map((t) => t[0]).join(',')}
+            key={key}
             className="flex items-stretch gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2"
           >
             {/* ティアバッジ */}
@@ -132,7 +162,7 @@ export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex flex-wrap items-center gap-1">
                 <span className="mr-1 truncate text-sm font-semibold text-zinc-100">
-                  {comp.label}
+                  {compName}
                 </span>
                 {comp.traits.map(([traitIdx, style]) => {
                   const trait = traits[traitIdx]
@@ -151,65 +181,72 @@ export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
                           className="h-4 w-4 object-contain"
                         />
                       )}
-                      {trait?.name ?? `#${traitIdx}`}
+                      {trait ? pickName(lang, trait) : `#${traitIdx}`}
                     </span>
                   )
                 })}
               </div>
-              <div className="flex flex-wrap gap-1">
+
+              {/* ユニット（下に推奨アイテム・装備紋章） */}
+              <div className="flex flex-wrap gap-1.5">
                 {comp.units.map((unitIdx) => {
                   const unit = units[unitIdx]
                   if (!unit) return null
+                  const unitName = pickName(lang, unit)
+                  const unitItemIdxs = comp.unitItems
+                    .filter((ui) => ui[0] === unitIdx)
+                    .map((ui) => ui[1])
+                  const unitEmblemIdxs = comp.holders
+                    .filter((h) => h[1] === unitIdx)
+                    .map((h) => h[0])
+                  const hasUnder = unitItemIdxs.length > 0 || unitEmblemIdxs.length > 0
                   return (
-                    <img
-                      key={unitIdx}
-                      src={unit.icon}
-                      alt={unit.name}
-                      title={unit.name}
-                      loading="lazy"
-                      className={`h-11 w-11 rounded border-2 object-cover ${costBorder(
-                        unit.cost,
-                      )}`}
-                    />
+                    <div key={unitIdx} className="flex w-11 flex-col items-center gap-0.5">
+                      <img
+                        src={unit.icon}
+                        alt={unitName}
+                        title={unitName}
+                        loading="lazy"
+                        className={`h-11 w-11 rounded border-2 object-cover ${costBorder(unit.cost)}`}
+                      />
+                      {hasUnder && (
+                        <div className="flex flex-wrap justify-center gap-0.5">
+                          {unitEmblemIdxs.map((ei) => {
+                            const emblem = emblems[ei]
+                            if (!emblem) return null
+                            return (
+                              <img
+                                key={`e${ei}`}
+                                src={emblem.icon}
+                                alt={pickName(lang, emblem)}
+                                title={pickName(lang, emblem)}
+                                loading="lazy"
+                                className={`h-4 w-4 object-contain ${
+                                  selectedEmblemSet.has(ei) ? 'rounded ring-1 ring-amber-400' : ''
+                                }`}
+                              />
+                            )
+                          })}
+                          {unitItemIdxs.map((ii, k) => {
+                            const item = items?.[ii]
+                            if (!item) return null
+                            return (
+                              <img
+                                key={`i${ii}-${k}`}
+                                src={item.icon}
+                                alt={pickName(lang, item)}
+                                title={pickName(lang, item)}
+                                loading="lazy"
+                                className="h-4 w-4 rounded object-cover"
+                              />
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
                   )
                 })}
               </div>
-
-              {selectedEmblems.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  {selectedEmblems.map((emblemIdx) => {
-                    const emblem = emblems[emblemIdx]
-                    if (!emblem) return null
-                    const holder = comp.holders.find((h) => h[0] === emblemIdx)
-                    const holderUnit = holder ? units[holder[1]] : undefined
-                    return (
-                      <div key={emblemIdx} className="flex items-center gap-1">
-                        <img
-                          src={emblem.icon}
-                          alt={emblem.name}
-                          title={emblem.name}
-                          loading="lazy"
-                          className="h-5 w-5 object-contain"
-                        />
-                        <span className="text-zinc-600">→</span>
-                        {holderUnit ? (
-                          <img
-                            src={holderUnit.icon}
-                            alt={holderUnit.name}
-                            title={`${holderUnit.name}（装備 ${holder![2]}回）`}
-                            loading="lazy"
-                            className={`h-7 w-7 rounded border object-cover ${costBorder(
-                              holderUnit.cost,
-                            )}`}
-                          />
-                        ) : (
-                          <span className="text-xs text-zinc-600">データなし</span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
             </div>
 
             {/* 指標ブロック */}
@@ -228,6 +265,14 @@ export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
               {metricCell(sortKey === 'win', '1位', pct(agg.win, agg.n))}
               {metricCell(sortKey === 'pick', 'Pick', `${(pickRate * 100).toFixed(2)}%`)}
               <div className="px-1.5 text-right text-[11px] text-zinc-500">n={agg.n}</div>
+              <button
+                type="button"
+                onClick={() => copy(key, code)}
+                className="mt-0.5 rounded border border-zinc-700 px-1.5 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                title="チームプランナーに貼り付けるコードをコピー"
+              >
+                {copiedKey === key ? 'コピーしました' : '構成コードをコピー'}
+              </button>
             </div>
           </div>
         )

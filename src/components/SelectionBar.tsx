@@ -1,13 +1,15 @@
 import type { EmblemInfo } from '../../shared/types'
+import { pickName, type Lang } from '../lib/i18n'
 
 interface SelectionBarProps {
   emblems: EmblemInfo[]
   /** emblems 配列インデックス → 選択個数 */
   counts: number[]
+  lang: Lang
   onClear: () => void
 }
 
-export function SelectionBar({ emblems, counts, onClear }: SelectionBarProps) {
+export function SelectionBar({ emblems, counts, lang, onClear }: SelectionBarProps) {
   const selected = counts
     .map((count, index) => ({ count, index }))
     .filter((x) => x.count > 0)
@@ -25,15 +27,16 @@ export function SelectionBar({ emblems, counts, onClear }: SelectionBarProps) {
       <div className="flex flex-wrap items-center gap-2">
         {selected.map(({ count, index }) => {
           const emblem = emblems[index]
+          const label = pickName(lang, emblem)
           return (
             <span
               key={emblem.api}
-              title={emblem.name}
+              title={label}
               className="flex items-center gap-1 rounded bg-zinc-800 px-1.5 py-1"
             >
               <img
                 src={emblem.icon}
-                alt={emblem.name}
+                alt={label}
                 loading="lazy"
                 className="h-7 w-7 object-contain"
               />

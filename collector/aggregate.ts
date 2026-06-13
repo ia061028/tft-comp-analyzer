@@ -15,6 +15,7 @@ import type {
   TraitInfo,
   EmblemInfo,
   UnitInfo,
+  ItemInfo,
 } from '../shared/types.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -137,12 +138,10 @@ async function main(): Promise<void> {
       `(${recordTraitNames.size} 種中 ${[...recordTraitNames].filter((t) => staticData.traits.has(t)).length} 解決)`,
   )
 
-  // 警告集計用（種類ごとのユニーク名）
+  // 警告集計用（種類ごとのユニーク名）。全バケット横断で dedup される。
   const unresolvedTraitNames = new Set<string>()
   const unresolvedUnitNames = new Set<string>()
   const unresolvedEmblemNames = new Set<string>()
-  let recordsExcludedUnresolvedTrait = 0
-  let noClusterKey = 0
 
   // 5/6. クラスタリング & クラスタ内集計
   interface ClusterAcc {
@@ -158,156 +157,177 @@ async function main(): Promise<void> {
     rows: Map<string, { emblems: string[]; n: number; top4: number; win: number; p: number }>
     // 紋章 apiName → 装備ユニット(character_id) → 回数（holder 集計用、eh ありレコードのみ）
     holderCounts: Map<string, Map<string, number>>
+    // unit apiName → item apiName → 回数（推奨アイテム集計用、ui ありレコードのみ）
+    itemCounts: Map<string, Map<string, number>>
   }
-  const clusters = new Map<string, ClusterAcc>()
 
-  for (const lr of target) {
-    const rec = lr.rec
+  /** レコード集合をクラスタリングして ClusterAcc 群を返す（全体/レベル別で共用）。 */
+  function buildClusters(records: LoadedRecord[]): {
+    clusters: ClusterAcc[]
+    noClusterKey: number
+    excludedUnresolvedTrait: number
+  } {
+    const map = new Map<string, ClusterAcc>()
+    let noClusterKey = 0
+    let excludedUnresolvedTrait = 0
 
-    // 未解決トレイト（静的データに無い apiName）を含むレコードは集計から除外。
-    let hasUnresolvedTrait = false
-    for (const tApi of Object.keys(rec.t)) {
-      if (!staticData.traits.has(tApi)) {
-        unresolvedTraitNames.add(tApi)
-        hasUnresolvedTrait = true
-      }
-    }
-    if (hasUnresolvedTrait) {
-      recordsExcludedUnresolvedTrait++
-      continue
-    }
+    for (const lr of records) {
+      const rec = lr.rec
 
-    // クラスタキー: style>=minStyle のトレイトのうち、スタイル降順（同点は apiName 昇順）で
-    // 上位 clusterMaxKeyTraits 件を採用し、apiName 昇順で連結（決定的）。
-    // 全ゴールドをキーにすると細分化しすぎるため、定義的な上位トレイトのみで集約する。
-    const goldTraits = Object.entries(rec.t).filter(([, style]) => style >= config.clusterMinStyle)
-    if (goldTraits.length === 0) {
-      noClusterKey++
-      continue
-    }
-    goldTraits.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-    const keyTraits = goldTraits.slice(0, config.clusterMaxKeyTraits).map(([tApi]) => tApi)
-    keyTraits.sort()
-    const clusterKey = keyTraits.join('|')
-
-    let acc = clusters.get(clusterKey)
-    if (!acc) {
-      acc = {
-        traitApis: keyTraits,
-        n: 0,
-        top4: 0,
-        win: 0,
-        styleLists: new Map(),
-        unitCounts: new Map(),
-        rows: new Map(),
-        holderCounts: new Map(),
-      }
-      clusters.set(clusterKey, acc)
-    }
-
-    acc.n++
-    if (rec.p <= 4) acc.top4++
-    if (rec.p === 1) acc.win++
-
-    // キートレイトの style を蓄積
-    for (const tApi of keyTraits) {
-      const list = acc.styleLists.get(tApi) ?? []
-      list.push(rec.t[tApi])
-      acc.styleLists.set(tApi, list)
-    }
-
-    // ユニット出現（解決できるものだけ。未解決は警告カウント、レコードは除外しない）
-    for (const uApi of rec.u) {
-      if (!staticData.units.has(uApi)) {
-        unresolvedUnitNames.add(uApi)
-        continue
-      }
-      acc.unitCounts.set(uApi, (acc.unitCounts.get(uApi) ?? 0) + 1)
-    }
-
-    // 紋章マルチセット: emblems 辞書に存在 かつ traitApi が当該レコードの t キーに含まれる
-    // （= シナジー発動中）。t のキーは発動トレイト全体（style 不問）。
-    const recTraitKeys = new Set(Object.keys(rec.t))
-    const activeEmblems: string[] = []
-    for (let k = 0; k < rec.e.length; k++) {
-      const eApi = rec.e[k]
-      const emb = staticData.emblems.get(eApi)
-      if (!emb) {
-        unresolvedEmblemNames.add(eApi)
-        continue
-      }
-      // 発動判定: 紋章の付与トレイト（変種含む全集合）のいずれかが当該レコードで発動中なら採用。
-      if (!emb.traitApis.some((a) => recTraitKeys.has(a))) continue
-      activeEmblems.push(eApi)
-
-      // 装備ユニット（holder）を集計。eh は e と同インデックス。解決できるユニットのみ。
-      const holder = rec.eh?.[k]
-      if (holder && staticData.units.has(holder)) {
-        let hc = acc.holderCounts.get(eApi)
-        if (!hc) {
-          hc = new Map()
-          acc.holderCounts.set(eApi, hc)
+      // 未解決トレイト（静的データに無い apiName）を含むレコードは集計から除外。
+      let hasUnresolvedTrait = false
+      for (const tApi of Object.keys(rec.t)) {
+        if (!staticData.traits.has(tApi)) {
+          unresolvedTraitNames.add(tApi)
+          hasUnresolvedTrait = true
         }
-        hc.set(holder, (hc.get(holder) ?? 0) + 1)
       }
+      if (hasUnresolvedTrait) {
+        excludedUnresolvedTrait++
+        continue
+      }
+
+      // クラスタキー: style>=minStyle のトレイトのうち、スタイル降順（同点は apiName 昇順）で
+      // 上位 clusterMaxKeyTraits 件を採用し、apiName 昇順で連結（決定的）。
+      const goldTraits = Object.entries(rec.t).filter(([, style]) => style >= config.clusterMinStyle)
+      if (goldTraits.length === 0) {
+        noClusterKey++
+        continue
+      }
+      goldTraits.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+      const keyTraits = goldTraits.slice(0, config.clusterMaxKeyTraits).map(([tApi]) => tApi)
+      keyTraits.sort()
+      const clusterKey = keyTraits.join('|')
+
+      let acc = map.get(clusterKey)
+      if (!acc) {
+        acc = {
+          traitApis: keyTraits,
+          n: 0,
+          top4: 0,
+          win: 0,
+          styleLists: new Map(),
+          unitCounts: new Map(),
+          rows: new Map(),
+          holderCounts: new Map(),
+          itemCounts: new Map(),
+        }
+        map.set(clusterKey, acc)
+      }
+
+      acc.n++
+      if (rec.p <= 4) acc.top4++
+      if (rec.p === 1) acc.win++
+
+      // キートレイトの style を蓄積
+      for (const tApi of keyTraits) {
+        const list = acc.styleLists.get(tApi) ?? []
+        list.push(rec.t[tApi])
+        acc.styleLists.set(tApi, list)
+      }
+
+      // ユニット出現＋ユニット別完成アイテム（解決できるものだけ）
+      for (let i = 0; i < rec.u.length; i++) {
+        const uApi = rec.u[i]
+        if (!staticData.units.has(uApi)) {
+          unresolvedUnitNames.add(uApi)
+          continue
+        }
+        acc.unitCounts.set(uApi, (acc.unitCounts.get(uApi) ?? 0) + 1)
+        const unitItemList = rec.ui?.[i]
+        if (unitItemList && unitItemList.length) {
+          let im = acc.itemCounts.get(uApi)
+          if (!im) {
+            im = new Map()
+            acc.itemCounts.set(uApi, im)
+          }
+          for (const it of unitItemList) {
+            if (staticData.items.has(it)) im.set(it, (im.get(it) ?? 0) + 1)
+          }
+        }
+      }
+
+      // 紋章マルチセット: emblems 辞書に存在 かつ 付与トレイト（変種含む）が発動中。
+      const recTraitKeys = new Set(Object.keys(rec.t))
+      const activeEmblems: string[] = []
+      for (let k = 0; k < rec.e.length; k++) {
+        const eApi = rec.e[k]
+        const emb = staticData.emblems.get(eApi)
+        if (!emb) {
+          unresolvedEmblemNames.add(eApi)
+          continue
+        }
+        if (!emb.traitApis.some((a) => recTraitKeys.has(a))) continue
+        activeEmblems.push(eApi)
+
+        const holder = rec.eh?.[k]
+        if (holder && staticData.units.has(holder)) {
+          let hc = acc.holderCounts.get(eApi)
+          if (!hc) {
+            hc = new Map()
+            acc.holderCounts.set(eApi, hc)
+          }
+          hc.set(holder, (hc.get(holder) ?? 0) + 1)
+        }
+      }
+      activeEmblems.sort()
+      const rowKey = activeEmblems.join('|')
+      let row = acc.rows.get(rowKey)
+      if (!row) {
+        row = { emblems: activeEmblems, n: 0, top4: 0, win: 0, p: 0 }
+        acc.rows.set(rowKey, row)
+      }
+      row.n++
+      if (rec.p <= 4) row.top4++
+      if (rec.p === 1) row.win++
+      row.p += rec.p
     }
-    activeEmblems.sort()
-    const rowKey = activeEmblems.join('|')
-    let row = acc.rows.get(rowKey)
-    if (!row) {
-      row = { emblems: activeEmblems, n: 0, top4: 0, win: 0, p: 0 }
-      acc.rows.set(rowKey, row)
-    }
-    row.n++
-    if (rec.p <= 4) row.top4++
-    if (rec.p === 1) row.win++
-    row.p += rec.p
+
+    return { clusters: [...map.values()], noClusterKey, excludedUnresolvedTrait }
   }
 
-  console.log(`クラスタ数: ${clusters.size}`)
-  console.log(`クラスタ対象外（キートレイト0）: ${noClusterKey}`)
-  console.log(`未解決トレイトで除外したレコード: ${recordsExcludedUnresolvedTrait}`)
-
-  // 7. インターン
-  // 出力で参照される apiName を収集。
-  const usedTraitApis = new Set<string>() // comps キー + emblems traitApi
+  // 7. PreComp 化（apiName ベース）。出力で参照する apiName を used 集合へ収集。
+  const usedTraitApis = new Set<string>()
   const usedUnitApis = new Set<string>()
-  const usedEmblemApis = new Set<string>() // 対象レコードの e に出現し辞書解決できた全紋章
+  const usedEmblemApis = new Set<string>()
+  const usedItemApis = new Set<string>()
 
-  // 各クラスタの units を「上位8種」に確定しつつ used 集合を埋める。
   interface PreComp {
     traitApis: string[]
     n: number
     top4: number
     win: number
     traitModeStyle: Map<string, number>
-    unitApis: string[] // 上位8（コスト/名前順は後で）
+    unitApis: string[]
     rows: { emblems: string[]; n: number; top4: number; win: number; p: number }[]
-    // 紋章ごとの最頻装備ユニット: [emblemApi, holderApi, count]
-    holders: [string, string, number][]
+    holders: [string, string, number][] // [emblemApi, holderApi, count]
+    unitItems: [string, string, number][] // [unitApi, itemApi, count]
   }
-  const preComps: PreComp[] = []
 
-  for (const acc of clusters.values()) {
-    // キートレイトの最頻 style
+  const MIN_OUTPUT_N = 3 // 合計サンプルがこの未満のクラスタは出力しない（長尾枝刈り）
+  const CARRY_UNITS = 4 // 推奨アイテムを出すユニット数（アイテム保持総数の上位）
+  const ITEMS_PER_UNIT = 3 // ユニットごとの推奨アイテム数
+
+  function accToPreComp(acc: ClusterAcc, repUnitCount: number): PreComp {
     const traitModeStyle = new Map<string, number>()
     for (const tApi of acc.traitApis) {
-      const ms = modeMaxNumber(acc.styleLists.get(tApi) ?? [])
-      traitModeStyle.set(tApi, ms ?? 0)
+      traitModeStyle.set(tApi, modeMaxNumber(acc.styleLists.get(tApi) ?? []) ?? 0)
       usedTraitApis.add(tApi)
     }
 
-    // 上位8ユニット（出現頻度降順、同数は名前昇順で決定的に）
-    const unitEntries = [...acc.unitCounts.entries()].sort((a, b) => {
-      if (b[1] !== a[1]) return b[1] - a[1]
-      const na = staticData.units.get(a[0])!.name
-      const nb = staticData.units.get(b[0])!.name
-      return na < nb ? -1 : na > nb ? 1 : a[0] < b[0] ? -1 : 1
-    })
-    const topUnits = unitEntries.slice(0, 8).map((e) => e[0])
+    // 代表ユニット（出現頻度降順、同数は名前昇順）。バケットごとに repUnitCount 件。
+    const topUnits = [...acc.unitCounts.entries()]
+      .sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1]
+        const na = staticData.units.get(a[0])!.name
+        const nb = staticData.units.get(b[0])!.name
+        return na < nb ? -1 : na > nb ? 1 : a[0] < b[0] ? -1 : 1
+      })
+      .slice(0, repUnitCount)
+      .map((e) => e[0])
     for (const u of topUnits) usedUnitApis.add(u)
 
-    // 紋章ごとの最頻装備ユニット（count 降順、同数は名前昇順で決定的に）。
+    // 紋章ごとの最頻装備ユニット。
     const holders: [string, string, number][] = []
     for (const [emblemApi, hc] of acc.holderCounts) {
       let bestUnit: string | undefined
@@ -329,10 +349,32 @@ async function main(): Promise<void> {
       }
     }
 
-    // 紋章 used 集合は「e に出現し辞書解決できた全紋章」（発動の有無に関わらず）なので、
-    // rows（発動済みのみ）ではなく target レコードを別途走査して収集する（下のループ）。
+    // 推奨アイテム: アイテム保持総数が多い上位 CARRY_UNITS ユニット × 上位 ITEMS_PER_UNIT アイテム。
+    const unitItems: [string, string, number][] = []
+    const carries = [...acc.itemCounts.entries()]
+      .map(([uApi, im]) => ({ uApi, im, total: [...im.values()].reduce((s, x) => s + x, 0) }))
+      .sort(
+        (a, b) =>
+          b.total - a.total ||
+          (staticData.units.get(a.uApi)!.name < staticData.units.get(b.uApi)!.name ? -1 : 1),
+      )
+      .slice(0, CARRY_UNITS)
+    for (const { uApi, im } of carries) {
+      const topItems = [...im.entries()]
+        .sort(
+          (a, b) =>
+            b[1] - a[1] ||
+            (staticData.items.get(a[0])!.name < staticData.items.get(b[0])!.name ? -1 : 1),
+        )
+        .slice(0, ITEMS_PER_UNIT)
+      for (const [itApi, count] of topItems) {
+        unitItems.push([uApi, itApi, count])
+        usedUnitApis.add(uApi)
+        usedItemApis.add(itApi)
+      }
+    }
 
-    preComps.push({
+    return {
       traitApis: acc.traitApis,
       n: acc.n,
       top4: acc.top4,
@@ -341,13 +383,34 @@ async function main(): Promise<void> {
       unitApis: topUnits,
       rows: [...acc.rows.values()],
       holders,
-    })
+      unitItems,
+    }
   }
 
-  // 「e に出現し辞書解決できた全紋章」を target レコードから直接収集（発動していなくても含める）。
+  /** レコード集合 → 出力対象 PreComp 群（n>=MIN_OUTPUT_N で枝刈り）。 */
+  function bucketPreComps(records: LoadedRecord[], repUnitCount: number): PreComp[] {
+    const { clusters } = buildClusters(records)
+    return clusters.filter((c) => c.n >= MIN_OUTPUT_N).map((c) => accToPreComp(c, repUnitCount))
+  }
+
+  // 全体バケット（代表ユニット10）とレベル別バケット（代表ユニット=レベル）。
+  const allResult = buildClusters(target)
+  const allPreComps = allResult.clusters
+    .filter((c) => c.n >= MIN_OUTPUT_N)
+    .map((c) => accToPreComp(c, 10))
+  const LEVELS = [7, 8, 9, 10] as const
+  const levelPreComps: Record<string, PreComp[]> = {}
+  for (const lv of LEVELS) {
+    const recs = target.filter((lr) => lr.rec.lv === lv)
+    levelPreComps[String(lv)] = bucketPreComps(recs, Math.min(lv, 10))
+  }
+
+  console.log(`クラスタ数（全体）: ${allResult.clusters.length}（出力 ${allPreComps.length}）`)
+  console.log(`クラスタ対象外（キートレイト0, 全体）: ${allResult.noClusterKey}`)
+  console.log(`未解決トレイトで除外したレコード（全体）: ${allResult.excludedUnresolvedTrait}`)
+
+  // 「e に出現し辞書解決できた全紋章」を target レコードから収集（発動の有無に関わらず）。
   for (const lr of target) {
-    // 対象レコードのみ（既にパッチフィルタ済み）。未解決トレイトで除外されたレコードは含めない方が自然だが、
-    // 仕様は「対象レコードの e に出現し辞書解決できた全紋章」。除外レコードは集計に寄与しないため除く。
     let hasUnresolvedTrait = false
     for (const tApi of Object.keys(lr.rec.t)) {
       if (!staticData.traits.has(tApi)) {
@@ -356,8 +419,7 @@ async function main(): Promise<void> {
       }
     }
     if (hasUnresolvedTrait) continue
-    const keyTraits = Object.entries(lr.rec.t).filter(([, s]) => s >= config.clusterMinStyle)
-    if (keyTraits.length === 0) continue
+    if (Object.values(lr.rec.t).every((s) => s < config.clusterMinStyle)) continue
     for (const eApi of lr.rec.e) {
       if (staticData.emblems.has(eApi)) usedEmblemApis.add(eApi)
     }
@@ -369,8 +431,7 @@ async function main(): Promise<void> {
     if (emb) usedTraitApis.add(emb.traitApi)
   }
 
-  // インターン配列を決定的順序で構築。
-  // traits: 名前昇順（同名は apiName）。units: コスト昇順→名前昇順。emblems: 表示名昇順。
+  // 8. インターン配列を決定的順序で構築（全バケット横断で1回）。
   const traitApisSorted = [...usedTraitApis].sort((a, b) => {
     const na = staticData.traits.get(a)!.name
     const nb = staticData.traits.get(b)!.name
@@ -380,7 +441,7 @@ async function main(): Promise<void> {
   const traitsOut: TraitInfo[] = traitApisSorted.map((api, i) => {
     traitIndex.set(api, i)
     const t = staticData.traits.get(api)!
-    return { api, name: t.name, icon: t.icon }
+    return { api, name: t.name, nameJa: t.nameJa, icon: t.icon }
   })
 
   const unitApisSorted = [...usedUnitApis].sort((a, b) => {
@@ -393,7 +454,7 @@ async function main(): Promise<void> {
   const unitsOut: UnitInfo[] = unitApisSorted.map((api, i) => {
     unitIndex.set(api, i)
     const u = staticData.units.get(api)!
-    return { api, name: u.name, cost: u.cost, icon: u.icon }
+    return { api, name: u.name, nameJa: u.nameJa, cost: u.cost, icon: u.icon, code: u.code }
   })
 
   const emblemApisSorted = [...usedEmblemApis].sort((a, b) => {
@@ -405,20 +466,32 @@ async function main(): Promise<void> {
   const emblemsOut: EmblemInfo[] = emblemApisSorted.map((api, i) => {
     emblemIndex.set(api, i)
     const e = staticData.emblems.get(api)!
-    return { api, name: e.name, trait: traitIndex.get(e.traitApi)!, icon: e.icon }
+    return { api, name: e.name, nameJa: e.nameJa, trait: traitIndex.get(e.traitApi)!, icon: e.icon }
   })
 
-  // comps 構築
-  const comps: CompStats[] = preComps.map((pc) => {
-    // traits: [traitIdx, modeStyle] traitIdx 昇順
+  const itemApisSorted = [...usedItemApis].sort((a, b) => {
+    const ia = staticData.items.get(a)!
+    const ib = staticData.items.get(b)!
+    return ia.name < ib.name ? -1 : ia.name > ib.name ? 1 : a < b ? -1 : a > b ? 1 : 0
+  })
+  const itemIndex = new Map<string, number>()
+  const itemsOut: ItemInfo[] = itemApisSorted.map((api, i) => {
+    itemIndex.set(api, i)
+    const it = staticData.items.get(api)!
+    return { api, name: it.name, nameJa: it.nameJa, icon: it.icon }
+  })
+
+  // 9. PreComp → CompStats（intern index 化）。
+  function toComp(pc: PreComp): CompStats {
     const traitPairs: [number, number][] = pc.traitApis
       .map((api): [number, number] => [traitIndex.get(api)!, pc.traitModeStyle.get(api) ?? 0])
       .sort((a, b) => a[0] - b[0])
 
-    // label: modeStyle 降順・同値は表示名昇順で " / " 連結
+    // label/labelJa: modeStyle 降順・同値は英語名昇順で順序を一意化し、各言語で連結。
     const labelParts = pc.traitApis
       .map((api) => ({
         name: staticData.traits.get(api)!.name,
+        nameJa: staticData.traits.get(api)!.nameJa,
         style: pc.traitModeStyle.get(api) ?? 0,
       }))
       .sort((a, b) => {
@@ -426,8 +499,8 @@ async function main(): Promise<void> {
         return a.name < b.name ? -1 : a.name > b.name ? 1 : 0
       })
     const label = labelParts.map((p) => p.name).join(' / ')
+    const labelJa = labelParts.map((p) => p.nameJa).join(' / ')
 
-    // units: コスト昇順・同コストは表示名昇順の units 配列インデックス
     const unitIdxs = pc.unitApis
       .map((api) => unitIndex.get(api)!)
       .sort((a, b) => {
@@ -437,20 +510,17 @@ async function main(): Promise<void> {
         return ua.name < ub.name ? -1 : ua.name > ub.name ? 1 : a - b
       })
 
-    // rows: emblem 配列インデックスのソート済みマルチセット
     const rows: EmblemRow[] = pc.rows
       .map((r): EmblemRow => {
         const e = r.emblems.map((api) => emblemIndex.get(api)!).sort((x, y) => x - y)
         return { e, n: r.n, top4: r.top4, win: r.win, p: r.p }
       })
       .sort((a, b) => {
-        // 決定的順序: 空マルチセット先頭、その後 e の辞書順。
         if (a.e.length !== b.e.length) return a.e.length - b.e.length
         for (let i = 0; i < a.e.length; i++) if (a.e[i] !== b.e[i]) return a.e[i] - b.e[i]
         return 0
       })
 
-    // holders: [emblemIdx, unitIdx, count]。emblemIdx 昇順で決定的に。
     const holders: [number, number, number][] = pc.holders
       .map(([emblemApi, unitApi, count]): [number, number, number] => [
         emblemIndex.get(emblemApi)!,
@@ -459,20 +529,34 @@ async function main(): Promise<void> {
       ])
       .sort((a, b) => a[0] - b[0])
 
+    const unitItems: [number, number, number][] = pc.unitItems
+      .map(([unitApi, itemApi, count]): [number, number, number] => [
+        unitIndex.get(unitApi)!,
+        itemIndex.get(itemApi)!,
+        count,
+      ])
+      .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+
     return {
       traits: traitPairs,
       label,
+      labelJa,
       units: unitIdxs,
       n: pc.n,
       top4: pc.top4,
       win: pc.win,
       rows,
       holders,
+      unitItems,
     }
-  })
+  }
 
   // 8. 出力
-  comps.sort((a, b) => b.n - a.n)
+  const comps: CompStats[] = allPreComps.map(toComp).sort((a, b) => b.n - a.n)
+  const compsByLevel: Record<string, CompStats[]> = {}
+  for (const lv of LEVELS) {
+    compsByLevel[String(lv)] = levelPreComps[String(lv)].map(toComp).sort((a, b) => b.n - a.n)
+  }
 
   const byRoute: Record<string, number> = {}
   const uniqueMatches = new Set<string>()
@@ -485,6 +569,7 @@ async function main(): Promise<void> {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
     patch: targetPatch,
+    tftPatch: config.tftPatchLabels[targetPatch] ?? targetPatch,
     setNumber: staticData.setNumber,
     config: {
       minStyle: config.clusterMinStyle,
@@ -499,7 +584,9 @@ async function main(): Promise<void> {
     traits: traitsOut,
     emblems: emblemsOut,
     units: unitsOut,
+    items: itemsOut,
     comps,
+    compsByLevel,
   }
 
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })
@@ -509,9 +596,13 @@ async function main(): Promise<void> {
   const sizeBytes = statSync(OUT_PATH).size
   const sizeKB = (sizeBytes / 1024).toFixed(1)
   console.log('--- 集計サマリ ---')
-  console.log(`comps 数: ${comps.length}`)
+  console.log(`TFTパッチ表記: ${out.tftPatch}（内部 ${targetPatch}）`)
+  console.log(`comps 数（全体）: ${comps.length}`)
   console.log(
-    `インターン: traits=${traitsOut.length} emblems=${emblemsOut.length} units=${unitsOut.length}`,
+    `レベル別 comps: ${LEVELS.map((lv) => `lv${lv}=${compsByLevel[String(lv)].length}`).join(' ')}`,
+  )
+  console.log(
+    `インターン: traits=${traitsOut.length} emblems=${emblemsOut.length} units=${unitsOut.length} items=${itemsOut.length}`,
   )
   console.log(`totals: matches=${uniqueMatches.size} participants=${target.length} byRoute=${JSON.stringify(byRoute)}`)
   console.log(`出力: ${OUT_PATH} (${sizeKB} KB)`)
