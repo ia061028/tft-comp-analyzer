@@ -1,26 +1,29 @@
 import type { EmblemInfo } from '../../shared/types'
+import { pickName, type Lang } from '../lib/i18n'
 
 interface EmblemGridProps {
   emblems: EmblemInfo[]
   /** emblems 配列インデックス → 選択個数 */
   counts: number[]
+  lang: Lang
   /** 左クリック: 選択個数 +1 */
   onAdd: (index: number) => void
   /** 右クリック: 選択個数 -1（0未満にしない） */
   onRemove: (index: number) => void
 }
 
-export function EmblemGrid({ emblems, counts, onAdd, onRemove }: EmblemGridProps) {
+export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove }: EmblemGridProps) {
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-2">
       {emblems.map((emblem, i) => {
         const count = counts[i] ?? 0
         const selected = count > 0
+        const label = pickName(lang, emblem)
         return (
           <button
             key={emblem.api}
             type="button"
-            title={emblem.name}
+            title={label}
             onClick={() => onAdd(i)}
             onContextMenu={(e) => {
               e.preventDefault()
@@ -34,7 +37,7 @@ export function EmblemGrid({ emblems, counts, onAdd, onRemove }: EmblemGridProps
           >
             <img
               src={emblem.icon}
-              alt={emblem.name}
+              alt={label}
               loading="lazy"
               className="h-12 w-12 object-contain"
             />

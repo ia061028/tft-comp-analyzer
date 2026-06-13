@@ -172,9 +172,21 @@ async function buildPuuidPool(
     const masterSampled = sample(masterValid, config.masterSamplePerPlatform)
     addAll(masterSampled)
 
+    // Diamond I〜IV。entries エンドポイントは LeagueEntry[] を直接返す（page=1 のみ取得）。
+    let diamondSampled = 0
+    for (const div of ['I', 'II', 'III', 'IV'] as const) {
+      const entries = await client.get<LeagueEntry[]>(
+        `${host}/tft/league/v1/entries/DIAMOND/${div}?page=1`,
+      )
+      const valid = (entries ?? []).filter((e) => e.puuid)
+      const sampled = sample(valid, config.diamondSamplePerDivision)
+      addAll(sampled)
+      diamondSampled += sampled.length
+    }
+
     console.log(
       `  [${platform}] challenger=${chalEntries.length} grandmaster=${gmEntries.length} ` +
-        `master=${masterEntries.length}(抽選${masterSampled.length}) → 新規puuid+${added}`,
+        `master=${masterEntries.length}(抽選${masterSampled.length}) diamond(抽選${diamondSampled}) → 新規puuid+${added}`,
     )
   }
 
@@ -223,6 +235,11 @@ function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemCon
       }
     }
 
+    // ユニット別の完成アイテム（u と同インデックス）。推奨アイテム表示用。
+    const ui: string[][] = part.units.map((unit) =>
+      (unit.itemNames ?? []).filter((it) => emblemCtx.completedItems.has(it)),
+    )
+
     records.push({
       m: matchId,
       v,
@@ -231,6 +248,7 @@ function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemCon
       e,
       eh,
       u,
+      ui,
       lv: part.level,
       ts,
     })

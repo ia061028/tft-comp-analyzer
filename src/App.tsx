@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { StatsFile } from '../shared/types'
+import type { Lang } from './lib/i18n'
 import { loadStats } from './lib/data'
 import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
 import { CompList } from './components/CompList'
 
 type SortKey = 'place' | 'top4' | 'win' | 'pick'
+type LevelKey = 'all' | '7' | '8' | '9' | '10'
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
@@ -18,6 +20,8 @@ function App() {
   const [selection, setSelection] = useState<number[]>([])
   const [sortKey, setSortKey] = useState<SortKey>('place')
   const [minSample, setMinSample] = useState<number | null>(null)
+  const [lang, setLang] = useState<Lang>('ja')
+  const [level, setLevel] = useState<LevelKey>('all')
 
   useEffect(() => {
     let cancelled = false
@@ -71,6 +75,10 @@ function App() {
   const appliedMinSample =
     selection.length > 0 ? Math.min(baseMinSample, emblemMinSample) : baseMinSample
 
+  // 表示する構成: 全体 or レベル別（古い stats.json に compsByLevel が無い場合は空配列）。
+  const selectedComps =
+    level === 'all' ? stats.comps : (stats.compsByLevel?.[level] ?? [])
+
   // selection は emblems 配列インデックスのマルチセット。counts[index] = 個数。
   const counts = stats.emblems.map(() => 0)
   for (const idx of selection) counts[idx] = (counts[idx] ?? 0) + 1
@@ -94,15 +102,51 @@ function App() {
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h1 className="text-xl font-bold text-zinc-100">TFT 紋章構成アナライザー</h1>
           <span className="text-sm text-zinc-400">
-            Set {stats.setNumber} ・ patch {stats.patch}
+            Set {stats.setNumber} ・ TFT {stats.tftPatch ?? stats.patch}
           </span>
           <span className="text-sm text-zinc-400">
             {stats.totals.matches.toLocaleString()} マッチ
           </span>
           <span className="text-xs text-zinc-500">生成 {generatedAt}</span>
+          <button
+            type="button"
+            onClick={() => setLang((l) => (l === 'ja' ? 'en' : 'ja'))}
+            className="ml-auto rounded border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-800"
+            title="表示言語を切替"
+          >
+            {lang === 'ja' ? '日本語' : 'EN'}
+          </button>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-6">
+          <div className="flex items-center gap-2 text-sm text-zinc-300">
+            <span className="shrink-0">レベル</span>
+            <div className="inline-flex overflow-hidden rounded border border-zinc-700">
+              {(
+                [
+                  ['all', '全体'],
+                  ['7', 'Lv7'],
+                  ['8', 'Lv8'],
+                  ['9', 'Lv9'],
+                  ['10', 'Lv10'],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setLevel(key)}
+                  className={`px-3 py-1 text-sm ${
+                    level === key
+                      ? 'bg-amber-400 font-semibold text-zinc-950'
+                      : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex items-center gap-2 text-sm text-zinc-300">
             <span className="shrink-0">並び替え</span>
             <div className="inline-flex overflow-hidden rounded border border-zinc-700">
@@ -158,18 +202,21 @@ function App() {
           <EmblemGrid
             emblems={stats.emblems}
             counts={counts}
+            lang={lang}
             onAdd={addEmblem}
             onRemove={removeEmblem}
           />
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          <SelectionBar emblems={stats.emblems} counts={counts} onClear={clear} />
+          <SelectionBar emblems={stats.emblems} counts={counts} lang={lang} onClear={clear} />
           <CompList
             stats={stats}
+            comps={selectedComps}
             sel={selection}
             sortKey={sortKey}
             minSample={appliedMinSample}
+            lang={lang}
           />
         </main>
       </div>

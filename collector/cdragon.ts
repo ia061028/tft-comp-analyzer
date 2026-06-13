@@ -1,12 +1,14 @@
-// Community Dragon の TFT 静的データ（en_us.json）から紋章コンテキストを取得する最小実装。
-// Phase 3 でトレイト/ユニット辞書・アイコンURL変換に拡張予定。
+// Community Dragon の TFT 静的データから紋章/トレイト/ユニット/アイテム辞書を取得する。
+// 構造判定は en_us を一次情報とし、表示名は ja_jp も取得して両言語を保持する。
 
 const CDRAGON_URL = 'https://raw.communitydragon.org/latest/cdragon/tft/en_us.json'
+const CDRAGON_URL_JA = 'https://raw.communitydragon.org/latest/cdragon/tft/ja_jp.json'
 
 interface CDragonItem {
   apiName?: string
   associatedTraits?: string[]
   incompatibleTraits?: string[]
+  composition?: string[]
   name?: string
   icon?: string
 }
@@ -21,6 +23,7 @@ interface CDragonChampion {
   apiName?: string
   name?: string
   cost?: number
+  traits?: string[]
   icon?: string
   squareIcon?: string
   tileIcon?: string
@@ -42,6 +45,8 @@ export interface EmblemContext {
   emblemSet: Set<string>
   /** items 全体の apiName 集合（CDragon が知っている全アイテム）。 */
   knownItems: Set<string>
+  /** 完成アイテム（composition 2要素 かつ 非紋章）の apiName 集合。ユニット別アイテム収集に使用。 */
+  completedItems: Set<string>
 }
 
 /**
@@ -62,14 +67,18 @@ export async function getEmblemContext(): Promise<EmblemContext> {
 
   const emblemSet = new Set<string>()
   const knownItems = new Set<string>()
+  const completedItems = new Set<string>()
   for (const item of items) {
     if (!item.apiName) continue
     knownItems.add(item.apiName)
-    if (Array.isArray(item.incompatibleTraits) && item.incompatibleTraits.length > 0) {
-      emblemSet.add(item.apiName)
+    const isEmblem = Array.isArray(item.incompatibleTraits) && item.incompatibleTraits.length > 0
+    if (isEmblem) emblemSet.add(item.apiName)
+    // 完成アイテム = 2コンポーネント合成 かつ 紋章でない。
+    if (!isEmblem && Array.isArray(item.composition) && item.composition.length === 2) {
+      completedItems.add(item.apiName)
     }
   }
-  return { emblemSet, knownItems }
+  return { emblemSet, knownItems, completedItems }
 }
 
 // ---- フル静的辞書（aggregate 用） ----
@@ -83,19 +92,45 @@ function iconUrl(path: string | undefined): string {
   return ICON_PREFIX + lower
 }
 
+/** チームプランナーのチャンピオンロスター外（非ショップ）apiName を弾く名前パターン。 */
+const NON_SHOP_RE = /Minion|Summon|FakeUnit|Enemy_|PVE|TrainingDummy|ArmoryKey|Chest|Core|Golem|Crab/
+
 export interface StaticData {
   setNumber: number
-  /** apiName → 表示名・アイコンURL */
-  traits: Map<string, { name: string; icon: string }>
-  /** champions apiName → 表示名・コスト・アイコンURL */
-  units: Map<string, { name: string; cost: number; icon: string }>
+  /** apiName → 表示名(en/ja)・アイコンURL */
+  traits: Map<string, { name: string; nameJa: string; icon: string }>
+  /** champions apiName → 表示名(en/ja)・コスト・アイコンURL・プランナーcode */
+  units: Map<string, { name: string; nameJa: string; cost: number; icon: string; code: number }>
   /**
    * 紋章(incompatibleTraits で付与トレイトを示すアイテム) apiName → 表示名・解決済み traitApi・アイコンURL。
    * traitApi は表示/クラスタ参照用の単一トレイト（先頭の解決トレイト）。
    * traitApis は発動判定用の全付与トレイト集合（Stargazer 等は基底＋変種が全て入る）。
    */
-  emblems: Map<string, { name: string; traitApi: string; traitApis: string[]; icon: string }>
+  emblems: Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string }>
+  /** 完成アイテム apiName → 表示名(en/ja)・アイコンURL */
+  items: Map<string, { name: string; nameJa: string; icon: string }>
   warnings: string[]
+}
+
+/** ja_jp を取得して apiName→日本語名 のマップ群を返す。取得失敗時は空マップ（en名にフォールバック）。 */
+async function fetchJaNames(
+  setNumber: number,
+): Promise<{ traits: Map<string, string>; units: Map<string, string>; items: Map<string, string> }> {
+  const traits = new Map<string, string>()
+  const units = new Map<string, string>()
+  const items = new Map<string, string>()
+  try {
+    const res = await fetch(CDRAGON_URL_JA)
+    if (!res.ok) return { traits, units, items }
+    const data = (await res.json()) as CDragonData
+    const jaSet = (data.setData ?? []).find((s) => s.number === setNumber)
+    for (const t of jaSet?.traits ?? []) if (t.apiName && t.name) traits.set(t.apiName, t.name)
+    for (const c of jaSet?.champions ?? []) if (c.apiName && c.name) units.set(c.apiName, c.name)
+    for (const i of data.items ?? []) if (i.apiName && i.name) items.set(i.apiName, i.name)
+  } catch {
+    // ネットワーク等の失敗時は en 名にフォールバック（空マップを返す）。
+  }
+  return { traits, units, items }
 }
 
 /**
@@ -132,12 +167,16 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
   }
   const setNumber = chosen.number ?? -1
 
+  // 日本語名（同セット番号から）
+  const ja = await fetchJaNames(setNumber)
+
   // traits
-  const traits = new Map<string, { name: string; icon: string }>()
+  const traits = new Map<string, { name: string; nameJa: string; icon: string }>()
   const traitNameToApi = new Map<string, string>()
   for (const t of chosen.traits ?? []) {
     if (!t.apiName) continue
-    traits.set(t.apiName, { name: t.name ?? t.apiName, icon: iconUrl(t.icon) })
+    const name = t.name ?? t.apiName
+    traits.set(t.apiName, { name, nameJa: ja.traits.get(t.apiName) ?? name, icon: iconUrl(t.icon) })
     if (t.name) traitNameToApi.set(t.name, t.apiName)
   }
 
@@ -150,18 +189,42 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
     )
   }
 
-  // units（champions）
-  const units = new Map<string, { name: string; cost: number; icon: string }>()
+  // units（champions）。プランナーcode = ショップロスターを apiName 昇順にした1始まり位置。
+  const setPrefix = `TFT${setNumber}_`
+  const roster = (chosen.champions ?? [])
+    .filter(
+      (c) =>
+        c.apiName &&
+        c.apiName.startsWith(setPrefix) &&
+        (c.cost ?? 0) >= 1 &&
+        (c.cost ?? 0) <= 5 &&
+        Array.isArray(c.traits) &&
+        c.traits.length > 0 &&
+        !NON_SHOP_RE.test(c.apiName),
+    )
+    .map((c) => c.apiName!)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  const codeByApi = new Map<string, number>()
+  roster.forEach((api, i) => codeByApi.set(api, i + 1))
+
+  const units = new Map<string, { name: string; nameJa: string; cost: number; icon: string; code: number }>()
   for (const c of chosen.champions ?? []) {
     if (!c.apiName) continue
     const icon = iconUrl(c.squareIcon ?? c.tileIcon ?? c.icon)
-    units.set(c.apiName, { name: c.name ?? c.apiName, cost: c.cost ?? 0, icon })
+    const name = c.name ?? c.apiName
+    units.set(c.apiName, {
+      name,
+      nameJa: ja.units.get(c.apiName) ?? name,
+      cost: c.cost ?? 0,
+      icon,
+      code: codeByApi.get(c.apiName) ?? 0,
+    })
   }
 
   // emblems（incompatibleTraits で付与トレイトを示すアイテム）
   // 付与トレイトが選定セットのトレイトに解決できるものだけを紋章として採用する。
   // これにより他セットのスパチュラ系アイテムや、別機構（オーグメント/Anima 系）は自然に除外される。
-  const emblems = new Map<string, { name: string; traitApi: string; traitApis: string[]; icon: string }>()
+  const emblems = new Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string }>()
   let unresolvedEmblemCount = 0
   for (const item of data.items ?? []) {
     if (!item.apiName) continue
@@ -180,8 +243,10 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
       unresolvedEmblemCount++
       continue
     }
+    const name = item.name ?? item.apiName
     emblems.set(item.apiName, {
-      name: item.name ?? item.apiName,
+      name,
+      nameJa: ja.items.get(item.apiName) ?? name,
       traitApi: traitApis[0],
       traitApis,
       icon: iconUrl(item.icon),
@@ -193,5 +258,16 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
     )
   }
 
-  return { setNumber, traits, units, emblems, warnings }
+  // items（完成アイテム = composition 2要素 かつ 非紋章）。推奨アイテム表示用。
+  const items = new Map<string, { name: string; nameJa: string; icon: string }>()
+  for (const item of data.items ?? []) {
+    if (!item.apiName) continue
+    const isEmblem = Array.isArray(item.incompatibleTraits) && item.incompatibleTraits.length > 0
+    if (isEmblem) continue
+    if (!Array.isArray(item.composition) || item.composition.length !== 2) continue
+    const name = item.name ?? item.apiName
+    items.set(item.apiName, { name, nameJa: ja.items.get(item.apiName) ?? name, icon: iconUrl(item.icon) })
+  }
+
+  return { setNumber, traits, units, emblems, items, warnings }
 }
