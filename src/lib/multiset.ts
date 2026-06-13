@@ -27,16 +27,18 @@ export function isMultisetSubset(sel: number[], row: number[]): boolean {
 export function aggregateComp(
   comp: CompStats,
   sel: number[],
-): { n: number; top4: number; win: number } {
+): { n: number; top4: number; win: number; p: number } {
   let n = 0
   let top4 = 0
   let win = 0
+  let p = 0
   for (const row of comp.rows) {
     if (isMultisetSubset(sel, row.e)) {
       n += row.n
       top4 += row.top4
       win += row.win
+      p += row.p
     }
   }
-  return { n, top4, win }
+  return { n, top4, win, p }
 }
