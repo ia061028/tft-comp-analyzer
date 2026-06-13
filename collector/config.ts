@@ -28,6 +28,11 @@ export const config = {
   maxNewMatchesPerRoutePerRun: 1000,
   /** Master帯からプラットフォームごとに抽選する人数の上限 */
   masterSamplePerPlatform: 100,
+  /**
+   * Diamond帯も収集対象に含めるか。dev キーのレート上限を避けるため既定 false。
+   * 本番APIキー切替後に true にする。
+   */
+  enableDiamond: false,
   /** Diamond帯からプラットフォーム×ディビジョンごとに抽選する人数の上限 */
   diamondSamplePerDivision: 50,
   /** 構成クラスタキーに含めるトレイトの最小style（3=ゴールド以上） */

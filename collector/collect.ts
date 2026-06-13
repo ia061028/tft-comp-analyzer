@@ -173,15 +173,18 @@ async function buildPuuidPool(
     addAll(masterSampled)
 
     // Diamond I〜IV。entries エンドポイントは LeagueEntry[] を直接返す（page=1 のみ取得）。
+    // 本番APIキー前提のため config.enableDiamond で切替（dev キーではレート上限回避のため既定 off）。
     let diamondSampled = 0
-    for (const div of ['I', 'II', 'III', 'IV'] as const) {
-      const entries = await client.get<LeagueEntry[]>(
-        `${host}/tft/league/v1/entries/DIAMOND/${div}?page=1`,
-      )
-      const valid = (entries ?? []).filter((e) => e.puuid)
-      const sampled = sample(valid, config.diamondSamplePerDivision)
-      addAll(sampled)
-      diamondSampled += sampled.length
+    if (config.enableDiamond) {
+      for (const div of ['I', 'II', 'III', 'IV'] as const) {
+        const entries = await client.get<LeagueEntry[]>(
+          `${host}/tft/league/v1/entries/DIAMOND/${div}?page=1`,
+        )
+        const valid = (entries ?? []).filter((e) => e.puuid)
+        const sampled = sample(valid, config.diamondSamplePerDivision)
+        addAll(sampled)
+        diamondSampled += sampled.length
+      }
     }
 
     console.log(
