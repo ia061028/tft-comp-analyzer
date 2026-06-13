@@ -66,15 +66,20 @@ export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
   const rows = comps
     .map((comp) => {
       const agg = aggregateComp(comp, sel)
-      const avgPlace = agg.n > 0 ? agg.p / agg.n : 0
+      // p が無い（古い stats.json）場合 agg.p は NaN になりうるため有限性を判定。
+      const avgPlace = agg.n > 0 && Number.isFinite(agg.p) ? agg.p / agg.n : NaN
       const pickRate = totals.participants > 0 ? agg.n / totals.participants : 0
       return { comp, agg, avgPlace, pickRate }
     })
     .filter(({ agg }) => agg.n > 0 && agg.n >= minSample)
     .sort((a, b) => {
       switch (sortKey) {
-        case 'place':
-          return a.avgPlace - b.avgPlace // 昇順（小さいほど良い）
+        case 'place': {
+          // 昇順（小さいほど良い）。平均順位不明（NaN）は末尾へ。
+          const av = Number.isFinite(a.avgPlace) ? a.avgPlace : Infinity
+          const bv = Number.isFinite(b.avgPlace) ? b.avgPlace : Infinity
+          return av - bv
+        }
         case 'win':
           return b.agg.win / b.agg.n - a.agg.win / a.agg.n
         case 'pick':
@@ -96,7 +101,10 @@ export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
   return (
     <div className="flex flex-col gap-2">
       {rows.map(({ comp, agg, avgPlace, pickRate }) => {
-        const tier = tierOf(avgPlace)
+        const hasPlace = Number.isFinite(avgPlace)
+        const tier = hasPlace
+          ? tierOf(avgPlace)
+          : { label: '?', classes: 'bg-zinc-700 text-zinc-300' }
         const metricCell = (active: boolean, label: string, value: string) => (
           <div
             className={`flex items-baseline justify-between gap-2 rounded px-1.5 py-0.5 ${
@@ -115,7 +123,7 @@ export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
             {/* ティアバッジ */}
             <div
               className={`flex w-9 shrink-0 items-center justify-center rounded-md text-xl font-black ${tier.classes}`}
-              title={`平均順位 ${avgPlace.toFixed(2)}`}
+              title={hasPlace ? `平均順位 ${avgPlace.toFixed(2)}` : '平均順位データなし'}
             >
               {tier.label}
             </div>
@@ -213,7 +221,7 @@ export function CompList({ stats, sel, sortKey, minSample }: CompListProps) {
                     sortKey === 'place' ? 'text-amber-300' : 'text-zinc-100'
                   }`}
                 >
-                  {avgPlace.toFixed(2)}
+                  {hasPlace ? avgPlace.toFixed(2) : '—'}
                 </span>
               </div>
               {metricCell(sortKey === 'top4', 'Top4', pct(agg.top4, agg.n))}
