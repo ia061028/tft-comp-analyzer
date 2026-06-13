@@ -212,11 +212,13 @@ function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemCon
     const u: string[] = part.units.map((unit) => unit.character_id)
 
     const e: string[] = []
+    const eh: string[] = []
     for (const unit of part.units) {
       for (const itemName of unit.itemNames ?? []) {
         // 紋章セットに含まれる、または CDragon が知らない（パッチ追従遅延対策）アイテムを収集。
         if (emblemCtx.emblemSet.has(itemName) || !emblemCtx.knownItems.has(itemName)) {
           e.push(itemName)
+          eh.push(unit.character_id)
         }
       }
     }
@@ -227,6 +229,7 @@ function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemCon
       p: part.placement,
       t,
       e,
+      eh,
       u,
       lv: part.level,
       ts,

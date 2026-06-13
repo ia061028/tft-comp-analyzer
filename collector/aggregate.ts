@@ -156,6 +156,8 @@ async function main(): Promise<void> {
     unitCounts: Map<string, number>
     // 紋章マルチセット（emblem apiName ソート済み JSON）→ 集計
     rows: Map<string, { emblems: string[]; n: number; top4: number; win: number }>
+    // 紋章 apiName → 装備ユニット(character_id) → 回数（holder 集計用、eh ありレコードのみ）
+    holderCounts: Map<string, Map<string, number>>
   }
   const clusters = new Map<string, ClusterAcc>()
 
@@ -175,15 +177,16 @@ async function main(): Promise<void> {
       continue
     }
 
-    // クラスタキー: style>=minStyle のトレイト apiName ソート。
-    const keyTraits: string[] = []
-    for (const [tApi, style] of Object.entries(rec.t)) {
-      if (style >= config.clusterMinStyle) keyTraits.push(tApi)
-    }
-    if (keyTraits.length === 0) {
+    // クラスタキー: style>=minStyle のトレイトのうち、スタイル降順（同点は apiName 昇順）で
+    // 上位 clusterMaxKeyTraits 件を採用し、apiName 昇順で連結（決定的）。
+    // 全ゴールドをキーにすると細分化しすぎるため、定義的な上位トレイトのみで集約する。
+    const goldTraits = Object.entries(rec.t).filter(([, style]) => style >= config.clusterMinStyle)
+    if (goldTraits.length === 0) {
       noClusterKey++
       continue
     }
+    goldTraits.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    const keyTraits = goldTraits.slice(0, config.clusterMaxKeyTraits).map(([tApi]) => tApi)
     keyTraits.sort()
     const clusterKey = keyTraits.join('|')
 
@@ -197,6 +200,7 @@ async function main(): Promise<void> {
         styleLists: new Map(),
         unitCounts: new Map(),
         rows: new Map(),
+        holderCounts: new Map(),
       }
       clusters.set(clusterKey, acc)
     }
@@ -225,13 +229,27 @@ async function main(): Promise<void> {
     // （= シナジー発動中）。t のキーは発動トレイト全体（style 不問）。
     const recTraitKeys = new Set(Object.keys(rec.t))
     const activeEmblems: string[] = []
-    for (const eApi of rec.e) {
+    for (let k = 0; k < rec.e.length; k++) {
+      const eApi = rec.e[k]
       const emb = staticData.emblems.get(eApi)
       if (!emb) {
         unresolvedEmblemNames.add(eApi)
         continue
       }
-      if (recTraitKeys.has(emb.traitApi)) activeEmblems.push(eApi)
+      // 発動判定: 紋章の付与トレイト（変種含む全集合）のいずれかが当該レコードで発動中なら採用。
+      if (!emb.traitApis.some((a) => recTraitKeys.has(a))) continue
+      activeEmblems.push(eApi)
+
+      // 装備ユニット（holder）を集計。eh は e と同インデックス。解決できるユニットのみ。
+      const holder = rec.eh?.[k]
+      if (holder && staticData.units.has(holder)) {
+        let hc = acc.holderCounts.get(eApi)
+        if (!hc) {
+          hc = new Map()
+          acc.holderCounts.set(eApi, hc)
+        }
+        hc.set(holder, (hc.get(holder) ?? 0) + 1)
+      }
     }
     activeEmblems.sort()
     const rowKey = activeEmblems.join('|')
@@ -264,6 +282,8 @@ async function main(): Promise<void> {
     traitModeStyle: Map<string, number>
     unitApis: string[] // 上位8（コスト/名前順は後で）
     rows: { emblems: string[]; n: number; top4: number; win: number }[]
+    // 紋章ごとの最頻装備ユニット: [emblemApi, holderApi, count]
+    holders: [string, string, number][]
   }
   const preComps: PreComp[] = []
 
@@ -286,6 +306,28 @@ async function main(): Promise<void> {
     const topUnits = unitEntries.slice(0, 8).map((e) => e[0])
     for (const u of topUnits) usedUnitApis.add(u)
 
+    // 紋章ごとの最頻装備ユニット（count 降順、同数は名前昇順で決定的に）。
+    const holders: [string, string, number][] = []
+    for (const [emblemApi, hc] of acc.holderCounts) {
+      let bestUnit: string | undefined
+      let bestCount = -1
+      for (const [unitApi, count] of hc) {
+        if (
+          count > bestCount ||
+          (count === bestCount &&
+            bestUnit !== undefined &&
+            staticData.units.get(unitApi)!.name < staticData.units.get(bestUnit)!.name)
+        ) {
+          bestCount = count
+          bestUnit = unitApi
+        }
+      }
+      if (bestUnit !== undefined) {
+        holders.push([emblemApi, bestUnit, bestCount])
+        usedUnitApis.add(bestUnit)
+      }
+    }
+
     // 紋章 used 集合は「e に出現し辞書解決できた全紋章」（発動の有無に関わらず）なので、
     // rows（発動済みのみ）ではなく target レコードを別途走査して収集する（下のループ）。
 
@@ -297,6 +339,7 @@ async function main(): Promise<void> {
       traitModeStyle,
       unitApis: topUnits,
       rows: [...acc.rows.values()],
+      holders,
     })
   }
 
@@ -406,6 +449,15 @@ async function main(): Promise<void> {
         return 0
       })
 
+    // holders: [emblemIdx, unitIdx, count]。emblemIdx 昇順で決定的に。
+    const holders: [number, number, number][] = pc.holders
+      .map(([emblemApi, unitApi, count]): [number, number, number] => [
+        emblemIndex.get(emblemApi)!,
+        unitIndex.get(unitApi)!,
+        count,
+      ])
+      .sort((a, b) => a[0] - b[0])
+
     return {
       traits: traitPairs,
       label,
@@ -414,6 +466,7 @@ async function main(): Promise<void> {
       top4: pc.top4,
       win: pc.win,
       rows,
+      holders,
     }
   })
 
@@ -432,7 +485,11 @@ async function main(): Promise<void> {
     generatedAt: new Date().toISOString(),
     patch: targetPatch,
     setNumber: staticData.setNumber,
-    config: { minStyle: config.clusterMinStyle, minSampleDefault: config.minSampleDefault },
+    config: {
+      minStyle: config.clusterMinStyle,
+      minSampleDefault: config.minSampleDefault,
+      emblemMinSample: config.emblemMinSample,
+    },
     totals: {
       matches: uniqueMatches.size,
       participants: target.length,

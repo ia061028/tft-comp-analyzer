@@ -46,7 +46,10 @@ function pct(num: number, den: number): string {
 }
 
 export function CompList({ stats, sel, metric, minSample }: CompListProps) {
-  const { comps, traits, units } = stats
+  const { comps, traits, units, emblems } = stats
+
+  // 選択中の紋章（重複を除いた登場順）。装備者表示に使う。
+  const selectedEmblems = [...new Set(sel)]
 
   const rows = comps
     .map((comp) => ({ comp, agg: aggregateComp(comp, sel) }))
@@ -123,6 +126,42 @@ export function CompList({ stats, sel, metric, minSample }: CompListProps) {
                   )
                 })}
               </div>
+
+              {selectedEmblems.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {selectedEmblems.map((emblemIdx) => {
+                    const emblem = emblems[emblemIdx]
+                    if (!emblem) return null
+                    const holder = comp.holders.find((h) => h[0] === emblemIdx)
+                    const holderUnit = holder ? units[holder[1]] : undefined
+                    return (
+                      <div key={emblemIdx} className="flex items-center gap-1">
+                        <img
+                          src={emblem.icon}
+                          alt={emblem.name}
+                          title={emblem.name}
+                          loading="lazy"
+                          className="h-5 w-5 object-contain"
+                        />
+                        <span className="text-zinc-600">→</span>
+                        {holderUnit ? (
+                          <img
+                            src={holderUnit.icon}
+                            alt={holderUnit.name}
+                            title={`${holderUnit.name}（装備 ${holder![2]}回）`}
+                            loading="lazy"
+                            className={`h-7 w-7 rounded border object-cover ${costBorder(
+                              holderUnit.cost,
+                            )}`}
+                          />
+                        ) : (
+                          <span className="text-xs text-zinc-600">データなし</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="shrink-0 text-right">

@@ -30,8 +30,12 @@ export const config = {
   masterSamplePerPlatform: 100,
   /** 構成クラスタキーに含めるトレイトの最小style（3=ゴールド以上） */
   clusterMinStyle: 3,
+  /** クラスタキーに含める上位トレイト数（スタイル降順で上位N件のみをキー化） */
+  clusterMaxKeyTraits: 2,
   /** UI表示のサンプル数閾値デフォルト */
   minSampleDefault: 20,
+  /** 紋章選択時にUIで適用する最小サンプル閾値（選択中はこの値まで自動で緩和） */
+  emblemMinSample: 5,
   /** 新パッチがこの試合数を超えたら集計対象を切替・旧パッチをprune */
   patchSwitchThreshold: 200,
   /** 実行時間バジェット（分）。残り5分で取得を打ち切り集計とflushを実施 */

@@ -12,6 +12,8 @@ export interface ParticipantRecord {
   t: Record<string, number>
   /** 装備された紋章アイテムの apiName（重複保持・発動フィルタは集計時に適用） */
   e: string[]
+  /** e と同インデックスで対応する装備ユニットの character_id（旧レコードは欠落） */
+  eh?: string[]
   /** 盤面ユニットの character_id */
   u: string[]
   /** プレイヤーレベル */
@@ -51,7 +53,7 @@ export interface EmblemRow {
 }
 
 export interface CompStats {
-  /** クラスタキー: [traitIdx, 最頻style] のソート済みペア（style>=minStyle のトレイトのみ） */
+  /** クラスタキー: [traitIdx, 最頻style] のソート済みペア（スタイル上位 clusterMaxKeyTraits 件） */
   traits: [number, number][]
   label: string
   /** クラスタ内最頻ユニット（units 配列インデックス、コスト順） */
@@ -60,6 +62,11 @@ export interface CompStats {
   top4: number
   win: number
   rows: EmblemRow[]
+  /**
+   * この構成で各紋章を最も多く装備したユニット。
+   * [emblemIdx, unitIdx, count]。holder が分かるレコード（eh あり）からのみ集計。
+   */
+  holders: [number, number, number][]
 }
 
 /** public/data/stats.json 全体 */
@@ -68,7 +75,7 @@ export interface StatsFile {
   generatedAt: string
   patch: string
   setNumber: number
-  config: { minStyle: number; minSampleDefault: number }
+  config: { minStyle: number; minSampleDefault: number; emblemMinSample: number }
   totals: {
     matches: number
     participants: number

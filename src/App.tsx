@@ -64,7 +64,12 @@ function App() {
   }
 
   const stats = load.stats
-  const effectiveMinSample = minSample ?? stats.config.minSampleDefault
+  // スライダー基準値。紋章選択中は対象サンプルが小さくなるため実効閾値を緩和する。
+  const baseMinSample = minSample ?? stats.config.minSampleDefault
+  const appliedMinSample =
+    selection.length > 0
+      ? Math.min(baseMinSample, stats.config.emblemMinSample)
+      : baseMinSample
 
   // selection は emblems 配列インデックスのマルチセット。counts[index] = 個数。
   const counts = stats.emblems.map(() => 0)
@@ -121,13 +126,18 @@ function App() {
               type="range"
               min={0}
               max={100}
-              value={effectiveMinSample}
+              value={baseMinSample}
               onChange={(e) => setMinSample(Number(e.target.value))}
               className="w-48 accent-amber-400"
             />
             <span className="w-8 text-right tabular-nums text-zinc-100">
-              {effectiveMinSample}
+              {baseMinSample}
             </span>
+            {selection.length > 0 && appliedMinSample !== baseMinSample && (
+              <span className="text-xs text-amber-300/80">
+                紋章選択中: 最小 {appliedMinSample}
+              </span>
+            )}
           </label>
         </div>
       </header>
@@ -149,7 +159,7 @@ function App() {
             stats={stats}
             sel={selection}
             metric={metric}
-            minSample={effectiveMinSample}
+            minSample={appliedMinSample}
           />
         </main>
       </div>
