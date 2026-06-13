@@ -149,8 +149,10 @@ async function main(): Promise<void> {
     n: number
     top4: number
     win: number
-    // トレイト apiName → style 値リスト（最頻 style 算出用）
+    // トレイト apiName → style 値リスト（最頻 style 算出用、代表シナジー判定にも使用）
     styleLists: Map<string, number[]>
+    // トレイト apiName → num_units 値リスト（代表ユニット数算出用、tc ありレコードのみ）
+    countLists: Map<string, number[]>
     // unit apiName → 出現回数
     unitCounts: Map<string, number>
     // 紋章マルチセット（emblem apiName ソート済み JSON）→ 集計（p=順位合計）
@@ -209,6 +211,7 @@ async function main(): Promise<void> {
           top4: 0,
           win: 0,
           styleLists: new Map(),
+          countLists: new Map(),
           unitCounts: new Map(),
           rows: new Map(),
           holderCounts: new Map(),
@@ -228,6 +231,12 @@ async function main(): Promise<void> {
         const list = acc.styleLists.get(tApi) ?? []
         list.push(style)
         acc.styleLists.set(tApi, list)
+        const cnt = rec.tc?.[tApi]
+        if (cnt && cnt > 0) {
+          const clist = acc.countLists.get(tApi) ?? []
+          clist.push(cnt)
+          acc.countLists.set(tApi, clist)
+        }
       }
 
       // ユニット出現＋ユニット別完成アイテム（解決できるものだけ）
@@ -308,7 +317,7 @@ async function main(): Promise<void> {
     top4: number
     win: number
     traitModeStyle: Map<string, number>
-    synergies: [string, number][] // [traitApi, modeStyle] 過半数で発動の代表シナジー
+    synergies: [string, number, number][] // [traitApi, modeStyle, modeCount] 過半数で発動の代表シナジー
     unitApis: string[]
     unitStarByApi: Map<string, number> // unitApi → 代表スター(mode)
 
@@ -330,10 +339,12 @@ async function main(): Promise<void> {
     }
 
     // 代表シナジー: クラスタの過半数(>=SYNERGY_MIN_FREQ)で発動しているトレイト。
-    const synergies: [string, number][] = []
+    // modeCount は最頻ユニット数（tc が無い旧データは 0）。
+    const synergies: [string, number, number][] = []
     for (const [tApi, list] of acc.styleLists) {
       if (list.length / acc.n >= SYNERGY_MIN_FREQ) {
-        synergies.push([tApi, modeMaxNumber(list) ?? 0])
+        const modeCount = modeMaxNumber(acc.countLists.get(tApi) ?? []) ?? 0
+        synergies.push([tApi, modeMaxNumber(list) ?? 0, modeCount])
         usedTraitApis.add(tApi)
       }
     }
@@ -533,9 +544,9 @@ async function main(): Promise<void> {
     const label = labelParts.map((p) => p.name).join(' / ')
     const labelJa = labelParts.map((p) => p.nameJa).join(' / ')
 
-    // synergies: 代表シナジー [traitIdx, modeStyle]。style 降順→トレイト名昇順。
-    const synergies: [number, number][] = pc.synergies
-      .map(([api, style]): [number, number] => [traitIndex.get(api)!, style])
+    // synergies: 代表シナジー [traitIdx, modeStyle, modeCount]。style 降順→トレイト名昇順。
+    const synergies: [number, number, number][] = pc.synergies
+      .map(([api, style, count]): [number, number, number] => [traitIndex.get(api)!, style, count])
       .sort((a, b) => {
         if (b[1] !== a[1]) return b[1] - a[1]
         const na = traitsOut[a[0]].name

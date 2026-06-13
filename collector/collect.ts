@@ -46,6 +46,8 @@ interface MatchTrait {
   name: string
   tier_current: number
   style: number
+  /** 発動ユニット数 */
+  num_units: number
 }
 
 interface MatchUnit {
@@ -220,9 +222,11 @@ function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemCon
   const records: ParticipantRecord[] = []
   for (const part of info.participants) {
     const t: Record<string, number> = {}
+    const tc: Record<string, number> = {}
     for (const trait of part.traits) {
       if (trait.tier_current >= 1) {
         t[trait.name] = trait.style
+        tc[trait.name] = trait.num_units
       }
     }
 
@@ -253,6 +257,7 @@ function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemCon
       v,
       p: part.placement,
       t,
+      tc,
       e,
       eh,
       u,
