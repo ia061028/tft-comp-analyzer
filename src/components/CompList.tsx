@@ -192,7 +192,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
                 <span className="shrink-0 rounded bg-zinc-700/70 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-200">
                   {t(lang, 'activeTraits', { n: (comp.synergies ?? comp.traits).length })}
                 </span>
-                {(comp.synergies ?? comp.traits).map(([traitIdx, style]) => {
+                {(comp.synergies ?? comp.traits).map(([traitIdx, style, count]) => {
                   const trait = traits[traitIdx]
                   return (
                     <span
@@ -210,6 +210,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
                         />
                       )}
                       {trait ? pickName(lang, trait) : `#${traitIdx}`}
+                      {count ? <span className="tabular-nums opacity-90">{count}</span> : null}
                     </span>
                   )
                 })}

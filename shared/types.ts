@@ -10,6 +10,8 @@ export interface ParticipantRecord {
   p: number
   /** 発動トレイト（tier_current>=1）→ style（1=ブロンズ,2=シルバー,3=ゴールド,4=プリズム） */
   t: Record<string, number>
+  /** 発動トレイト → ユニット数(num_units)。例: ブローラー2なら2（旧レコードは欠落） */
+  tc?: Record<string, number>
   /** 装備された紋章アイテムの apiName（重複保持・発動フィルタは集計時に適用） */
   e: string[]
   /** e と同インデックスで対応する装備ユニットの character_id（旧レコードは欠落） */
@@ -78,10 +80,11 @@ export interface CompStats {
   /** クラスタキー: [traitIdx, 最頻style] のソート済みペア（スタイル上位 clusterMaxKeyTraits 件、label構築用） */
   traits: [number, number][]
   /**
-   * この構成で代表的に発動しているシナジー [traitIdx, 最頻style]。
+   * この構成で代表的に発動しているシナジー [traitIdx, 最頻style, 代表ユニット数]。
    * クラスタ内の過半数(>=50%)で発動(tier>=1=ブロンズ以上)しているトレイト。style降順。
+   * 代表ユニット数は最頻 num_units（旧データは 0）。
    */
-  synergies: [number, number][]
+  synergies: [number, number, number][]
   label: string
   /** 日本語の構成名（traits の日本語名で構築） */
   labelJa: string
