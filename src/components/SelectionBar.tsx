@@ -17,7 +17,7 @@ export function SelectionBar({ emblems, counts, lang, onClear }: SelectionBarPro
   if (selected.length === 0) {
     return (
       <div className="rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-400">
-        紋章を選択すると絞り込み（未選択＝全体ティアリスト）
+        紋章を選択すると、その紋章を使う構成が表示されます
       </div>
     )
   }

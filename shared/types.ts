@@ -73,8 +73,13 @@ export interface EmblemRow {
 }
 
 export interface CompStats {
-  /** クラスタキー: [traitIdx, 最頻style] のソート済みペア（スタイル上位 clusterMaxKeyTraits 件） */
+  /** クラスタキー: [traitIdx, 最頻style] のソート済みペア（スタイル上位 clusterMaxKeyTraits 件、label構築用） */
   traits: [number, number][]
+  /**
+   * この構成で代表的に発動しているシナジー [traitIdx, 最頻style]。
+   * クラスタ内の過半数(>=50%)で発動(tier>=1=ブロンズ以上)しているトレイト。style降順。
+   */
+  synergies: [number, number][]
   label: string
   /** 日本語の構成名（traits の日本語名で構築） */
   labelJa: string
