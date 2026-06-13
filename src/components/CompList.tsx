@@ -77,8 +77,17 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
   const { traits, units, emblems, items, totals } = stats
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
-  // 選択中の紋章（重複を除いた登場順）。装備者ハイライトに使う。
+  // 選択中の紋章。装備者ハイライトに使う。
   const selectedEmblemSet = new Set(sel)
+
+  // 紋章未選択時は一覧を出さず案内のみ。
+  if (sel.length === 0) {
+    return (
+      <div className="rounded-md border border-zinc-800 bg-zinc-900/40 px-4 py-12 text-center text-sm text-zinc-400">
+        左の紋章を選択すると、その紋章を使う構成が表示されます
+      </div>
+    )
+  }
 
   const rows = comps
     .map((comp) => {
@@ -110,7 +119,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
   if (rows.length === 0) {
     return (
       <div className="rounded-md border border-zinc-800 bg-zinc-900/40 px-4 py-8 text-center text-sm text-zinc-400">
-        条件に一致する構成がありません（サンプル数 {minSample} 以上）
+        条件に一致する構成がありません（頻度 {minSample} 以上）
       </div>
     )
   }
@@ -126,7 +135,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {rows.map(({ comp, agg, avgPlace, pickRate }) => {
         const key = comp.label + '|' + comp.traits.map((t) => t[0]).join(',')
         const hasPlace = Number.isFinite(avgPlace)
@@ -148,11 +157,11 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
         return (
           <div
             key={key}
-            className="flex items-stretch gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2"
+            className="flex items-stretch gap-4 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3"
           >
             {/* ティアバッジ */}
             <div
-              className={`flex w-9 shrink-0 items-center justify-center rounded-md text-xl font-black ${tier.classes}`}
+              className={`flex w-12 shrink-0 items-center justify-center rounded-md text-2xl font-black ${tier.classes}`}
               title={hasPlace ? `平均順位 ${avgPlace.toFixed(2)}` : '平均順位データなし'}
             >
               {tier.label}
@@ -160,16 +169,16 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
 
             {/* 構成本体 */}
             <div className="min-w-0 flex-1">
-              <div className="mb-1 flex flex-wrap items-center gap-1">
-                <span className="mr-1 truncate text-sm font-semibold text-zinc-100">
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 truncate text-base font-semibold text-zinc-100">
                   {compName}
                 </span>
-                {comp.traits.map(([traitIdx, style]) => {
+                {(comp.synergies ?? comp.traits).map(([traitIdx, style]) => {
                   const trait = traits[traitIdx]
                   return (
                     <span
                       key={traitIdx}
-                      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-semibold ${styleClasses(
+                      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-semibold ${styleClasses(
                         style,
                       )}`}
                     >
@@ -178,7 +187,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
                           src={trait.icon}
                           alt=""
                           loading="lazy"
-                          className="h-4 w-4 object-contain"
+                          className="h-5 w-5 object-contain"
                         />
                       )}
                       {trait ? pickName(lang, trait) : `#${traitIdx}`}
@@ -188,7 +197,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
               </div>
 
               {/* ユニット（下に推奨アイテム・装備紋章） */}
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {comp.units.map((unitIdx) => {
                   const unit = units[unitIdx]
                   if (!unit) return null
@@ -201,13 +210,13 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
                     .map((h) => h[0])
                   const hasUnder = unitItemIdxs.length > 0 || unitEmblemIdxs.length > 0
                   return (
-                    <div key={unitIdx} className="flex w-11 flex-col items-center gap-0.5">
+                    <div key={unitIdx} className="flex w-14 flex-col items-center gap-1">
                       <img
                         src={unit.icon}
                         alt={unitName}
                         title={unitName}
                         loading="lazy"
-                        className={`h-11 w-11 rounded border-2 object-cover ${costBorder(unit.cost)}`}
+                        className={`h-14 w-14 rounded border-2 object-cover ${costBorder(unit.cost)}`}
                       />
                       {hasUnder && (
                         <div className="flex flex-wrap justify-center gap-0.5">
@@ -221,7 +230,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
                                 alt={pickName(lang, emblem)}
                                 title={pickName(lang, emblem)}
                                 loading="lazy"
-                                className={`h-4 w-4 object-contain ${
+                                className={`h-5 w-5 object-contain ${
                                   selectedEmblemSet.has(ei) ? 'rounded ring-1 ring-amber-400' : ''
                                 }`}
                               />
@@ -237,7 +246,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
                                 alt={pickName(lang, item)}
                                 title={pickName(lang, item)}
                                 loading="lazy"
-                                className="h-4 w-4 rounded object-cover"
+                                className="h-5 w-5 rounded object-cover"
                               />
                             )
                           })}
@@ -250,7 +259,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
             </div>
 
             {/* 指標ブロック */}
-            <div className="flex w-32 shrink-0 flex-col justify-center gap-0.5">
+            <div className="flex w-36 shrink-0 flex-col justify-center gap-0.5">
               <div className="mb-0.5 flex items-baseline justify-between gap-2 px-1.5">
                 <span className="text-[11px] text-zinc-400">平均</span>
                 <span

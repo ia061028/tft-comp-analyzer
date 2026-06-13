@@ -219,10 +219,11 @@ async function main(): Promise<void> {
       if (rec.p <= 4) acc.top4++
       if (rec.p === 1) acc.win++
 
-      // キートレイトの style を蓄積
-      for (const tApi of keyTraits) {
+      // 発動トレイト全て(tier>=1=ブロンズ以上)の style を蓄積。
+      // キートレイトの最頻style算出に加え、代表シナジー（過半数で発動するトレイト）算出に使う。
+      for (const [tApi, style] of Object.entries(rec.t)) {
         const list = acc.styleLists.get(tApi) ?? []
-        list.push(rec.t[tApi])
+        list.push(style)
         acc.styleLists.set(tApi, list)
       }
 
@@ -298,6 +299,7 @@ async function main(): Promise<void> {
     top4: number
     win: number
     traitModeStyle: Map<string, number>
+    synergies: [string, number][] // [traitApi, modeStyle] 過半数で発動の代表シナジー
     unitApis: string[]
     rows: { emblems: string[]; n: number; top4: number; win: number; p: number }[]
     holders: [string, string, number][] // [emblemApi, holderApi, count]
@@ -307,12 +309,22 @@ async function main(): Promise<void> {
   const MIN_OUTPUT_N = 3 // 合計サンプルがこの未満のクラスタは出力しない（長尾枝刈り）
   const CARRY_UNITS = 4 // 推奨アイテムを出すユニット数（アイテム保持総数の上位）
   const ITEMS_PER_UNIT = 3 // ユニットごとの推奨アイテム数
+  const SYNERGY_MIN_FREQ = 0.5 // クラスタ内でこの割合以上発動しているトレイトを代表シナジーとする
 
   function accToPreComp(acc: ClusterAcc, repUnitCount: number): PreComp {
     const traitModeStyle = new Map<string, number>()
     for (const tApi of acc.traitApis) {
       traitModeStyle.set(tApi, modeMaxNumber(acc.styleLists.get(tApi) ?? []) ?? 0)
       usedTraitApis.add(tApi)
+    }
+
+    // 代表シナジー: クラスタの過半数(>=SYNERGY_MIN_FREQ)で発動しているトレイト。
+    const synergies: [string, number][] = []
+    for (const [tApi, list] of acc.styleLists) {
+      if (list.length / acc.n >= SYNERGY_MIN_FREQ) {
+        synergies.push([tApi, modeMaxNumber(list) ?? 0])
+        usedTraitApis.add(tApi)
+      }
     }
 
     // 代表ユニット（出現頻度降順、同数は名前昇順）。バケットごとに repUnitCount 件。
@@ -380,6 +392,7 @@ async function main(): Promise<void> {
       top4: acc.top4,
       win: acc.win,
       traitModeStyle,
+      synergies,
       unitApis: topUnits,
       rows: [...acc.rows.values()],
       holders,
@@ -501,6 +514,16 @@ async function main(): Promise<void> {
     const label = labelParts.map((p) => p.name).join(' / ')
     const labelJa = labelParts.map((p) => p.nameJa).join(' / ')
 
+    // synergies: 代表シナジー [traitIdx, modeStyle]。style 降順→トレイト名昇順。
+    const synergies: [number, number][] = pc.synergies
+      .map(([api, style]): [number, number] => [traitIndex.get(api)!, style])
+      .sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1]
+        const na = traitsOut[a[0]].name
+        const nb = traitsOut[b[0]].name
+        return na < nb ? -1 : na > nb ? 1 : 0
+      })
+
     const unitIdxs = pc.unitApis
       .map((api) => unitIndex.get(api)!)
       .sort((a, b) => {
@@ -539,6 +562,7 @@ async function main(): Promise<void> {
 
     return {
       traits: traitPairs,
+      synergies,
       label,
       labelJa,
       units: unitIdxs,

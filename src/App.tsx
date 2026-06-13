@@ -175,7 +175,7 @@ function App() {
           </div>
 
           <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <span className="shrink-0">最小サンプル</span>
+            <span className="shrink-0">頻度</span>
             <input
               type="range"
               min={0}
@@ -189,7 +189,7 @@ function App() {
             </span>
             {selection.length > 0 && appliedMinSample !== baseMinSample && (
               <span className="text-xs text-amber-300/80">
-                紋章選択中: 最小 {appliedMinSample}
+                紋章選択中: 頻度 {appliedMinSample}
               </span>
             )}
           </label>
