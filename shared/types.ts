@@ -18,6 +18,8 @@ export interface ParticipantRecord {
   u: string[]
   /** u と同インデックスで対応する、そのユニットの完成アイテム apiName 群（旧レコードは欠落） */
   ui?: string[][]
+  /** u と同インデックスで対応する、そのユニットのスターレベル(1-3)（旧レコードは欠落） */
+  us?: number[]
   /** プレイヤーレベル */
   lv: number
   /** game_datetime（epoch秒） */
@@ -85,6 +87,8 @@ export interface CompStats {
   labelJa: string
   /** クラスタ内最頻ユニット（units 配列インデックス、コスト順） */
   units: number[]
+  /** units と同インデックスで対応する代表スターレベル(1-3、不明は0)。us ありレコードから集計。 */
+  unitStars: number[]
   n: number
   top4: number
   win: number
