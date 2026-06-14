@@ -333,6 +333,7 @@ async function main(): Promise<void> {
   const MIN_OUTPUT_N = 3 // 合計サンプルがこの未満のクラスタは出力しない（長尾枝刈り）
   const CARRY_UNITS = 4 // 推奨アイテムを出すユニット数（アイテム保持総数の上位）
   const ITEMS_PER_UNIT = 3 // ユニットごとの推奨アイテム数
+  const ROW_MIN_N = 2 // 出力する紋章行の最小サンプル（単発の組合せ＝ノイズを枝刈り）
   const HOLDERS_PER_EMBLEM = 3 // 1紋章あたり表示する装備ユニットの最大数
   const HOLDER_MIN_SHARE = 0.2 // 2体目以降を採用する占有率しきい値
   const SYNERGY_MIN_FREQ = 0.5 // クラスタ内でこの割合以上発動しているトレイトを代表シナジーとする
@@ -568,7 +569,11 @@ async function main(): Promise<void> {
     // units と同順の代表スター。
     const unitStars = unitIdxs.map((idx) => pc.unitStarByApi.get(unitsOut[idx].api) ?? 0)
 
+    // 行の枝刈り: 紋章を含み(n>=ROW_MIN_N)の行のみ出力。
+    // 空紋章行(e=[])はフロントの紋章フィルタで参照されず、n=1 の単発組合せは採用率しきい値
+    // 未満のノイズのため、stats.json サイズ削減のため除外（採用率の分母 comp.n は別途保持）。
     const rows: EmblemRow[] = pc.rows
+      .filter((r) => r.emblems.length > 0 && r.n >= ROW_MIN_N)
       .map((r): EmblemRow => {
         const e = r.emblems.map((api) => emblemIndex.get(api)!).sort((x, y) => x - y)
         return { e, n: r.n, top4: r.top4, win: r.win, p: r.p }
