@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CompStats, StatsFile, UnitInfo } from '../../shared/types'
-import { aggregateComp } from '../lib/multiset'
+import { aggregateAny, emblemGames } from '../lib/multiset'
 import { pickName, t, type Lang } from '../lib/i18n'
 
 type SortKey = 'rate' | 'place' | 'top4' | 'win'
@@ -105,18 +105,30 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
     )
   }
 
+  const selList = [...new Set(sel)]
+  const K = selList.length
+
   const rows = comps
     .map((comp) => {
-      const agg = aggregateComp(comp, sel)
+      // OR集計: いずれかの選択紋章を装備していたゲーム。
+      const agg = aggregateAny(comp, selList)
       // p が無い（古い stats.json）場合 agg.p は NaN になりうるため有限性を判定。
       const avgPlace = agg.n > 0 && Number.isFinite(agg.p) ? agg.p / agg.n : NaN
-      // 採用率: この構成のゲームのうち、選択紋章を装備していた割合。
+      // OR採用率: この構成のゲームのうち、いずれかの選択紋章を装備していた割合。
       const usageRate = comp.n > 0 ? agg.n / comp.n : 0
-      return { comp, agg, avgPlace, usageRate }
+      // 活用度: 選択紋章のうち、しきい値以上の採用率で使われている数。
+      let usedCount = 0
+      for (const e of selList) {
+        const r = comp.n > 0 ? emblemGames(comp, e) / comp.n : 0
+        if (r * 100 >= ratePct) usedCount++
+      }
+      return { comp, agg, avgPlace, usageRate, usedCount }
     })
-    // 採用率がしきい値以上、かつ統計の信頼性のため最小サンプル以上。
-    .filter(({ agg, usageRate }) => agg.n >= MIN_SAMPLE && usageRate * 100 >= ratePct)
+    // いずれかの選択紋章をしきい値以上で活用、かつ統計の信頼性のため最小サンプル以上。
+    .filter(({ agg, usedCount }) => agg.n >= MIN_SAMPLE && usedCount >= 1)
     .sort((a, b) => {
+      // AND優先: 活用数が多い構成（全部使う構成）を上位へ。
+      if (b.usedCount !== a.usedCount) return b.usedCount - a.usedCount
       switch (sortKey) {
         case 'place': {
           // 昇順（小さいほど良い）。平均順位不明（NaN）は末尾へ。
@@ -154,7 +166,7 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
 
   return (
     <div className="flex flex-col gap-3">
-      {rows.map(({ comp, agg, avgPlace, usageRate }) => {
+      {rows.map(({ comp, agg, avgPlace, usageRate, usedCount }) => {
         const key = comp.label + '|' + comp.traits.map((t) => t[0]).join(',')
         const hasPlace = Number.isFinite(avgPlace)
         const tier = hasPlace
@@ -195,6 +207,18 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
                 <span className="mr-1 truncate text-base font-semibold text-zinc-100">
                   {compName}
                 </span>
+                {K >= 2 && (
+                  <span
+                    className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                      usedCount >= K
+                        ? 'bg-amber-400 text-zinc-950'
+                        : 'bg-zinc-700/70 text-amber-200'
+                    }`}
+                    title={t(lang, 'utilizationTitle')}
+                  >
+                    {t(lang, 'utilization', { n: usedCount, k: K })}
+                  </span>
+                )}
                 <span className="shrink-0 rounded bg-zinc-700/70 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-200">
                   {t(lang, 'activeTraits', { n: (comp.synergies ?? comp.traits).length })}
                 </span>

@@ -44,6 +44,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     copied: 'コピーしました',
     copyCodeTitle: 'チームプランナーに貼り付けるコードをコピー',
     activeTraits: '発動特性 {n}',
+    utilization: '活用 {n}/{k}',
+    utilizationTitle: '選択した紋章のうち、この構成が活用している数',
   },
   en: {
     loading: 'Loading…',
@@ -81,6 +83,8 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     copied: 'Copied',
     copyCodeTitle: 'Copy code for Team Planner',
     activeTraits: '{n} traits',
+    utilization: 'Uses {n}/{k}',
+    utilizationTitle: 'How many of the selected emblems this comp uses',
   },
 }
 
