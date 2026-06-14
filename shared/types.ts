@@ -117,7 +117,6 @@ export interface StatsFile {
   /** 表示用 TFT バージョン（例 "17.5"。未マップ時は patch にフォールバック） */
   tftPatch: string
   setNumber: number
-  config: { minStyle: number; minSampleDefault: number; emblemMinSample: number }
   totals: {
     matches: number
     participants: number

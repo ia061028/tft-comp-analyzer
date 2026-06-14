@@ -631,11 +631,6 @@ async function main(): Promise<void> {
     patch: targetPatch,
     tftPatch: config.tftPatchLabels[targetPatch] ?? targetPatch,
     setNumber: staticData.setNumber,
-    config: {
-      minStyle: config.clusterMinStyle,
-      minSampleDefault: config.minSampleDefault,
-      emblemMinSample: config.emblemMinSample,
-    },
     totals: {
       matches: uniqueMatches.size,
       participants: target.length,

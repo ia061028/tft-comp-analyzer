@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "collect": "tsx collector/collect.ts",
     "aggregate": "tsx collector/aggregate.ts",
-    "test": "tsx --test collector/*.test.ts"
+    "test": "tsx --test \"collector/*.test.ts\" \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
