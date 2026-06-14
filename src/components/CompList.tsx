@@ -78,15 +78,19 @@ function pct(num: number, den: number): string {
   return `${((num / den) * 100).toFixed(1)}%`
 }
 
-/** チームプランナーの貼付コード: 01 + 各チャンピオン1バイト(hex) + 10枠まで00 + TFTSet{N}。 */
+/**
+ * チームプランナーの貼付コード（現行 02 形式）:
+ * `02` + 10スロット×「team_planner_code を12bit=3桁hex(big-endian)」 + `TFTSet{N}`。空き枠は `000`。
+ * （旧 01 形式は8bit/2桁だが、グローバルIDが255を超えるため12bit形式に変更されている）
+ */
 function buildPlannerCode(unitIdxs: number[], units: UnitInfo[], setNumber: number): string {
   const slots: string[] = []
   for (const idx of unitIdxs) {
     const code = units[idx]?.code ?? 0
-    if (code > 0) slots.push(code.toString(16).padStart(2, '0'))
+    if (code > 0) slots.push(code.toString(16).padStart(3, '0'))
   }
-  while (slots.length < 10) slots.push('00')
-  return '01' + slots.slice(0, 10).join('') + 'TFTSet' + setNumber
+  while (slots.length < 10) slots.push('000')
+  return '02' + slots.slice(0, 10).join('') + 'TFTSet' + setNumber
 }
 
 export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompListProps) {
