@@ -3,6 +3,9 @@
 
 const CDRAGON_URL = 'https://raw.communitydragon.org/latest/cdragon/tft/en_us.json'
 const CDRAGON_URL_JA = 'https://raw.communitydragon.org/latest/cdragon/tft/ja_jp.json'
+// チームプランナーのチャンピオン定義（公式バイト値 team_planner_code を含む）。
+const TEAMPLANNER_URL =
+  'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/tftchampions-teamplanner.json'
 
 interface CDragonItem {
   apiName?: string
@@ -92,9 +95,6 @@ function iconUrl(path: string | undefined): string {
   return ICON_PREFIX + lower
 }
 
-/** チームプランナーのチャンピオンロスター外（非ショップ）apiName を弾く名前パターン。 */
-const NON_SHOP_RE = /Minion|Summon|FakeUnit|Enemy_|PVE|TrainingDummy|ArmoryKey|Chest|Core|Golem|Crab/
-
 export interface StaticData {
   setNumber: number
   /** apiName → 表示名(en/ja)・アイコンURL */
@@ -131,6 +131,33 @@ async function fetchJaNames(
     // ネットワーク等の失敗時は en 名にフォールバック（空マップを返す）。
   }
   return { traits, units, items }
+}
+
+interface TeamPlannerChampion {
+  character_id?: string
+  team_planner_code?: number
+}
+
+/**
+ * チームプランナー定義から character_id → team_planner_code（貼付コードのバイト値）を取得。
+ * これが公式の正値。en_us の並び順から推測してはならない。取得失敗時は空マップ（code=0=非対応）。
+ */
+async function fetchPlannerCodes(setNumber: number): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  try {
+    const res = await fetch(TEAMPLANNER_URL)
+    if (!res.ok) return map
+    const data = (await res.json()) as Record<string, TeamPlannerChampion[]>
+    const list = data[`TFTSet${setNumber}`] ?? []
+    for (const c of list) {
+      if (c.character_id && typeof c.team_planner_code === 'number') {
+        map.set(c.character_id, c.team_planner_code)
+      }
+    }
+  } catch {
+    // 取得失敗時はコード未設定（プランナーコードはその分 00 になる）。
+  }
+  return map
 }
 
 /**
@@ -189,24 +216,8 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
     )
   }
 
-  // units（champions）。プランナーcode = ショップロスターを apiName 昇順にした1始まり位置。
-  const setPrefix = `TFT${setNumber}_`
-  const roster = (chosen.champions ?? [])
-    .filter(
-      (c) =>
-        c.apiName &&
-        c.apiName.startsWith(setPrefix) &&
-        (c.cost ?? 0) >= 1 &&
-        (c.cost ?? 0) <= 5 &&
-        Array.isArray(c.traits) &&
-        c.traits.length > 0 &&
-        !NON_SHOP_RE.test(c.apiName),
-    )
-    .map((c) => c.apiName!)
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-  const codeByApi = new Map<string, number>()
-  roster.forEach((api, i) => codeByApi.set(api, i + 1))
-
+  // units（champions）。プランナーcode は公式の team_planner_code を使う（en_us の並びからは導けない）。
+  const plannerCodes = await fetchPlannerCodes(setNumber)
   const units = new Map<string, { name: string; nameJa: string; cost: number; icon: string; code: number }>()
   for (const c of chosen.champions ?? []) {
     if (!c.apiName) continue
@@ -217,7 +228,7 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
       nameJa: ja.units.get(c.apiName) ?? name,
       cost: c.cost ?? 0,
       icon,
-      code: codeByApi.get(c.apiName) ?? 0,
+      code: plannerCodes.get(c.apiName) ?? 0,
     })
   }
 
