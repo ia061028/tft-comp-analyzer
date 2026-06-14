@@ -6,7 +6,7 @@ import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
 import { CompList } from './components/CompList'
 
-type SortKey = 'place' | 'top4' | 'win' | 'pick'
+type SortKey = 'rate' | 'place' | 'top4' | 'win'
 type LevelKey = 'all' | '7' | '8' | '9' | '10'
 type LoadState =
   | { status: 'loading' }
@@ -18,7 +18,7 @@ function App() {
   const [reloadKey, setReloadKey] = useState(0)
 
   const [selection, setSelection] = useState<number[]>([])
-  const [sortKey, setSortKey] = useState<SortKey>('place')
+  const [sortKey, setSortKey] = useState<SortKey>('rate')
   const [minSample, setMinSample] = useState<number | null>(null)
   const [lang, setLang] = useState<Lang>('ja')
   const [level, setLevel] = useState<LevelKey>('all')
@@ -29,7 +29,7 @@ function App() {
       .then((stats) => {
         if (cancelled) return
         setLoad({ status: 'ready', stats })
-        setMinSample((cur) => (cur === null ? (stats.config.emblemMinSample ?? 5) : cur))
+        setMinSample((cur) => (cur === null ? 5 : cur)) // 採用率(%)の初期値
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -69,12 +69,11 @@ function App() {
   }
 
   const stats = load.stats
-  // 構成一覧は紋章選択時のみ表示（emblem-gated）なので、スライダー値を直接しきい値(n>=値)に使う。
-  // 範囲は 1〜emblemMinSample+1（=6）。それ以上は紋章フィルタ下では意味が無いため上限を絞る。
-  const emblemMinSample = stats.config.emblemMinSample ?? 5
-  const freqMin = 1
-  const freqMax = emblemMinSample + 1
-  const minSampleVal = Math.min(Math.max(minSample ?? emblemMinSample, freqMin), freqMax)
+  // 紋章フィルタ時の絞り込みは「採用率(%)」=その構成内で紋章を装備したゲームの割合。
+  // スライダーはその閾値。0〜30%（それ以上は実データ上ほぼ該当しない）。
+  const rateMin = 0
+  const rateMax = 30
+  const ratePct = Math.min(Math.max(minSample ?? 5, rateMin), rateMax)
 
   // 表示する構成: 全体 or レベル別（古い stats.json に compsByLevel が無い場合は空配列）。
   const selectedComps =
@@ -154,10 +153,10 @@ function App() {
             <div className="inline-flex overflow-hidden rounded border border-zinc-700">
               {(
                 [
+                  ['rate', t(lang, 'sortRate')],
                   ['place', t(lang, 'sortPlace')],
                   ['top4', t(lang, 'sortTop4')],
                   ['win', t(lang, 'sortWin')],
-                  ['pick', t(lang, 'sortPick')],
                 ] as const
               ).map(([key, label]) => (
                 <button
@@ -177,16 +176,16 @@ function App() {
           </div>
 
           <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <span className="shrink-0">{t(lang, 'frequency')}</span>
+            <span className="shrink-0">{t(lang, 'adoptionRate')}</span>
             <input
               type="range"
-              min={freqMin}
-              max={freqMax}
-              value={minSampleVal}
+              min={rateMin}
+              max={rateMax}
+              value={ratePct}
               onChange={(e) => setMinSample(Number(e.target.value))}
               className="w-32 accent-amber-400"
             />
-            <span className="w-6 text-right tabular-nums text-zinc-100">{minSampleVal}</span>
+            <span className="w-10 text-right tabular-nums text-zinc-100">{ratePct}%</span>
           </label>
         </div>
       </header>
@@ -210,7 +209,7 @@ function App() {
             comps={selectedComps}
             sel={selection}
             sortKey={sortKey}
-            minSample={minSampleVal}
+            ratePct={ratePct}
             lang={lang}
           />
         </main>
