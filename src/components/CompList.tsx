@@ -3,7 +3,7 @@ import type { CompStats, StatsFile, UnitInfo } from '../../shared/types'
 import { aggregateComp } from '../lib/multiset'
 import { pickName, t, type Lang } from '../lib/i18n'
 
-type SortKey = 'place' | 'top4' | 'win' | 'pick'
+type SortKey = 'rate' | 'place' | 'top4' | 'win'
 
 interface CompListProps {
   stats: StatsFile
@@ -11,9 +11,13 @@ interface CompListProps {
   comps: CompStats[]
   sel: number[]
   sortKey: SortKey
-  minSample: number
+  /** 採用率(%)の下限しきい値 */
+  ratePct: number
   lang: Lang
 }
+
+/** 統計の信頼性のための最小サンプル（採用率が高くても n がこれ未満なら除外）。 */
+const MIN_SAMPLE = 3
 
 /** style 値 → バッジ配色（3=ゴールド系, 4=プリズム系, 1-2は念のため銅/銀） */
 function styleClasses(style: number): string {
@@ -85,8 +89,8 @@ function buildPlannerCode(unitIdxs: number[], units: UnitInfo[], setNumber: numb
   return '01' + slots.slice(0, 10).join('') + 'TFTSet' + setNumber
 }
 
-export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompListProps) {
-  const { traits, units, emblems, items, totals } = stats
+export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompListProps) {
+  const { traits, units, emblems, items } = stats
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
   // 選択中の紋章。装備者ハイライトに使う。
@@ -106,10 +110,12 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
       const agg = aggregateComp(comp, sel)
       // p が無い（古い stats.json）場合 agg.p は NaN になりうるため有限性を判定。
       const avgPlace = agg.n > 0 && Number.isFinite(agg.p) ? agg.p / agg.n : NaN
-      const pickRate = totals.participants > 0 ? agg.n / totals.participants : 0
-      return { comp, agg, avgPlace, pickRate }
+      // 採用率: この構成のゲームのうち、選択紋章を装備していた割合。
+      const usageRate = comp.n > 0 ? agg.n / comp.n : 0
+      return { comp, agg, avgPlace, usageRate }
     })
-    .filter(({ agg }) => agg.n > 0 && agg.n >= minSample)
+    // 採用率がしきい値以上、かつ統計の信頼性のため最小サンプル以上。
+    .filter(({ agg, usageRate }) => agg.n >= MIN_SAMPLE && usageRate * 100 >= ratePct)
     .sort((a, b) => {
       switch (sortKey) {
         case 'place': {
@@ -120,18 +126,18 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
         }
         case 'win':
           return b.agg.win / b.agg.n - a.agg.win / a.agg.n
-        case 'pick':
-          return b.pickRate - a.pickRate
         case 'top4':
-        default:
           return b.agg.top4 / b.agg.n - a.agg.top4 / a.agg.n
+        case 'rate':
+        default:
+          return b.usageRate - a.usageRate
       }
     })
 
   if (rows.length === 0) {
     return (
       <div className="rounded-md border border-zinc-800 bg-zinc-900/40 px-4 py-8 text-center text-sm text-zinc-400">
-        {t(lang, 'noComps', { x: minSample })}
+        {t(lang, 'noCompsRate', { x: ratePct })}
       </div>
     )
   }
@@ -148,7 +154,7 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
 
   return (
     <div className="flex flex-col gap-3">
-      {rows.map(({ comp, agg, avgPlace, pickRate }) => {
+      {rows.map(({ comp, agg, avgPlace, usageRate }) => {
         const key = comp.label + '|' + comp.traits.map((t) => t[0]).join(',')
         const hasPlace = Number.isFinite(avgPlace)
         const tier = hasPlace
@@ -296,9 +302,9 @@ export function CompList({ stats, comps, sel, sortKey, minSample, lang }: CompLi
                   {hasPlace ? avgPlace.toFixed(2) : '—'}
                 </span>
               </div>
+              {metricCell(sortKey === 'rate', t(lang, 'metricRate'), `${(usageRate * 100).toFixed(1)}%`)}
               {metricCell(sortKey === 'top4', t(lang, 'metricTop4'), pct(agg.top4, agg.n))}
               {metricCell(sortKey === 'win', t(lang, 'metricWin'), pct(agg.win, agg.n))}
-              {metricCell(sortKey === 'pick', t(lang, 'metricPick'), `${(pickRate * 100).toFixed(2)}%`)}
               <div className="px-1.5 text-right text-[11px] text-zinc-500">n={agg.n}</div>
               <button
                 type="button"
