@@ -191,15 +191,19 @@ async function main(): Promise<void> {
         continue
       }
 
-      // クラスタキー: style>=minStyle のトレイトのうち、スタイル降順（同点は apiName 昇順）で
-      // 上位 clusterMaxKeyTraits 件を採用し、apiName 昇順で連結（決定的）。
-      const goldTraits = Object.entries(rec.t).filter(([, style]) => style >= config.clusterMinStyle)
-      if (goldTraits.length === 0) {
+      // クラスタキー（看板トレイト）: ゴールド以上(style>=clusterMinStyle)があればそれを、
+      // 無ければ発動中の全特性を候補とし、その中からスタイル降順（同点 apiName 昇順）で
+      // 上位 clusterMaxKeyTraits 件を採用、apiName 昇順で連結（決定的）。
+      // これによりゴールド構成は従来どおり、ゴールドが無い盤面（全ブロンズ等）も構成化される。
+      const active = Object.entries(rec.t)
+      if (active.length === 0) {
         noClusterKey++
         continue
       }
-      goldTraits.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-      const keyTraits = goldTraits.slice(0, config.clusterMaxKeyTraits).map(([tApi]) => tApi)
+      const gold = active.filter(([, style]) => style >= config.clusterMinStyle)
+      const keyCandidates = gold.length > 0 ? gold : active
+      keyCandidates.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+      const keyTraits = keyCandidates.slice(0, config.clusterMaxKeyTraits).map(([tApi]) => tApi)
       keyTraits.sort()
       const clusterKey = keyTraits.join('|')
 

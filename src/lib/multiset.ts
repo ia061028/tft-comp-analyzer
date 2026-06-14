@@ -42,3 +42,35 @@ export function aggregateComp(
   }
   return { n, top4, win, p }
 }
+
+/**
+ * comp.rows のうち row.e が sel と1つでも交差する行（=選択紋章のいずれかを装備）を合算（OR集計）。
+ * 空 sel の場合は全行を合算（aggregateComp と同じ）。単一選択なら subset と同結果。
+ */
+export function aggregateAny(
+  comp: CompStats,
+  sel: number[],
+): { n: number; top4: number; win: number; p: number } {
+  if (sel.length === 0) return aggregateComp(comp, sel)
+  const selSet = new Set(sel)
+  let n = 0
+  let top4 = 0
+  let win = 0
+  let p = 0
+  for (const row of comp.rows) {
+    if (row.e.some((e) => selSet.has(e))) {
+      n += row.n
+      top4 += row.top4
+      win += row.win
+      p += row.p
+    }
+  }
+  return { n, top4, win, p }
+}
+
+/** comp 内で、単一紋章 emblemIdx を装備していたゲーム数（その紋章を含む行のn合計）。 */
+export function emblemGames(comp: CompStats, emblemIdx: number): number {
+  let n = 0
+  for (const row of comp.rows) if (row.e.includes(emblemIdx)) n += row.n
+  return n
+}
