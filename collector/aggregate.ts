@@ -329,6 +329,8 @@ async function main(): Promise<void> {
   const MIN_OUTPUT_N = 3 // 合計サンプルがこの未満のクラスタは出力しない（長尾枝刈り）
   const CARRY_UNITS = 4 // 推奨アイテムを出すユニット数（アイテム保持総数の上位）
   const ITEMS_PER_UNIT = 3 // ユニットごとの推奨アイテム数
+  const HOLDERS_PER_EMBLEM = 3 // 1紋章あたり表示する装備ユニットの最大数
+  const HOLDER_MIN_SHARE = 0.2 // 2体目以降を採用する占有率しきい値
   const SYNERGY_MIN_FREQ = 0.5 // クラスタ内でこの割合以上発動しているトレイトを代表シナジーとする
 
   function accToPreComp(acc: ClusterAcc, repUnitCount: number): PreComp {
@@ -368,25 +370,22 @@ async function main(): Promise<void> {
       if (ms) unitStarByApi.set(uApi, ms)
     }
 
-    // 紋章ごとの最頻装備ユニット。
+    // 紋章ごとの装備ユニット。同じ紋章を複数チャンピオンが装備するケースを示すため、
+    // 最頻1体だけでなく「占有率が一定以上の上位ユニット（最大 HOLDERS_PER_EMBLEM 体）」を出力。
     const holders: [string, string, number][] = []
     for (const [emblemApi, hc] of acc.holderCounts) {
-      let bestUnit: string | undefined
-      let bestCount = -1
-      for (const [unitApi, count] of hc) {
-        if (
-          count > bestCount ||
-          (count === bestCount &&
-            bestUnit !== undefined &&
-            staticData.units.get(unitApi)!.name < staticData.units.get(bestUnit)!.name)
-        ) {
-          bestCount = count
-          bestUnit = unitApi
-        }
-      }
-      if (bestUnit !== undefined) {
-        holders.push([emblemApi, bestUnit, bestCount])
-        usedUnitApis.add(bestUnit)
+      const total = [...hc.values()].reduce((s, x) => s + x, 0)
+      const sorted = [...hc.entries()].sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1]
+        const na = staticData.units.get(a[0])!.name
+        const nb = staticData.units.get(b[0])!.name
+        return na < nb ? -1 : na > nb ? 1 : a[0] < b[0] ? -1 : 1
+      })
+      // 占有率 >= HOLDER_MIN_SHARE のユニットを採用（少なくとも先頭1体は必ず採用）。
+      const picked = sorted.filter(([, c], i) => i === 0 || c / total >= HOLDER_MIN_SHARE)
+      for (const [unitApi, count] of picked.slice(0, HOLDERS_PER_EMBLEM)) {
+        holders.push([emblemApi, unitApi, count])
+        usedUnitApis.add(unitApi)
       }
     }
 
