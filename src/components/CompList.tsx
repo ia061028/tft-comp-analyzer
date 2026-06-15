@@ -203,7 +203,7 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
 
             {/* 構成本体 */}
             <div className="min-w-0 flex-1">
-              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <div className="mb-1 flex flex-wrap items-center gap-1.5">
                 <span className="mr-1 truncate text-base font-semibold text-zinc-100">
                   {compName}
                 </span>
@@ -222,6 +222,10 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
                 <span className="shrink-0 rounded bg-zinc-700/70 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-200">
                   {t(lang, 'activeTraits', { n: (comp.synergies ?? comp.traits).length })}
                 </span>
+              </div>
+
+              {/* 発動中の特性のみの行 */}
+              <div className="mb-2 flex flex-wrap items-center gap-1">
                 {(comp.synergies ?? comp.traits).map(([traitIdx, style, count]) => {
                   const trait = traits[traitIdx]
                   return (
@@ -256,9 +260,11 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
                   const unitItemIdxs = comp.unitItems
                     .filter((ui) => ui[0] === unitIdx)
                     .map((ui) => ui[1])
+                  // 装備紋章は「選択中の紋章」のみ表示（ユーザー指定）。
                   const unitEmblemIdxs = comp.holders
                     .filter((h) => h[1] === unitIdx)
                     .map((h) => h[0])
+                    .filter((ei) => selectedEmblemSet.has(ei))
                   const hasUnder = unitItemIdxs.length > 0 || unitEmblemIdxs.length > 0
                   return (
                     <div key={unitIdx} className="flex w-14 flex-col items-center gap-0.5">
@@ -270,9 +276,7 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
                           src={unit.icon}
                           alt={unitName}
                           loading="lazy"
-                          className={`h-14 w-14 rounded border-2 object-cover ${
-                            star === 3 ? 'border-amber-300 ring-1 ring-amber-300/60' : costBorder(unit.cost)
-                          }`}
+                          className={`h-14 w-14 rounded border-2 object-cover ${costBorder(unit.cost)}`}
                         />
                       </Tip>
                       {hasUnder && (
