@@ -73,10 +73,6 @@ function tierOf(avgPlace: number): { label: string; classes: string } {
   return { label: 'D', classes: 'bg-zinc-600 text-zinc-100' }
 }
 
-function pct(num: number, den: number): string {
-  if (den === 0) return '0.0%'
-  return `${((num / den) * 100).toFixed(1)}%`
-}
 
 /**
  * チームプランナーの貼付コード（現行 02 形式）:
@@ -120,16 +116,15 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
       const avgPlace = agg.n > 0 && Number.isFinite(agg.p) ? agg.p / agg.n : NaN
       // OR採用率: この構成のゲームのうち、いずれかの選択紋章を装備していた割合。
       const usageRate = comp.n > 0 ? agg.n / comp.n : 0
-      // 活用度: 選択紋章のうち、しきい値以上の採用率で使われている数。
+      // 活用度: 選択紋章のうち、実際にこの構成で1ゲーム以上使われている数（ratePctと無関係）。
       let usedCount = 0
       for (const e of selList) {
-        const r = comp.n > 0 ? emblemGames(comp, e) / comp.n : 0
-        if (r * 100 >= ratePct) usedCount++
+        if (emblemGames(comp, e) > 0) usedCount++
       }
       return { comp, agg, avgPlace, usageRate, usedCount }
     })
-    // いずれかの選択紋章をしきい値以上で活用、かつ統計の信頼性のため最小サンプル以上。
-    .filter(({ agg, usedCount }) => agg.n >= MIN_SAMPLE && usedCount >= 1)
+    // OR採用率がしきい値以上、かつ選択紋章を1種以上実際に使用、かつ最小サンプル以上。
+    .filter(({ agg, usageRate, usedCount }) => agg.n >= MIN_SAMPLE && usageRate * 100 >= ratePct && usedCount >= 1)
     .sort((a, b) => {
       // AND優先: 活用数が多い構成（全部使う構成）を上位へ。
       if (b.usedCount !== a.usedCount) return b.usedCount - a.usedCount
@@ -170,7 +165,7 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
 
   return (
     <div className="flex flex-col gap-3">
-      {rows.map(({ comp, agg, avgPlace, usageRate, usedCount }) => {
+      {rows.map(({ comp, agg, avgPlace, usedCount }) => {
         const key = comp.label + '|' + comp.traits.map((t) => t[0]).join(',')
         const hasPlace = Number.isFinite(avgPlace)
         const tier = hasPlace
@@ -330,10 +325,9 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
                   {hasPlace ? avgPlace.toFixed(2) : '—'}
                 </span>
               </div>
-              {metricCell(sortKey === 'rate', t(lang, 'metricRate'), `${(usageRate * 100).toFixed(1)}%`)}
-              {metricCell(sortKey === 'top4', t(lang, 'metricTop4'), pct(agg.top4, agg.n))}
-              {metricCell(sortKey === 'win', t(lang, 'metricWin'), pct(agg.win, agg.n))}
-              <div className="px-1.5 text-right text-[11px] text-zinc-500">n={agg.n}</div>
+              {metricCell(sortKey === 'rate', t(lang, 'metricRate'), `${agg.n}/${comp.n}`)}
+              {metricCell(sortKey === 'top4', t(lang, 'metricTop4'), `${agg.top4}/${agg.n}`)}
+              {metricCell(sortKey === 'win', t(lang, 'metricWin'), `${agg.win}/${agg.n}`)}
               <button
                 type="button"
                 onClick={() => copy(key, code)}
