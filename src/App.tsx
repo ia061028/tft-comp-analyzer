@@ -18,7 +18,7 @@ function App() {
   const [reloadKey, setReloadKey] = useState(0)
 
   const [selection, setSelection] = useState<number[]>([])
-  const [sortKey, setSortKey] = useState<SortKey>('rate')
+  const [sortKey, setSortKey] = useState<SortKey>('place')
   const [minSample, setMinSample] = useState<number | null>(null)
   const [lang, setLang] = useState<Lang>('ja')
   const [level, setLevel] = useState<LevelKey>('all')
@@ -153,10 +153,10 @@ function App() {
             <div className="inline-flex overflow-hidden rounded border border-zinc-700">
               {(
                 [
-                  ['rate', t(lang, 'sortRate')],
                   ['place', t(lang, 'sortPlace')],
                   ['top4', t(lang, 'sortTop4')],
                   ['win', t(lang, 'sortWin')],
+                  ['rate', t(lang, 'sortRate')],
                 ] as const
               ).map(([key, label]) => (
                 <button

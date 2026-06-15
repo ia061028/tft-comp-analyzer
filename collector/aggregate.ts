@@ -24,9 +24,26 @@ const RECORDS_DIR = join(ROOT, 'data', 'state', 'records')
 const OUT_DIR = join(ROOT, 'public', 'data')
 const OUT_PATH = join(OUT_DIR, 'stats.json')
 
+// 召喚ユニット（ビア＆バイン=TFT17_Summon・ミィプシー=TFT17_IvernMinion・PVE等）は
+// 導き手等で盤面にレベル+1で出現するため構成ユニットから除外（レベルと整合）。
+const NON_BOARD_UNIT_RE = /_Summon$|Minion|PVE|Enemy_|TrainingDummy/
+
 interface LoadedRecord {
   rec: ParticipantRecord
   route: string
+}
+
+/**
+ * count 以下の最大ブレークポイントを返す。
+ * bps が未定義/空、または count 以下のブレークポイントが存在しない場合は count を返す。
+ */
+function activeBreakpoint(count: number, bps: number[] | undefined): number {
+  if (!bps || bps.length === 0) return count
+  let best: number | undefined
+  for (const bp of bps) {
+    if (bp <= count && (best === undefined || bp > best)) best = bp
+  }
+  return best ?? count
 }
 
 /** 最頻値（同数なら大きい方）。空なら undefined。 */
@@ -250,6 +267,9 @@ async function main(): Promise<void> {
           unresolvedUnitNames.add(uApi)
           continue
         }
+        const uInfo = staticData.units.get(uApi)!
+        // 召喚ユニット・非ショップユニットを除外（コスト範囲外 or apiName パターン一致）
+        if (uInfo.cost < 1 || uInfo.cost > 5 || NON_BOARD_UNIT_RE.test(uApi)) continue
         acc.unitCounts.set(uApi, (acc.unitCounts.get(uApi) ?? 0) + 1)
         const unitItemList = rec.ui?.[i]
         if (unitItemList && unitItemList.length) {
@@ -347,11 +367,12 @@ async function main(): Promise<void> {
 
     // 代表シナジー: クラスタの過半数(>=SYNERGY_MIN_FREQ)で発動しているトレイト。
     // modeCount は最頻ユニット数（tc が無い旧データは 0）。
+    // 3番目の要素は modeCount 以下の最大発動ブレークポイント（活性ブレークポイント）。
     const synergies: [string, number, number][] = []
     for (const [tApi, list] of acc.styleLists) {
       if (list.length / acc.n >= SYNERGY_MIN_FREQ) {
         const modeCount = modeMaxNumber(acc.countLists.get(tApi) ?? []) ?? 0
-        synergies.push([tApi, modeMaxNumber(list) ?? 0, modeCount])
+        synergies.push([tApi, modeMaxNumber(list) ?? 0, activeBreakpoint(modeCount, staticData.traitBreakpoints.get(tApi))])
         usedTraitApis.add(tApi)
       }
     }

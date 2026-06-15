@@ -20,6 +20,7 @@ interface CDragonTrait {
   apiName?: string
   name?: string
   icon?: string
+  effects?: { minUnits?: number }[]
 }
 
 interface CDragonChampion {
@@ -99,6 +100,8 @@ export interface StaticData {
   setNumber: number
   /** apiName → 表示名(en/ja)・アイコンURL */
   traits: Map<string, { name: string; nameJa: string; icon: string }>
+  /** トレイト apiName → 発動ブレークポイント数リスト（昇順）。シナジー数の活性ブレークポイント算出用。 */
+  traitBreakpoints: Map<string, number[]>
   /** champions apiName → 表示名(en/ja)・コスト・アイコンURL・プランナーcode */
   units: Map<string, { name: string; nameJa: string; cost: number; icon: string; code: number }>
   /**
@@ -199,12 +202,20 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
 
   // traits
   const traits = new Map<string, { name: string; nameJa: string; icon: string }>()
+  const traitBreakpoints = new Map<string, number[]>()
   const traitNameToApi = new Map<string, string>()
   for (const t of chosen.traits ?? []) {
     if (!t.apiName) continue
     const name = t.name ?? t.apiName
     traits.set(t.apiName, { name, nameJa: ja.traits.get(t.apiName) ?? name, icon: iconUrl(t.icon) })
     if (t.name) traitNameToApi.set(t.name, t.apiName)
+    // effects の minUnits から発動ブレークポイントを昇順に収集（0以下・undefined は除外）。
+    const bps = [...new Set(
+      (t.effects ?? [])
+        .map((e) => e.minUnits)
+        .filter((v): v is number => typeof v === 'number' && v > 0),
+    )].sort((a, b) => a - b)
+    traitBreakpoints.set(t.apiName, bps)
   }
 
   // カバレッジ警告
@@ -280,5 +291,5 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
     items.set(item.apiName, { name, nameJa: ja.items.get(item.apiName) ?? name, icon: iconUrl(item.icon) })
   }
 
-  return { setNumber, traits, units, emblems, items, warnings }
+  return { setNumber, traits, traitBreakpoints, units, emblems, items, warnings }
 }
