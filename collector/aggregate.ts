@@ -534,7 +534,7 @@ async function main(): Promise<void> {
   const emblemsOut: EmblemInfo[] = emblemApisSorted.map((api, i) => {
     emblemIndex.set(api, i)
     const e = staticData.emblems.get(api)!
-    return { api, name: e.name, nameJa: e.nameJa, trait: traitIndex.get(e.traitApi)!, icon: e.icon }
+    return { api, name: e.name, nameJa: e.nameJa, trait: traitIndex.get(e.traitApi)!, icon: e.icon, base: e.base }
   })
 
   const itemApisSorted = [...usedItemApis].sort((a, b) => {
@@ -668,6 +668,7 @@ async function main(): Promise<void> {
     items: itemsOut,
     comps,
     compsByLevel,
+    baseItemIcons: staticData.baseItemIcons,
   }
 
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CompStats, StatsFile, UnitInfo } from '../../shared/types'
 import { aggregateAny, emblemGames } from '../lib/multiset'
 import { pickName, t, type Lang } from '../lib/i18n'
+import { Tip } from './Tip'
 
 type SortKey = 'rate' | 'place' | 'top4' | 'win'
 
@@ -224,29 +225,29 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
                 {(comp.synergies ?? comp.traits).map(([traitIdx, style, count]) => {
                   const trait = traits[traitIdx]
                   return (
-                    <span
-                      key={traitIdx}
-                      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-semibold ${styleClasses(
-                        style,
-                      )}`}
-                    >
-                      {trait?.icon && (
-                        <img
-                          src={trait.icon}
-                          alt=""
-                          loading="lazy"
-                          className="h-5 w-5 object-contain"
-                        />
-                      )}
-                      {trait ? pickName(lang, trait) : `#${traitIdx}`}
-                      {count ? <span className="tabular-nums opacity-90">{count}</span> : null}
-                    </span>
+                    <Tip key={traitIdx} label={trait ? pickName(lang, trait) : `#${traitIdx}`}>
+                      <span
+                        className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-xs font-semibold ${styleClasses(
+                          style,
+                        )}`}
+                      >
+                        {trait?.icon && (
+                          <img
+                            src={trait.icon}
+                            alt=""
+                            loading="lazy"
+                            className="h-5 w-5 object-contain"
+                          />
+                        )}
+                        {count ? <span className="rounded bg-zinc-950/40 px-1 text-xs font-bold tabular-nums">{count}</span> : null}
+                      </span>
+                    </Tip>
                   )
                 })}
               </div>
 
               {/* ユニット（下に推奨アイテム・装備紋章） */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-x-3 gap-y-2">
                 {comp.units.map((unitIdx, pos) => {
                   const unit = units[unitIdx]
                   if (!unit) return null
@@ -264,47 +265,56 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
                       <div className={`h-3 text-[11px] leading-3 ${starColor(star)}`}>
                         {star > 0 ? '★'.repeat(star) : ''}
                       </div>
-                      <img
-                        src={unit.icon}
-                        alt={unitName}
-                        title={star > 0 ? `${unitName} ★${star}` : unitName}
-                        loading="lazy"
-                        className={`h-14 w-14 rounded border-2 object-cover ${
-                          star === 3 ? 'border-amber-300 ring-1 ring-amber-300/60' : costBorder(unit.cost)
-                        }`}
-                      />
+                      <Tip label={star > 0 ? `${unitName} ★${star}` : unitName}>
+                        <img
+                          src={unit.icon}
+                          alt={unitName}
+                          loading="lazy"
+                          className={`h-14 w-14 rounded border-2 object-cover ${
+                            star === 3 ? 'border-amber-300 ring-1 ring-amber-300/60' : costBorder(unit.cost)
+                          }`}
+                        />
+                      </Tip>
                       {hasUnder && (
-                        <div className="flex flex-wrap justify-center gap-0.5">
-                          {unitEmblemIdxs.map((ei) => {
-                            const emblem = emblems[ei]
-                            if (!emblem) return null
-                            return (
-                              <img
-                                key={`e${ei}`}
-                                src={emblem.icon}
-                                alt={pickName(lang, emblem)}
-                                title={pickName(lang, emblem)}
-                                loading="lazy"
-                                className={`h-5 w-5 object-contain ${
-                                  selectedEmblemSet.has(ei) ? 'rounded ring-1 ring-amber-400' : ''
-                                }`}
-                              />
-                            )
-                          })}
-                          {unitItemIdxs.map((ii, k) => {
-                            const item = items?.[ii]
-                            if (!item) return null
-                            return (
-                              <img
-                                key={`i${ii}-${k}`}
-                                src={item.icon}
-                                alt={pickName(lang, item)}
-                                title={pickName(lang, item)}
-                                loading="lazy"
-                                className="h-5 w-5 rounded object-cover"
-                              />
-                            )
-                          })}
+                        <div className="flex flex-col items-center gap-0.5">
+                          {unitItemIdxs.length > 0 && (
+                            <div className="grid grid-cols-3 justify-items-center gap-0.5">
+                              {unitItemIdxs.map((ii, k) => {
+                                const item = items?.[ii]
+                                if (!item) return null
+                                return (
+                                  <Tip key={`i${ii}-${k}`} label={pickName(lang, item)}>
+                                    <img
+                                      src={item.icon}
+                                      alt={pickName(lang, item)}
+                                      loading="lazy"
+                                      className="h-5 w-5 rounded object-cover"
+                                    />
+                                  </Tip>
+                                )
+                              })}
+                            </div>
+                          )}
+                          {unitEmblemIdxs.length > 0 && (
+                            <div className="flex flex-wrap justify-center gap-0.5">
+                              {unitEmblemIdxs.map((ei) => {
+                                const emblem = emblems[ei]
+                                if (!emblem) return null
+                                return (
+                                  <Tip key={`e${ei}`} label={pickName(lang, emblem)}>
+                                    <img
+                                      src={emblem.icon}
+                                      alt={pickName(lang, emblem)}
+                                      loading="lazy"
+                                      className={`h-5 w-5 object-contain ${
+                                        selectedEmblemSet.has(ei) ? 'rounded ring-1 ring-amber-400' : ''
+                                      }`}
+                                    />
+                                  </Tip>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
