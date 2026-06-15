@@ -97,7 +97,7 @@ function App() {
   const generatedAt = new Date(stats.generatedAt).toLocaleString()
 
   return (
-    <div className="mx-auto flex h-screen w-full max-w-[1280px] flex-col">
+    <div className="mx-auto flex h-screen w-full max-w-[1440px] flex-col">
       <header className="border-b border-zinc-800 px-4 py-3">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h1 className="text-xl font-bold text-zinc-100">{t(lang, 'title')}</h1>
