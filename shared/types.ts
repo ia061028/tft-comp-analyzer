@@ -44,6 +44,8 @@ export interface EmblemInfo {
   /** traits 配列へのインデックス */
   trait: number
   icon: string
+  /** 合成素材分類: none=合成不可, spatula=へら系, fryingpan=フライパン系 */
+  base: 'none' | 'spatula' | 'fryingpan'
 }
 
 export interface UnitInfo {
@@ -129,4 +131,6 @@ export interface StatsFile {
   comps: CompStats[]
   /** レベル別の構成（キー "7".."10"）。全体は comps。 */
   compsByLevel: Record<string, CompStats[]>
+  /** 合成素材アイテムアイコン（紋章グリッドのカテゴリヘッダ用） */
+  baseItemIcons?: { spatula: string; fryingPan: string }
 }

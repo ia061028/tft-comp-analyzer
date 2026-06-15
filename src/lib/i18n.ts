@@ -41,6 +41,9 @@ const ja = {
   activeTraits: '発動特性 {n}',
   utilization: '活用 {n}/{k}',
   utilizationTitle: '選択した紋章のうち、この構成が活用している数',
+  emblemCatSpatula: 'へら系統',
+  emblemCatPan: 'フライパン系統',
+  emblemCatNone: '合成不可',
 }
 
 /** 翻訳キー（ja を基準に型化。en はこの全キーを持つことを型で強制）。 */
@@ -80,6 +83,9 @@ const en: Record<UIKey, string> = {
   activeTraits: '{n} traits',
   utilization: 'Uses {n}/{k}',
   utilizationTitle: 'How many of the selected emblems this comp uses',
+  emblemCatSpatula: 'Spatula',
+  emblemCatPan: 'Frying Pan',
+  emblemCatNone: 'Non-craftable',
 }
 
 const STRINGS: Record<Lang, Record<UIKey, string>> = { ja, en }

@@ -109,9 +109,11 @@ export interface StaticData {
    * traitApi は表示/クラスタ参照用の単一トレイト（先頭の解決トレイト）。
    * traitApis は発動判定用の全付与トレイト集合（Stargazer 等は基底＋変種が全て入る）。
    */
-  emblems: Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string }>
+  emblems: Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string; base: 'none' | 'spatula' | 'fryingpan' }>
   /** 完成アイテム apiName → 表示名(en/ja)・アイコンURL */
   items: Map<string, { name: string; nameJa: string; icon: string }>
+  /** 合成素材アイテムアイコン（紋章グリッドのカテゴリヘッダ用） */
+  baseItemIcons: { spatula: string; fryingPan: string }
   warnings: string[]
 }
 
@@ -246,7 +248,7 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
   // emblems（incompatibleTraits で付与トレイトを示すアイテム）
   // 付与トレイトが選定セットのトレイトに解決できるものだけを紋章として採用する。
   // これにより他セットのスパチュラ系アイテムや、別機構（オーグメント/Anima 系）は自然に除外される。
-  const emblems = new Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string }>()
+  const emblems = new Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string; base: 'none' | 'spatula' | 'fryingpan' }>()
   let unresolvedEmblemCount = 0
   for (const item of data.items ?? []) {
     if (!item.apiName) continue
@@ -266,12 +268,19 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
       continue
     }
     const name = item.name ?? item.apiName
+    const comp = item.composition ?? []
+    const base: 'none' | 'spatula' | 'fryingpan' =
+      comp.length === 0 ? 'none'
+      : comp.includes('TFT_Item_Spatula') ? 'spatula'
+      : comp.includes('TFT_Item_FryingPan') ? 'fryingpan'
+      : 'none'
     emblems.set(item.apiName, {
       name,
       nameJa: ja.items.get(item.apiName) ?? name,
       traitApi: traitApis[0],
       traitApis,
       icon: iconUrl(item.icon),
+      base,
     })
   }
   if (unresolvedEmblemCount > 0) {
@@ -291,5 +300,13 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
     items.set(item.apiName, { name, nameJa: ja.items.get(item.apiName) ?? name, icon: iconUrl(item.icon) })
   }
 
-  return { setNumber, traits, traitBreakpoints, units, emblems, items, warnings }
+  // 合成素材アイコン（紋章グリッドのカテゴリヘッダ用）。
+  const spatulaItem = (data.items ?? []).find((it) => it.apiName === 'TFT_Item_Spatula')
+  const fryingPanItem = (data.items ?? []).find((it) => it.apiName === 'TFT_Item_FryingPan')
+  const baseItemIcons = {
+    spatula: iconUrl(spatulaItem?.icon),
+    fryingPan: iconUrl(fryingPanItem?.icon),
+  }
+
+  return { setNumber, traits, traitBreakpoints, units, emblems, items, baseItemIcons, warnings }
 }
