@@ -174,6 +174,17 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
           : { label: '?', classes: 'bg-zinc-700 text-zinc-300' }
         const compName = (lang === 'ja' ? comp.labelJa : comp.label) || comp.label
         const code = buildPlannerCode(comp.units, units, stats.setNumber)
+        // 装備紋章が付与するトレイトのうち、構成の synergies に未掲載のものを「紋章由来」として補完。
+        // （付与トレイトは紋章装備サブセットでのみ発動し、クラスタ過半数に届かず希釈されるため）
+        const baseSynTraitIdxs = new Set((comp.synergies ?? comp.traits).map((s) => s[0]))
+        const grantedChips: { traitIdx: number; emblemIdx: number }[] = []
+        for (const ei of selList) {
+          if (emblemGames(comp, ei) <= 0) continue
+          const gt = emblems[ei]?.trait
+          if (gt == null || baseSynTraitIdxs.has(gt)) continue
+          if (grantedChips.some((g) => g.traitIdx === gt)) continue
+          grantedChips.push({ traitIdx: gt, emblemIdx: ei })
+        }
         const metricCell = (active: boolean, label: string, value: string) => (
           <div
             className={`flex items-baseline justify-between gap-2 rounded px-1.5 py-0.5 ${
@@ -244,6 +255,30 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
                           />
                         )}
                         {count ? <span className="rounded bg-zinc-950/40 px-1 text-xs font-bold tabular-nums">{count}</span> : null}
+                      </span>
+                    </Tip>
+                  )
+                })}
+                {grantedChips.map(({ traitIdx, emblemIdx }) => {
+                  const trait = traits[traitIdx]
+                  const emblem = emblems[emblemIdx]
+                  return (
+                    <Tip
+                      key={`g${traitIdx}`}
+                      label={`${trait ? pickName(lang, trait) : `#${traitIdx}`}（${emblem ? pickName(lang, emblem) : ''}）`}
+                    >
+                      <span className="relative inline-flex items-center rounded border border-amber-400/70 bg-amber-400/10 px-1.5 py-0.5 text-xs font-semibold text-amber-200">
+                        {trait?.icon && (
+                          <img src={trait.icon} alt="" loading="lazy" className="h-5 w-5 object-contain" />
+                        )}
+                        {emblem?.icon && (
+                          <img
+                            src={emblem.icon}
+                            alt=""
+                            loading="lazy"
+                            className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-zinc-900 object-contain ring-1 ring-amber-400"
+                          />
+                        )}
                       </span>
                     </Tip>
                   )
