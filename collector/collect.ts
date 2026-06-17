@@ -377,8 +377,14 @@ async function main(): Promise<void> {
       )
     } catch (err) {
       if (err instanceof AuthError) {
-        console.error(`認証エラー: ${err.message}。キー失効と判断し state に触れず終了します。`)
-        process.exit(1)
+        // キー失効は想定内（開発キーは24h失効）。ここで exit 1 にすると6時間ごとの
+        // CI が赤失敗し、失敗メールが繰り返し届く。state には一切触れていないので
+        // ::warning:: アノテーションを出して正常終了し、ジョブは成功扱いにする。
+        // 既存 state / stats.json は不変で、サイトは前回データを配信し続ける。
+        console.log(
+          `::warning::認証エラー: ${err.message}。キー失効と判断し収集をスキップ（state は不変・前回データを配信継続）。`,
+        )
+        process.exit(0)
       }
       throw err
     }
