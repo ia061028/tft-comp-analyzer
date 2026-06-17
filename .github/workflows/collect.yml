@@ -27,8 +27,9 @@ jobs:
 
       - run: npm ci
 
-      # collect は冒頭に認証プリフライトを行い、キー失効（401/403）なら
-      # state に触れる前に exit 1 → このジョブが赤失敗し、コミットは発生しない。
+      # collect は冒頭に認証プリフライトを行う。キー失効（401/403）の場合は
+      # ::warning:: を出して exit 0（収集スキップ・state 不変）→ ジョブは成功扱いとなり
+      # 失敗メールは飛ばない。実エラー（ルート例外等）は従来どおり exit 1 で赤失敗する。
       - name: collect
         run: npm run collect
         env:
