@@ -9,9 +9,8 @@ import { pickTargetPatch, compareVersions } from './patches.ts'
 import { getStaticData, type StaticData } from './cdragon.ts'
 import type {
   ParticipantRecord,
-  StatsFile,
-  CompStats,
-  EmblemRow,
+  WireStatsFile,
+  WireComp,
   TraitInfo,
   EmblemInfo,
   UnitInfo,
@@ -549,25 +548,12 @@ async function main(): Promise<void> {
     return { api, name: it.name, nameJa: it.nameJa, icon: it.icon }
   })
 
-  // 9. PreComp → CompStats（intern index 化）。
-  function toComp(pc: PreComp): CompStats {
+  // 9. PreComp → WireComp（intern index 化＋オンディスク圧縮形式）。
+  // label/labelJa は traits から復元できるため持たない（フロント data.ts で再構築）。
+  function toComp(pc: PreComp): WireComp {
     const traitPairs: [number, number][] = pc.traitApis
       .map((api): [number, number] => [traitIndex.get(api)!, pc.traitModeStyle.get(api) ?? 0])
       .sort((a, b) => a[0] - b[0])
-
-    // label/labelJa: modeStyle 降順・同値は英語名昇順で順序を一意化し、各言語で連結。
-    const labelParts = pc.traitApis
-      .map((api) => ({
-        name: staticData.traits.get(api)!.name,
-        nameJa: staticData.traits.get(api)!.nameJa,
-        style: pc.traitModeStyle.get(api) ?? 0,
-      }))
-      .sort((a, b) => {
-        if (b.style !== a.style) return b.style - a.style
-        return a.name < b.name ? -1 : a.name > b.name ? 1 : 0
-      })
-    const label = labelParts.map((p) => p.name).join(' / ')
-    const labelJa = labelParts.map((p) => p.nameJa).join(' / ')
 
     // synergies: 代表シナジー [traitIdx, modeStyle, modeCount]。style 降順→トレイト名昇順。
     const synergies: [number, number, number][] = pc.synergies
@@ -593,15 +579,16 @@ async function main(): Promise<void> {
     // 行の枝刈り: 紋章を含み(n>=ROW_MIN_N)の行のみ出力。
     // 空紋章行(e=[])はフロントの紋章フィルタで参照されず、n=1 の単発組合せは採用率しきい値
     // 未満のノイズのため、stats.json サイズ削減のため除外（採用率の分母 comp.n は別途保持）。
-    const rows: EmblemRow[] = pc.rows
+    // 出力はタプル [e[], n, top4, win, p]（キー名コスト削減）。
+    const rows: [number[], number, number, number, number][] = pc.rows
       .filter((r) => r.emblems.length > 0 && r.n >= ROW_MIN_N)
-      .map((r): EmblemRow => {
+      .map((r): [number[], number, number, number, number] => {
         const e = r.emblems.map((api) => emblemIndex.get(api)!).sort((x, y) => x - y)
-        return { e, n: r.n, top4: r.top4, win: r.win, p: r.p }
+        return [e, r.n, r.top4, r.win, r.p]
       })
       .sort((a, b) => {
-        if (a.e.length !== b.e.length) return a.e.length - b.e.length
-        for (let i = 0; i < a.e.length; i++) if (a.e[i] !== b.e[i]) return a.e[i] - b.e[i]
+        if (a[0].length !== b[0].length) return a[0].length - b[0].length
+        for (let i = 0; i < a[0].length; i++) if (a[0][i] !== b[0][i]) return a[0][i] - b[0][i]
         return 0
       })
 
@@ -621,25 +608,25 @@ async function main(): Promise<void> {
       ])
       .sort((a, b) => a[0] - b[0] || a[1] - b[1])
 
-    return {
-      traits: traitPairs,
-      synergies,
-      label,
-      labelJa,
-      units: unitIdxs,
-      unitStars,
+    // 空配列・全0の unitStars は省略（decode 側でデフォルト復元）。
+    const wire: WireComp = {
+      t: traitPairs,
+      u: unitIdxs,
       n: pc.n,
-      top4: pc.top4,
-      win: pc.win,
-      rows,
-      holders,
-      unitItems,
+      q: pc.top4,
+      w: pc.win,
     }
+    if (synergies.length) wire.s = synergies
+    if (unitStars.some((s) => s > 0)) wire.k = unitStars
+    if (rows.length) wire.r = rows
+    if (holders.length) wire.h = holders
+    if (unitItems.length) wire.i = unitItems
+    return wire
   }
 
   // 8. 出力
-  const comps: CompStats[] = allPreComps.map(toComp).sort((a, b) => b.n - a.n)
-  const compsByLevel: Record<string, CompStats[]> = {}
+  const comps: WireComp[] = allPreComps.map(toComp).sort((a, b) => b.n - a.n)
+  const compsByLevel: Record<string, WireComp[]> = {}
   for (const lv of LEVELS) {
     compsByLevel[String(lv)] = levelPreComps[String(lv)].map(toComp).sort((a, b) => b.n - a.n)
   }
@@ -651,8 +638,8 @@ async function main(): Promise<void> {
     uniqueMatches.add(lr.rec.m)
   }
 
-  const out: StatsFile = {
-    schemaVersion: 1,
+  const out: WireStatsFile = {
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     patch: targetPatch,
     tftPatch: config.tftPatchLabels[targetPatch] ?? targetPatch,

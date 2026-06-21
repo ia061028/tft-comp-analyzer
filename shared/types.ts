@@ -110,9 +110,58 @@ export interface CompStats {
   unitItems: [number, number, number][]
 }
 
-/** public/data/stats.json 全体 */
+/**
+ * オンディスク圧縮形式の構成（stats.json に書き出す形）。
+ * - キー名を短縮し、label/labelJa は traits から復元するため持たない。
+ * - 空配列フィールド(s/r/h/i)・全0の unitStars(k) は省略してバイト削減。
+ * - フロントは data.ts の decodeStats で CompStats（リッチ型）へ復元する。
+ */
+export interface WireComp {
+  /** traits: [traitIdx, modeStyle] */
+  t: [number, number][]
+  /** synergies: [traitIdx, modeStyle, breakpoint]（空なら省略） */
+  s?: [number, number, number][]
+  /** units（units 配列インデックス、コスト順） */
+  u: number[]
+  /** unitStars（u と同順。全0なら省略） */
+  k?: number[]
+  n: number
+  /** top4 */
+  q: number
+  /** win */
+  w: number
+  /** rows: [e[], n, top4, win, p]（空なら省略） */
+  r?: [number[], number, number, number, number][]
+  /** holders: [emblemIdx, unitIdx, count]（空なら省略） */
+  h?: [number, number, number][]
+  /** unitItems: [unitIdx, itemIdx, count]（空なら省略） */
+  i?: [number, number, number][]
+}
+
+/** stats.json 全体のオンディスク圧縮形式。decodeStats で StatsFile へ復元。 */
+export interface WireStatsFile {
+  schemaVersion: 2
+  generatedAt: string
+  patch: string
+  tftPatch: string
+  setNumber: number
+  totals: {
+    matches: number
+    participants: number
+    byRoute: Record<string, number>
+  }
+  traits: TraitInfo[]
+  emblems: EmblemInfo[]
+  units: UnitInfo[]
+  items: ItemInfo[]
+  comps: WireComp[]
+  compsByLevel: Record<string, WireComp[]>
+  baseItemIcons?: { spatula: string; fryingPan: string }
+}
+
+/** public/data/stats.json をデコードしたフロント内部の表現（リッチ型） */
 export interface StatsFile {
-  schemaVersion: 1
+  schemaVersion: number
   generatedAt: string
   /** 内部パッチキー（game_version 由来、例 "16.12"） */
   patch: string
