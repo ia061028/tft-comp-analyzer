@@ -80,6 +80,9 @@ export function CompList({ stats, comps, sel, sortKey, ratePct, lang }: CompList
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="px-1 text-xs font-medium text-zinc-500">
+        {t(lang, 'resultCount', { n: rows.length })}
+      </div>
       {rows.map(({ comp, agg, avgPlace, usedCount }) => (
         <CompCard
           key={comp.label + '|' + comp.traits.map((tr) => tr[0]).join(',')}
