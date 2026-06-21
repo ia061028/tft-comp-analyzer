@@ -72,7 +72,7 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                         e.preventDefault()
                         onRemove(i)
                       }}
-                      className={`relative flex w-full items-center justify-center rounded-md border p-1 transition-colors ${
+                      className={`relative flex w-full items-center justify-center rounded-lg border p-1 transition-all duration-150 hover:scale-[1.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
                         selected
                           ? 'border-amber-400 bg-amber-400/10 ring-1 ring-amber-400/50'
                           : 'border-zinc-700 bg-zinc-800/40 hover:border-zinc-500 hover:bg-zinc-800'
@@ -85,7 +85,7 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                         className="h-12 w-12 object-contain"
                       />
                       {selected && (
-                        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-xs font-bold text-zinc-950">
+                        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-xs font-bold text-zinc-950 shadow">
                           {count}
                         </span>
                       )}

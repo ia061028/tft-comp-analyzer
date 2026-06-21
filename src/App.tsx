@@ -5,6 +5,7 @@ import { loadStats } from './lib/data'
 import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
 import { CompList } from './components/CompList'
+import { SegmentedControl } from './components/SegmentedControl'
 
 type SortKey = 'rate' | 'place' | 'top4' | 'win'
 type LevelKey = 'all' | '7' | '8' | '9' | '10'
@@ -43,27 +44,36 @@ function App() {
 
   if (load.status === 'loading') {
     return (
-      <div className="flex h-screen items-center justify-center text-zinc-400">
-        {t(lang, 'loading')}
+      <div className="flex h-screen flex-col items-center justify-center gap-3 text-zinc-400">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-amber-400"
+          aria-hidden
+        />
+        <span className="text-sm">{t(lang, 'loading')}</span>
       </div>
     )
   }
 
   if (load.status === 'error') {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 text-zinc-300">
-        <p className="text-sm font-semibold text-zinc-200">{t(lang, 'loadFailed')}</p>
-        <p className="text-xs text-red-400">{load.message}</p>
-        <button
-          type="button"
-          onClick={() => {
-            setLoad({ status: 'loading' })
-            setReloadKey((k) => k + 1)
-          }}
-          className="rounded border border-zinc-600 px-3 py-1.5 text-sm hover:bg-zinc-800"
-        >
-          {t(lang, 'retry')}
-        </button>
+      <div className="flex h-screen flex-col items-center justify-center gap-3 px-4 text-zinc-300">
+        <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 text-center">
+          <span className="text-3xl" aria-hidden>
+            ⚠️
+          </span>
+          <p className="text-sm font-semibold text-zinc-200">{t(lang, 'loadFailed')}</p>
+          <p className="break-all text-xs text-red-400">{load.message}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoad({ status: 'loading' })
+              setReloadKey((k) => k + 1)
+            }}
+            className="rounded-lg border border-zinc-600 px-3 py-1.5 text-sm transition-colors hover:border-zinc-400 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+          >
+            {t(lang, 'retry')}
+          </button>
+        </div>
       </div>
     )
   }
@@ -76,8 +86,7 @@ function App() {
   const ratePct = Math.min(Math.max(minSample ?? 5, rateMin), rateMax)
 
   // 表示する構成: 全体 or レベル別（古い stats.json に compsByLevel が無い場合は空配列）。
-  const selectedComps =
-    level === 'all' ? stats.comps : (stats.compsByLevel?.[level] ?? [])
+  const selectedComps = level === 'all' ? stats.comps : (stats.compsByLevel?.[level] ?? [])
 
   // selection は emblems 配列インデックスのマルチセット。counts[index] = 個数。
   const counts = stats.emblems.map(() => 0)
@@ -98,9 +107,11 @@ function App() {
 
   return (
     <div className="mx-auto flex h-screen w-full max-w-[1440px] flex-col">
-      <header className="border-b border-zinc-800 px-4 py-3">
+      <header className="border-b border-zinc-800 bg-zinc-950/60 px-4 py-3 backdrop-blur">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h1 className="text-xl font-bold text-zinc-100">{t(lang, 'title')}</h1>
+          <h1 className="bg-gradient-to-r from-amber-200 to-amber-400 bg-clip-text text-xl font-bold text-transparent">
+            {t(lang, 'title')}
+          </h1>
           <span className="text-sm text-zinc-400">
             Set {stats.setNumber} ・ TFT {stats.tftPatch ?? stats.patch}
           </span>
@@ -111,7 +122,7 @@ function App() {
           <button
             type="button"
             onClick={() => setLang((l) => (l === 'ja' ? 'en' : 'ja'))}
-            className="ml-auto inline-flex items-center gap-1 rounded border border-zinc-600 bg-zinc-800/60 px-2.5 py-1 text-xs font-semibold text-zinc-200 hover:border-zinc-400 hover:bg-zinc-800"
+            className="ml-auto inline-flex items-center gap-1 rounded-lg border border-zinc-600 bg-zinc-800/60 px-2.5 py-1 text-xs font-semibold text-zinc-200 transition-colors hover:border-zinc-400 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
             title={t(lang, 'langSwitchTitle')}
           >
             <span aria-hidden>🌐</span>
@@ -119,60 +130,36 @@ function App() {
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-6">
+        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex items-center gap-2 text-sm text-zinc-300">
             <span className="shrink-0">{t(lang, 'level')}</span>
-            <div className="inline-flex overflow-hidden rounded border border-zinc-700">
-              {(
-                [
-                  ['all', t(lang, 'all')],
-                  ['7', 'Lv7'],
-                  ['8', 'Lv8'],
-                  ['9', 'Lv9'],
-                  ['10', 'Lv10'],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setLevel(key)}
-                  className={`px-3 py-1 text-sm ${
-                    level === key
-                      ? 'bg-amber-400 font-semibold text-zinc-950'
-                      : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl<LevelKey>
+              ariaLabel={t(lang, 'level')}
+              value={level}
+              onChange={setLevel}
+              options={[
+                { key: 'all', label: t(lang, 'all') },
+                { key: '7', label: 'Lv7' },
+                { key: '8', label: 'Lv8' },
+                { key: '9', label: 'Lv9' },
+                { key: '10', label: 'Lv10' },
+              ]}
+            />
           </div>
 
           <div className="flex items-center gap-2 text-sm text-zinc-300">
             <span className="shrink-0">{t(lang, 'sort')}</span>
-            <div className="inline-flex overflow-hidden rounded border border-zinc-700">
-              {(
-                [
-                  ['place', t(lang, 'sortPlace')],
-                  ['top4', t(lang, 'sortTop4')],
-                  ['win', t(lang, 'sortWin')],
-                  ['rate', t(lang, 'sortRate')],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSortKey(key)}
-                  className={`px-3 py-1 text-sm ${
-                    sortKey === key
-                      ? 'bg-amber-400 font-semibold text-zinc-950'
-                      : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl<SortKey>
+              ariaLabel={t(lang, 'sort')}
+              value={sortKey}
+              onChange={setSortKey}
+              options={[
+                { key: 'place', label: t(lang, 'sortPlace') },
+                { key: 'top4', label: t(lang, 'sortTop4') },
+                { key: 'win', label: t(lang, 'sortWin') },
+                { key: 'rate', label: t(lang, 'sortRate') },
+              ]}
+            />
           </div>
 
           <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -204,15 +191,14 @@ function App() {
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          <SelectionBar emblems={stats.emblems} counts={counts} lang={lang} onClear={clear} />
-          <CompList
-            stats={stats}
-            comps={selectedComps}
-            sel={selection}
-            sortKey={sortKey}
-            ratePct={ratePct}
+          <SelectionBar
+            emblems={stats.emblems}
+            counts={counts}
             lang={lang}
+            onClear={clear}
+            onRemove={removeEmblem}
           />
+          <CompList stats={stats} comps={selectedComps} sel={selection} sortKey={sortKey} ratePct={ratePct} lang={lang} />
         </main>
       </div>
     </div>
