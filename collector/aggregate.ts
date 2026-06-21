@@ -1,5 +1,6 @@
 // Phase 3: data/state/records/*.ndjson → public/data/stats.json
-// style>=minStyle クラスタリング、発動トレイト紋章フィルタ、マルチセットrow、代表ユニット、インターン。
+// 構成 = 盤面ユニット集合が完全一致するレコード群（クラスタリングはしない）。
+// 各構成に「紋章活用シグネチャ(sig)」を持たせ、選択紋章に応じた活用判定はランタイムで行う。
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs'
 import { dirname, join, basename } from 'node:path'
@@ -106,7 +107,6 @@ async function main(): Promise<void> {
   console.log(`重複ガード: ${dupSkipped} 件スキップ → ${deduped.length} レコード`)
 
   // 3. パッチ選定（ヒステリシス: ユニークマッチ数 >= threshold の最新パッチ）
-  // マッチ数はレコード数ではなくユニークマッチID数で数える。
   const patchRecordCounts = new Map<string, number>()
   const patchMatchSets = new Map<string, Set<string>>()
   for (const lr of deduped) {
@@ -121,9 +121,7 @@ async function main(): Promise<void> {
   const matchCountByPatch = new Map<string, number>()
   for (const [v, set] of patchMatchSets) matchCountByPatch.set(v, set.size)
 
-  const patchEntries = [...patchRecordCounts.entries()].sort((a, b) =>
-    compareVersions(b[0], a[0]),
-  )
+  const patchEntries = [...patchRecordCounts.entries()].sort((a, b) => compareVersions(b[0], a[0]))
   console.log(`パッチ分布（ヒステリシス閾値=${config.patchSwitchThreshold} ユニークマッチ）:`)
   for (const [v, recCount] of patchEntries) {
     const matches = matchCountByPatch.get(v) ?? 0
@@ -143,278 +141,237 @@ async function main(): Promise<void> {
   const recordTraitNames = new Set<string>()
   for (const lr of target) for (const k of Object.keys(lr.rec.t)) recordTraitNames.add(k)
   const staticData: StaticData = await getStaticData(recordTraitNames)
+  const resolvedTraits = [...recordTraitNames].filter((t) => staticData.traits.has(t)).length
   const coverage =
-    recordTraitNames.size === 0
-      ? 100
-      : (([...recordTraitNames].filter((t) => staticData.traits.has(t)).length /
-          recordTraitNames.size) *
-          100)
+    recordTraitNames.size === 0 ? 100 : (resolvedTraits / recordTraitNames.size) * 100
   console.log(
     `選定セット: ${staticData.setNumber}, トレイトカバレッジ: ${coverage.toFixed(1)}% ` +
-      `(${recordTraitNames.size} 種中 ${[...recordTraitNames].filter((t) => staticData.traits.has(t)).length} 解決)`,
+      `(${recordTraitNames.size} 種中 ${resolvedTraits} 解決)`,
   )
 
-  // 警告集計用（種類ごとのユニーク名）。全バケット横断で dedup される。
   const unresolvedTraitNames = new Set<string>()
   const unresolvedUnitNames = new Set<string>()
   const unresolvedEmblemNames = new Set<string>()
 
-  // 5/6. クラスタリング & クラスタ内集計
-  interface ClusterAcc {
-    traitApis: string[] // キートレイト apiName（ソート済み）
+  // 5. 盤面ユニット集合でグルーピング ＋ 紋章活用シグネチャ集計
+  interface SigAcc {
+    one: string[] // +1 紋章 apiName（ソート済み）
+    half: string[] // +0.5 紋章 apiName（ソート済み）
     n: number
     top4: number
     win: number
-    // トレイト apiName → style 値リスト（最頻 style 算出用、代表シナジー判定にも使用）
-    styleLists: Map<string, number[]>
-    // トレイト apiName → num_units 値リスト（代表ユニット数算出用、tc ありレコードのみ）
-    countLists: Map<string, number[]>
-    // unit apiName → 出現回数
-    unitCounts: Map<string, number>
-    // 紋章マルチセット（emblem apiName ソート済み JSON）→ 集計（p=順位合計）
-    rows: Map<string, { emblems: string[]; n: number; top4: number; win: number; p: number }>
-    // 紋章 apiName → 装備ユニット(character_id) → 回数（holder 集計用、eh ありレコードのみ）
-    holderCounts: Map<string, Map<string, number>>
-    // unit apiName → item apiName → 回数（推奨アイテム集計用、ui ありレコードのみ）
-    itemCounts: Map<string, Map<string, number>>
-    // unit apiName → スターレベル値リスト（代表スター算出用、us ありレコードのみ）
+    p: number // 順位合計
+  }
+  interface CompAcc {
+    unitApis: string[] // 盤面ユニット apiName（ソート済み・構成キー）
+    n: number
+    // 表示用
     unitStarLists: Map<string, number[]>
+    itemCounts: Map<string, Map<string, number>>
+    holderCounts: Map<string, Map<string, number>>
+    // 紋章活用シグネチャ
+    sigs: Map<string, SigAcc>
   }
 
-  /** レコード集合をクラスタリングして ClusterAcc 群を返す（全体/レベル別で共用）。 */
-  function buildClusters(records: LoadedRecord[]): {
-    clusters: ClusterAcc[]
-    noClusterKey: number
-    excludedUnresolvedTrait: number
-  } {
-    const map = new Map<string, ClusterAcc>()
-    let noClusterKey = 0
-    let excludedUnresolvedTrait = 0
+  const map = new Map<string, CompAcc>()
+  let noBoard = 0
+  let excludedUnresolvedTrait = 0
 
-    for (const lr of records) {
-      const rec = lr.rec
+  for (const lr of target) {
+    const rec = lr.rec
 
-      // 未解決トレイト（静的データに無い apiName）を含むレコードは集計から除外。
-      let hasUnresolvedTrait = false
-      for (const tApi of Object.keys(rec.t)) {
-        if (!staticData.traits.has(tApi)) {
-          unresolvedTraitNames.add(tApi)
-          hasUnresolvedTrait = true
-        }
+    // 未解決トレイトを含むレコードは集計から除外（カバレッジ100%なら発生しない）。
+    let hasUnresolvedTrait = false
+    for (const tApi of Object.keys(rec.t)) {
+      if (!staticData.traits.has(tApi)) {
+        unresolvedTraitNames.add(tApi)
+        hasUnresolvedTrait = true
       }
-      if (hasUnresolvedTrait) {
-        excludedUnresolvedTrait++
-        continue
-      }
-
-      // クラスタキー（看板トレイト）: ゴールド以上(style>=clusterMinStyle)があればそれを、
-      // 無ければ発動中の全特性を候補とし、その中からスタイル降順（同点 apiName 昇順）で
-      // 上位 clusterMaxKeyTraits 件を採用、apiName 昇順で連結（決定的）。
-      // これによりゴールド構成は従来どおり、ゴールドが無い盤面（全ブロンズ等）も構成化される。
-      const active = Object.entries(rec.t)
-      if (active.length === 0) {
-        noClusterKey++
-        continue
-      }
-      const gold = active.filter(([, style]) => style >= config.clusterMinStyle)
-      const keyCandidates = gold.length > 0 ? gold : active
-      keyCandidates.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-      const keyTraits = keyCandidates.slice(0, config.clusterMaxKeyTraits).map(([tApi]) => tApi)
-      keyTraits.sort()
-      const clusterKey = keyTraits.join('|')
-
-      let acc = map.get(clusterKey)
-      if (!acc) {
-        acc = {
-          traitApis: keyTraits,
-          n: 0,
-          top4: 0,
-          win: 0,
-          styleLists: new Map(),
-          countLists: new Map(),
-          unitCounts: new Map(),
-          rows: new Map(),
-          holderCounts: new Map(),
-          itemCounts: new Map(),
-          unitStarLists: new Map(),
-        }
-        map.set(clusterKey, acc)
-      }
-
-      acc.n++
-      if (rec.p <= 4) acc.top4++
-      if (rec.p === 1) acc.win++
-
-      // 発動トレイト全て(tier>=1=ブロンズ以上)の style を蓄積。
-      // キートレイトの最頻style算出に加え、代表シナジー（過半数で発動するトレイト）算出に使う。
-      for (const [tApi, style] of Object.entries(rec.t)) {
-        const list = acc.styleLists.get(tApi) ?? []
-        list.push(style)
-        acc.styleLists.set(tApi, list)
-        const cnt = rec.tc?.[tApi]
-        if (cnt && cnt > 0) {
-          const clist = acc.countLists.get(tApi) ?? []
-          clist.push(cnt)
-          acc.countLists.set(tApi, clist)
-        }
-      }
-
-      // ユニット出現＋ユニット別完成アイテム（解決できるものだけ）
-      for (let i = 0; i < rec.u.length; i++) {
-        const uApi = rec.u[i]
-        if (!staticData.units.has(uApi)) {
-          unresolvedUnitNames.add(uApi)
-          continue
-        }
-        const uInfo = staticData.units.get(uApi)!
-        // 召喚ユニット・非ショップユニットを除外（コスト範囲外 or apiName パターン一致）
-        if (uInfo.cost < 1 || uInfo.cost > 5 || NON_BOARD_UNIT_RE.test(uApi)) continue
-        acc.unitCounts.set(uApi, (acc.unitCounts.get(uApi) ?? 0) + 1)
-        const unitItemList = rec.ui?.[i]
-        if (unitItemList && unitItemList.length) {
-          let im = acc.itemCounts.get(uApi)
-          if (!im) {
-            im = new Map()
-            acc.itemCounts.set(uApi, im)
-          }
-          for (const it of unitItemList) {
-            if (staticData.items.has(it)) im.set(it, (im.get(it) ?? 0) + 1)
-          }
-        }
-        const star = rec.us?.[i]
-        if (star && star > 0) {
-          const list = acc.unitStarLists.get(uApi) ?? []
-          list.push(star)
-          acc.unitStarLists.set(uApi, list)
-        }
-      }
-
-      // 紋章マルチセット: emblems 辞書に存在 かつ 付与トレイト（変種含む）が発動中。
-      const recTraitKeys = new Set(Object.keys(rec.t))
-      const activeEmblems: string[] = []
-      for (let k = 0; k < rec.e.length; k++) {
-        const eApi = rec.e[k]
-        const emb = staticData.emblems.get(eApi)
-        if (!emb) {
-          unresolvedEmblemNames.add(eApi)
-          continue
-        }
-        if (!emb.traitApis.some((a) => recTraitKeys.has(a))) continue
-        activeEmblems.push(eApi)
-
-        const holder = rec.eh?.[k]
-        if (holder && staticData.units.has(holder)) {
-          let hc = acc.holderCounts.get(eApi)
-          if (!hc) {
-            hc = new Map()
-            acc.holderCounts.set(eApi, hc)
-          }
-          hc.set(holder, (hc.get(holder) ?? 0) + 1)
-        }
-      }
-      activeEmblems.sort()
-      const rowKey = activeEmblems.join('|')
-      let row = acc.rows.get(rowKey)
-      if (!row) {
-        row = { emblems: activeEmblems, n: 0, top4: 0, win: 0, p: 0 }
-        acc.rows.set(rowKey, row)
-      }
-      row.n++
-      if (rec.p <= 4) row.top4++
-      if (rec.p === 1) row.win++
-      row.p += rec.p
+    }
+    if (hasUnresolvedTrait) {
+      excludedUnresolvedTrait++
+      continue
     }
 
-    return { clusters: [...map.values()], noClusterKey, excludedUnresolvedTrait }
+    // 盤面ユニット集合（召喚・非ショップ除外、コスト1-5、重複除去）。
+    // 盤面から除外したユニット（召喚等）の特性寄与は、Riot の num_units を盤面実効数に
+    // 補正するために記録する（召喚も Riot の特性数に含まれるため）。
+    const boardSet = new Set<string>()
+    const summonTraitCount = new Map<string, number>()
+    for (const uApi of rec.u) {
+      if (!staticData.units.has(uApi)) {
+        unresolvedUnitNames.add(uApi)
+        continue
+      }
+      const uInfo = staticData.units.get(uApi)!
+      if (uInfo.cost < 1 || uInfo.cost > 5 || NON_BOARD_UNIT_RE.test(uApi)) {
+        for (const tApi of uInfo.traits) {
+          summonTraitCount.set(tApi, (summonTraitCount.get(tApi) ?? 0) + 1)
+        }
+        continue
+      }
+      boardSet.add(uApi)
+    }
+    if (boardSet.size === 0) {
+      noBoard++
+      continue
+    }
+    const boardApis = [...boardSet].sort()
+    const boardKey = boardApis.join('|')
+
+    let acc = map.get(boardKey)
+    if (!acc) {
+      acc = {
+        unitApis: boardApis,
+        n: 0,
+        unitStarLists: new Map(),
+        itemCounts: new Map(),
+        holderCounts: new Map(),
+        sigs: new Map(),
+      }
+      map.set(boardKey, acc)
+    }
+    acc.n++
+
+    // 発動トレイト集合（紋章の発動判定に使用）。
+    const recTraitKeys = new Set(Object.keys(rec.t))
+
+    // ユニット別スター・完成アイテム（盤面ユニットのみ）。
+    for (let i = 0; i < rec.u.length; i++) {
+      const uApi = rec.u[i]
+      if (!boardSet.has(uApi)) continue
+      const star = rec.us?.[i]
+      if (star && star > 0) {
+        const list = acc.unitStarLists.get(uApi) ?? []
+        list.push(star)
+        acc.unitStarLists.set(uApi, list)
+      }
+      const unitItemList = rec.ui?.[i]
+      if (unitItemList && unitItemList.length) {
+        let im = acc.itemCounts.get(uApi)
+        if (!im) {
+          im = new Map()
+          acc.itemCounts.set(uApi, im)
+        }
+        for (const it of unitItemList) {
+          if (staticData.items.has(it)) im.set(it, (im.get(it) ?? 0) + 1)
+        }
+      }
+    }
+
+    // 紋章活用スコア → シグネチャ。紋章の個数（multiplicity）を保持する。
+    // 同一紋章を複数装備した場合は同数だけ one/half 配列に積む。
+    const emblemInstances = new Map<string, number>()
+    for (const eApi of rec.e) emblemInstances.set(eApi, (emblemInstances.get(eApi) ?? 0) + 1)
+
+    const oneApisArr: string[] = []
+    const halfApisArr: string[] = []
+    const activeEmblemApis = new Set<string>()
+    for (const [eApi, inst] of emblemInstances) {
+      const emb = staticData.emblems.get(eApi)
+      if (!emb) {
+        unresolvedEmblemNames.add(eApi)
+        continue
+      }
+      // 付与特性（変種含む）のうち発動中(tier>=1)のもの。最大 num_units の変種を採用。
+      let bestVariant: string | undefined
+      let bestRaw = -1
+      for (const a of emb.traitApis) {
+        if (recTraitKeys.has(a)) {
+          const nu = rec.tc?.[a] ?? 0
+          if (nu > bestRaw) {
+            bestRaw = nu
+            bestVariant = a
+          }
+        }
+      }
+      if (!bestVariant) continue // 発動していない紋章は活用に数えない
+      activeEmblemApis.add(eApi)
+
+      // 盤面実効特性数 = Riot num_units − 召喚ユニットの当該特性寄与。
+      const effective = Math.max(0, (rec.tc?.[bestVariant] ?? 0) - (summonTraitCount.get(bestVariant) ?? 0))
+      if (effective <= 0) continue // 盤面に実体が無い（召喚のみ）→ 活用に数えない
+
+      // 余り判定: 実効数がちょうどブレークポイントなら +1、超過なら +0.5。
+      const bp = activeBreakpoint(effective, staticData.traitBreakpoints.get(bestVariant))
+      const bucket = effective > bp ? halfApisArr : oneApisArr
+      for (let j = 0; j < inst; j++) bucket.push(eApi)
+    }
+
+    // 装備者（発動ゲート済み・インスタンス単位）。
+    for (let k = 0; k < rec.e.length; k++) {
+      const eApi = rec.e[k]
+      if (!activeEmblemApis.has(eApi)) continue
+      const holder = rec.eh?.[k]
+      if (holder && staticData.units.has(holder)) {
+        let hc = acc.holderCounts.get(eApi)
+        if (!hc) {
+          hc = new Map()
+          acc.holderCounts.set(eApi, hc)
+        }
+        hc.set(holder, (hc.get(holder) ?? 0) + 1)
+      }
+    }
+
+    if (oneApisArr.length === 0 && halfApisArr.length === 0) continue // 発動紋章なし → シグネチャ対象外
+
+    const oneApis = oneApisArr.sort()
+    const halfApis = halfApisArr.sort()
+    const sigKey = JSON.stringify([oneApis, halfApis])
+    let sig = acc.sigs.get(sigKey)
+    if (!sig) {
+      sig = { one: oneApis, half: halfApis, n: 0, top4: 0, win: 0, p: 0 }
+      acc.sigs.set(sigKey, sig)
+    }
+    sig.n++
+    if (rec.p <= 4) sig.top4++
+    if (rec.p === 1) sig.win++
+    sig.p += rec.p
   }
 
-  // 7. PreComp 化（apiName ベース）。出力で参照する apiName を used 集合へ収集。
+  console.log(
+    `盤面グループ: ${map.size}（盤面なし除外 ${noBoard}, 未解決トレイト除外 ${excludedUnresolvedTrait}）`,
+  )
+
+  // 6. 出力対象（総レコード n>=MIN_OUTPUT_N）。
+  const MIN_OUTPUT_N = 3
+  const CARRY_UNITS = 4
+  const ITEMS_PER_UNIT = 3
+  const HOLDERS_PER_EMBLEM = 3
+  const HOLDER_MIN_SHARE = 0.2
+
   const usedTraitApis = new Set<string>()
   const usedUnitApis = new Set<string>()
   const usedEmblemApis = new Set<string>()
   const usedItemApis = new Set<string>()
 
   interface PreComp {
-    traitApis: string[]
-    n: number
-    top4: number
-    win: number
-    traitModeStyle: Map<string, number>
-    synergies: [string, number, number][] // [traitApi, modeStyle, modeCount] 過半数で発動の代表シナジー
     unitApis: string[]
-    unitStarByApi: Map<string, number> // unitApi → 代表スター(mode)
-
-    rows: { emblems: string[]; n: number; top4: number; win: number; p: number }[]
-    holders: [string, string, number][] // [emblemApi, holderApi, count]
+    n: number
+    unitStarByApi: Map<string, number>
     unitItems: [string, string, number][] // [unitApi, itemApi, count]
+    holders: [string, string, number][] // [emblemApi, unitApi, count]
+    sigs: SigAcc[]
   }
 
-  const MIN_OUTPUT_N = 3 // 合計サンプルがこの未満のクラスタは出力しない（長尾枝刈り）
-  const CARRY_UNITS = 4 // 推奨アイテムを出すユニット数（アイテム保持総数の上位）
-  const ITEMS_PER_UNIT = 3 // ユニットごとの推奨アイテム数
-  const ROW_MIN_N = 2 // 出力する紋章行の最小サンプル（単発の組合せ＝ノイズを枝刈り）
-  const HOLDERS_PER_EMBLEM = 3 // 1紋章あたり表示する装備ユニットの最大数
-  const HOLDER_MIN_SHARE = 0.2 // 2体目以降を採用する占有率しきい値
-  const SYNERGY_MIN_FREQ = 0.5 // クラスタ内でこの割合以上発動しているトレイトを代表シナジーとする
+  const preComps: PreComp[] = []
+  for (const acc of map.values()) {
+    if (acc.n < MIN_OUTPUT_N) continue
 
-  function accToPreComp(acc: ClusterAcc, repUnitCount: number): PreComp {
-    const traitModeStyle = new Map<string, number>()
-    for (const tApi of acc.traitApis) {
-      traitModeStyle.set(tApi, modeMaxNumber(acc.styleLists.get(tApi) ?? []) ?? 0)
-      usedTraitApis.add(tApi)
+    // 盤面ユニットと、その所持トレイトを used に追加（フロントの発動数算出に使う）。
+    for (const u of acc.unitApis) {
+      usedUnitApis.add(u)
+      for (const tApi of staticData.units.get(u)?.traits ?? []) usedTraitApis.add(tApi)
     }
 
-    // 代表シナジー: クラスタの過半数(>=SYNERGY_MIN_FREQ)で発動しているトレイト。
-    // modeCount は最頻ユニット数（tc が無い旧データは 0）。
-    // 3番目の要素は modeCount 以下の最大発動ブレークポイント（活性ブレークポイント）。
-    const synergies: [string, number, number][] = []
-    for (const [tApi, list] of acc.styleLists) {
-      if (list.length / acc.n >= SYNERGY_MIN_FREQ) {
-        const modeCount = modeMaxNumber(acc.countLists.get(tApi) ?? []) ?? 0
-        synergies.push([tApi, modeMaxNumber(list) ?? 0, activeBreakpoint(modeCount, staticData.traitBreakpoints.get(tApi))])
-        usedTraitApis.add(tApi)
-      }
-    }
-
-    // 代表ユニット（出現頻度降順、同数は名前昇順）。バケットごとに repUnitCount 件。
-    const topUnits = [...acc.unitCounts.entries()]
-      .sort((a, b) => {
-        if (b[1] !== a[1]) return b[1] - a[1]
-        const na = staticData.units.get(a[0])!.name
-        const nb = staticData.units.get(b[0])!.name
-        return na < nb ? -1 : na > nb ? 1 : a[0] < b[0] ? -1 : 1
-      })
-      .slice(0, repUnitCount)
-      .map((e) => e[0])
-    for (const u of topUnits) usedUnitApis.add(u)
-
-    // 代表ユニットの代表スターレベル（mode）。
+    // 代表スター。
     const unitStarByApi = new Map<string, number>()
-    for (const uApi of topUnits) {
+    for (const uApi of acc.unitApis) {
       const ms = modeMaxNumber(acc.unitStarLists.get(uApi) ?? [])
       if (ms) unitStarByApi.set(uApi, ms)
     }
 
-    // 紋章ごとの装備ユニット。同じ紋章を複数チャンピオンが装備するケースを示すため、
-    // 最頻1体だけでなく「占有率が一定以上の上位ユニット（最大 HOLDERS_PER_EMBLEM 体）」を出力。
-    const holders: [string, string, number][] = []
-    for (const [emblemApi, hc] of acc.holderCounts) {
-      const total = [...hc.values()].reduce((s, x) => s + x, 0)
-      const sorted = [...hc.entries()].sort((a, b) => {
-        if (b[1] !== a[1]) return b[1] - a[1]
-        const na = staticData.units.get(a[0])!.name
-        const nb = staticData.units.get(b[0])!.name
-        return na < nb ? -1 : na > nb ? 1 : a[0] < b[0] ? -1 : 1
-      })
-      // 占有率 >= HOLDER_MIN_SHARE のユニットを採用（少なくとも先頭1体は必ず採用）。
-      const picked = sorted.filter(([, c], i) => i === 0 || c / total >= HOLDER_MIN_SHARE)
-      for (const [unitApi, count] of picked.slice(0, HOLDERS_PER_EMBLEM)) {
-        holders.push([emblemApi, unitApi, count])
-        usedUnitApis.add(unitApi)
-      }
-    }
-
-    // 推奨アイテム: アイテム保持総数が多い上位 CARRY_UNITS ユニット × 上位 ITEMS_PER_UNIT アイテム。
+    // 推奨アイテム（保持総数上位 CARRY_UNITS ユニット × 上位 ITEMS_PER_UNIT）。
     const unitItems: [string, string, number][] = []
     const carries = [...acc.itemCounts.entries()]
       .map(([uApi, im]) => ({ uApi, im, total: [...im.values()].reduce((s, x) => s + x, 0) }))
@@ -439,66 +396,48 @@ async function main(): Promise<void> {
       }
     }
 
-    return {
-      traitApis: acc.traitApis,
-      n: acc.n,
-      top4: acc.top4,
-      win: acc.win,
-      traitModeStyle,
-      synergies,
-      unitApis: topUnits,
-      unitStarByApi,
-      rows: [...acc.rows.values()],
-      holders,
-      unitItems,
-    }
-  }
-
-  /** レコード集合 → 出力対象 PreComp 群（n>=MIN_OUTPUT_N で枝刈り）。 */
-  function bucketPreComps(records: LoadedRecord[], repUnitCount: number): PreComp[] {
-    const { clusters } = buildClusters(records)
-    return clusters.filter((c) => c.n >= MIN_OUTPUT_N).map((c) => accToPreComp(c, repUnitCount))
-  }
-
-  // 全体バケット（代表ユニット10）とレベル別バケット（代表ユニット=レベル）。
-  const allResult = buildClusters(target)
-  const allPreComps = allResult.clusters
-    .filter((c) => c.n >= MIN_OUTPUT_N)
-    .map((c) => accToPreComp(c, 10))
-  const LEVELS = [7, 8, 9, 10] as const
-  const levelPreComps: Record<string, PreComp[]> = {}
-  for (const lv of LEVELS) {
-    const recs = target.filter((lr) => lr.rec.lv === lv)
-    levelPreComps[String(lv)] = bucketPreComps(recs, Math.min(lv, 10))
-  }
-
-  console.log(`クラスタ数（全体）: ${allResult.clusters.length}（出力 ${allPreComps.length}）`)
-  console.log(`クラスタ対象外（キートレイト0, 全体）: ${allResult.noClusterKey}`)
-  console.log(`未解決トレイトで除外したレコード（全体）: ${allResult.excludedUnresolvedTrait}`)
-
-  // 「e に出現し辞書解決できた全紋章」を target レコードから収集（発動の有無に関わらず）。
-  for (const lr of target) {
-    let hasUnresolvedTrait = false
-    for (const tApi of Object.keys(lr.rec.t)) {
-      if (!staticData.traits.has(tApi)) {
-        hasUnresolvedTrait = true
-        break
+    // 装備者。
+    const holders: [string, string, number][] = []
+    for (const [emblemApi, hc] of acc.holderCounts) {
+      const total = [...hc.values()].reduce((s, x) => s + x, 0)
+      const sorted = [...hc.entries()].sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1]
+        const na = staticData.units.get(a[0])!.name
+        const nb = staticData.units.get(b[0])!.name
+        return na < nb ? -1 : na > nb ? 1 : a[0] < b[0] ? -1 : 1
+      })
+      const picked = sorted.filter(([, c], i) => i === 0 || c / total >= HOLDER_MIN_SHARE)
+      for (const [unitApi, count] of picked.slice(0, HOLDERS_PER_EMBLEM)) {
+        holders.push([emblemApi, unitApi, count])
+        usedUnitApis.add(unitApi)
+        usedEmblemApis.add(emblemApi)
       }
     }
-    if (hasUnresolvedTrait) continue
-    if (Object.values(lr.rec.t).every((s) => s < config.clusterMinStyle)) continue
-    for (const eApi of lr.rec.e) {
-      if (staticData.emblems.has(eApi)) usedEmblemApis.add(eApi)
+
+    // シグネチャ（紋章 idx は後でインターン）。
+    const sigs = [...acc.sigs.values()]
+    for (const s of sigs) {
+      for (const e of s.one) usedEmblemApis.add(e)
+      for (const e of s.half) usedEmblemApis.add(e)
     }
+
+    preComps.push({
+      unitApis: acc.unitApis,
+      n: acc.n,
+      unitStarByApi,
+      unitItems,
+      holders,
+      sigs,
+    })
   }
 
-  // emblems の traitApi 参照先トレイトも used に追加。
+  // emblems の traitApi 参照先も used に追加。
   for (const eApi of usedEmblemApis) {
     const emb = staticData.emblems.get(eApi)
     if (emb) usedTraitApis.add(emb.traitApi)
   }
 
-  // 8. インターン配列を決定的順序で構築（全バケット横断で1回）。
+  // 7. インターン配列（決定的順序）。
   const traitApisSorted = [...usedTraitApis].sort((a, b) => {
     const na = staticData.traits.get(a)!.name
     const nb = staticData.traits.get(b)!.name
@@ -508,7 +447,7 @@ async function main(): Promise<void> {
   const traitsOut: TraitInfo[] = traitApisSorted.map((api, i) => {
     traitIndex.set(api, i)
     const t = staticData.traits.get(api)!
-    return { api, name: t.name, nameJa: t.nameJa, icon: t.icon }
+    return { api, name: t.name, nameJa: t.nameJa, icon: t.icon, tiers: t.tiers }
   })
 
   const unitApisSorted = [...usedUnitApis].sort((a, b) => {
@@ -521,7 +460,11 @@ async function main(): Promise<void> {
   const unitsOut: UnitInfo[] = unitApisSorted.map((api, i) => {
     unitIndex.set(api, i)
     const u = staticData.units.get(api)!
-    return { api, name: u.name, nameJa: u.nameJa, cost: u.cost, icon: u.icon, code: u.code }
+    // 所持トレイトを traitIdx へ（インターン済みのもののみ）。
+    const traitIdxs = u.traits
+      .map((t) => traitIndex.get(t))
+      .filter((x): x is number => x !== undefined)
+    return { api, name: u.name, nameJa: u.nameJa, cost: u.cost, icon: u.icon, code: u.code, traits: traitIdxs }
   })
 
   const emblemApisSorted = [...usedEmblemApis].sort((a, b) => {
@@ -548,23 +491,8 @@ async function main(): Promise<void> {
     return { api, name: it.name, nameJa: it.nameJa, icon: it.icon }
   })
 
-  // 9. PreComp → WireComp（intern index 化＋オンディスク圧縮形式）。
-  // label/labelJa は traits から復元できるため持たない（フロント data.ts で再構築）。
-  function toComp(pc: PreComp): WireComp {
-    const traitPairs: [number, number][] = pc.traitApis
-      .map((api): [number, number] => [traitIndex.get(api)!, pc.traitModeStyle.get(api) ?? 0])
-      .sort((a, b) => a[0] - b[0])
-
-    // synergies: 代表シナジー [traitIdx, modeStyle, modeCount]。style 降順→トレイト名昇順。
-    const synergies: [number, number, number][] = pc.synergies
-      .map(([api, style, count]): [number, number, number] => [traitIndex.get(api)!, style, count])
-      .sort((a, b) => {
-        if (b[1] !== a[1]) return b[1] - a[1]
-        const na = traitsOut[a[0]].name
-        const nb = traitsOut[b[0]].name
-        return na < nb ? -1 : na > nb ? 1 : 0
-      })
-
+  // 8. PreComp → WireComp。
+  function toWire(pc: PreComp): WireComp {
     const unitIdxs = pc.unitApis
       .map((api) => unitIndex.get(api)!)
       .sort((a, b) => {
@@ -573,32 +501,7 @@ async function main(): Promise<void> {
         if (ua.cost !== ub.cost) return ua.cost - ub.cost
         return ua.name < ub.name ? -1 : ua.name > ub.name ? 1 : a - b
       })
-    // units と同順の代表スター。
     const unitStars = unitIdxs.map((idx) => pc.unitStarByApi.get(unitsOut[idx].api) ?? 0)
-
-    // 行の枝刈り: 紋章を含み(n>=ROW_MIN_N)の行のみ出力。
-    // 空紋章行(e=[])はフロントの紋章フィルタで参照されず、n=1 の単発組合せは採用率しきい値
-    // 未満のノイズのため、stats.json サイズ削減のため除外（採用率の分母 comp.n は別途保持）。
-    // 出力はタプル [e[], n, top4, win, p]（キー名コスト削減）。
-    const rows: [number[], number, number, number, number][] = pc.rows
-      .filter((r) => r.emblems.length > 0 && r.n >= ROW_MIN_N)
-      .map((r): [number[], number, number, number, number] => {
-        const e = r.emblems.map((api) => emblemIndex.get(api)!).sort((x, y) => x - y)
-        return [e, r.n, r.top4, r.win, r.p]
-      })
-      .sort((a, b) => {
-        if (a[0].length !== b[0].length) return a[0].length - b[0].length
-        for (let i = 0; i < a[0].length; i++) if (a[0][i] !== b[0][i]) return a[0][i] - b[0][i]
-        return 0
-      })
-
-    const holders: [number, number, number][] = pc.holders
-      .map(([emblemApi, unitApi, count]): [number, number, number] => [
-        emblemIndex.get(emblemApi)!,
-        unitIndex.get(unitApi)!,
-        count,
-      ])
-      .sort((a, b) => a[0] - b[0])
 
     const unitItems: [number, number, number][] = pc.unitItems
       .map(([unitApi, itemApi, count]): [number, number, number] => [
@@ -608,28 +511,33 @@ async function main(): Promise<void> {
       ])
       .sort((a, b) => a[0] - b[0] || a[1] - b[1])
 
-    // 空配列・全0の unitStars は省略（decode 側でデフォルト復元）。
-    const wire: WireComp = {
-      t: traitPairs,
-      u: unitIdxs,
-      n: pc.n,
-      q: pc.top4,
-      w: pc.win,
-    }
-    if (synergies.length) wire.s = synergies
+    const holders: [number, number, number][] = pc.holders
+      .map(([emblemApi, unitApi, count]): [number, number, number] => [
+        emblemIndex.get(emblemApi)!,
+        unitIndex.get(unitApi)!,
+        count,
+      ])
+      .sort((a, b) => a[0] - b[0])
+
+    const g: [number[], number[], number, number, number, number][] = pc.sigs
+      .map((s): [number[], number[], number, number, number, number] => [
+        s.one.map((e) => emblemIndex.get(e)!).sort((x, y) => x - y),
+        s.half.map((e) => emblemIndex.get(e)!).sort((x, y) => x - y),
+        s.n,
+        s.top4,
+        s.win,
+        s.p,
+      ])
+      .sort((a, b) => b[2] - a[2])
+
+    const wire: WireComp = { u: unitIdxs, n: pc.n, g }
     if (unitStars.some((s) => s > 0)) wire.k = unitStars
-    if (rows.length) wire.r = rows
-    if (holders.length) wire.h = holders
     if (unitItems.length) wire.i = unitItems
+    if (holders.length) wire.h = holders
     return wire
   }
 
-  // 8. 出力
-  const comps: WireComp[] = allPreComps.map(toComp).sort((a, b) => b.n - a.n)
-  const compsByLevel: Record<string, WireComp[]> = {}
-  for (const lv of LEVELS) {
-    compsByLevel[String(lv)] = levelPreComps[String(lv)].map(toComp).sort((a, b) => b.n - a.n)
-  }
+  const comps: WireComp[] = preComps.map(toWire).sort((a, b) => b.n - a.n)
 
   const byRoute: Record<string, number> = {}
   const uniqueMatches = new Set<string>()
@@ -639,7 +547,7 @@ async function main(): Promise<void> {
   }
 
   const out: WireStatsFile = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedAt: new Date().toISOString(),
     patch: targetPatch,
     tftPatch: config.tftPatchLabels[targetPatch] ?? targetPatch,
@@ -654,7 +562,6 @@ async function main(): Promise<void> {
     units: unitsOut,
     items: itemsOut,
     comps,
-    compsByLevel,
     baseItemIcons: staticData.baseItemIcons,
   }
 
@@ -664,19 +571,18 @@ async function main(): Promise<void> {
   // 9. ログ
   const sizeBytes = statSync(OUT_PATH).size
   const sizeKB = (sizeBytes / 1024).toFixed(1)
+  const totalSigs = comps.reduce((s, c) => s + c.g.length, 0)
   console.log('--- 集計サマリ ---')
   console.log(`TFTパッチ表記: ${out.tftPatch}（内部 ${targetPatch}）`)
-  console.log(`comps 数（全体）: ${comps.length}`)
-  console.log(
-    `レベル別 comps: ${LEVELS.map((lv) => `lv${lv}=${compsByLevel[String(lv)].length}`).join(' ')}`,
-  )
+  console.log(`comps 数: ${comps.length}, sig 行合計: ${totalSigs}`)
   console.log(
     `インターン: traits=${traitsOut.length} emblems=${emblemsOut.length} units=${unitsOut.length} items=${itemsOut.length}`,
   )
-  console.log(`totals: matches=${uniqueMatches.size} participants=${target.length} byRoute=${JSON.stringify(byRoute)}`)
+  console.log(
+    `totals: matches=${uniqueMatches.size} participants=${target.length} byRoute=${JSON.stringify(byRoute)}`,
+  )
   console.log(`出力: ${OUT_PATH} (${sizeKB} KB)`)
 
-  // 警告
   const warnLines: string[] = []
   for (const w of staticData.warnings) warnLines.push(`[静的データ] ${w}`)
   if (parseFailures > 0) warnLines.push(`[parse失敗] ${parseFailures} 行`)

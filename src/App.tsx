@@ -6,8 +6,8 @@ import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
 import { CompList } from './components/CompList'
 import { SegmentedControl } from './components/SegmentedControl'
+import type { SortKey } from './components/CompCard'
 
-type SortKey = 'rate' | 'place' | 'top4' | 'win'
 type LevelKey = 'all' | '7' | '8' | '9' | '10'
 type LoadState =
   | { status: 'loading' }
@@ -19,8 +19,8 @@ function App() {
   const [reloadKey, setReloadKey] = useState(0)
 
   const [selection, setSelection] = useState<number[]>([])
-  const [sortKey, setSortKey] = useState<SortKey>('place')
-  const [minSample, setMinSample] = useState<number | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey>('top4')
+  const [minAdopt, setMinAdopt] = useState(5)
   const [lang, setLang] = useState<Lang>('ja')
   const [level, setLevel] = useState<LevelKey>('all')
 
@@ -30,7 +30,6 @@ function App() {
       .then((stats) => {
         if (cancelled) return
         setLoad({ status: 'ready', stats })
-        setMinSample((cur) => (cur === null ? 5 : cur)) // 採用率(%)の初期値
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -79,14 +78,10 @@ function App() {
   }
 
   const stats = load.stats
-  // 紋章フィルタ時の絞り込みは「採用率(%)」=その構成内で紋章を装備したゲームの割合。
-  // スライダーはその閾値。0〜30%（それ以上は実データ上ほぼ該当しない）。
-  const rateMin = 0
-  const rateMax = 30
-  const ratePct = Math.min(Math.max(minSample ?? 5, rateMin), rateMax)
 
-  // 表示する構成: 全体 or レベル別（古い stats.json に compsByLevel が無い場合は空配列）。
-  const selectedComps = level === 'all' ? stats.comps : (stats.compsByLevel?.[level] ?? [])
+  // レベル = 盤面ユニット数でフィルタ。
+  const selectedComps =
+    level === 'all' ? stats.comps : stats.comps.filter((c) => c.units.length === Number(level))
 
   // selection は emblems 配列インデックスのマルチセット。counts[index] = 個数。
   const counts = stats.emblems.map(() => 0)
@@ -157,7 +152,7 @@ function App() {
                 { key: 'place', label: t(lang, 'sortPlace') },
                 { key: 'top4', label: t(lang, 'sortTop4') },
                 { key: 'win', label: t(lang, 'sortWin') },
-                { key: 'rate', label: t(lang, 'sortRate') },
+                { key: 'adopt', label: t(lang, 'sortAdopt') },
               ]}
             />
           </div>
@@ -166,13 +161,13 @@ function App() {
             <span className="shrink-0">{t(lang, 'adoptionRate')}</span>
             <input
               type="range"
-              min={rateMin}
-              max={rateMax}
-              value={ratePct}
-              onChange={(e) => setMinSample(Number(e.target.value))}
+              min={0}
+              max={50}
+              value={minAdopt}
+              onChange={(e) => setMinAdopt(Number(e.target.value))}
               className="w-32 accent-amber-400"
             />
-            <span className="w-10 text-right tabular-nums text-zinc-100">{ratePct}%</span>
+            <span className="w-8 text-right tabular-nums text-zinc-100">{minAdopt}</span>
           </label>
         </div>
       </header>
@@ -198,7 +193,14 @@ function App() {
             onClear={clear}
             onRemove={removeEmblem}
           />
-          <CompList stats={stats} comps={selectedComps} sel={selection} sortKey={sortKey} ratePct={ratePct} lang={lang} />
+          <CompList
+            stats={stats}
+            comps={selectedComps}
+            sel={selection}
+            sortKey={sortKey}
+            minAdopt={minAdopt}
+            lang={lang}
+          />
         </main>
       </div>
     </div>

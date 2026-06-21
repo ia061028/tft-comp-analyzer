@@ -20,7 +20,7 @@ interface CDragonTrait {
   apiName?: string
   name?: string
   icon?: string
-  effects?: { minUnits?: number }[]
+  effects?: { minUnits?: number; style?: number }[]
 }
 
 interface CDragonChampion {
@@ -98,12 +98,12 @@ function iconUrl(path: string | undefined): string {
 
 export interface StaticData {
   setNumber: number
-  /** apiName → 表示名(en/ja)・アイコンURL */
-  traits: Map<string, { name: string; nameJa: string; icon: string }>
+  /** apiName → 表示名(en/ja)・アイコンURL・発動ティア([minUnits, style] 昇順) */
+  traits: Map<string, { name: string; nameJa: string; icon: string; tiers: [number, number][] }>
   /** トレイト apiName → 発動ブレークポイント数リスト（昇順）。シナジー数の活性ブレークポイント算出用。 */
   traitBreakpoints: Map<string, number[]>
-  /** champions apiName → 表示名(en/ja)・コスト・アイコンURL・プランナーcode */
-  units: Map<string, { name: string; nameJa: string; cost: number; icon: string; code: number }>
+  /** champions apiName → 表示名(en/ja)・コスト・アイコンURL・プランナーcode・所持トレイト(apiName) */
+  units: Map<string, { name: string; nameJa: string; cost: number; icon: string; code: number; traits: string[] }>
   /**
    * 紋章(incompatibleTraits で付与トレイトを示すアイテム) apiName → 表示名・解決済み traitApi・アイコンURL。
    * traitApi は表示/クラスタ参照用の単一トレイト（先頭の解決トレイト）。
@@ -203,21 +203,28 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
   const ja = await fetchJaNames(setNumber)
 
   // traits
-  const traits = new Map<string, { name: string; nameJa: string; icon: string }>()
+  const traits = new Map<string, { name: string; nameJa: string; icon: string; tiers: [number, number][] }>()
   const traitBreakpoints = new Map<string, number[]>()
   const traitNameToApi = new Map<string, string>()
   for (const t of chosen.traits ?? []) {
     if (!t.apiName) continue
     const name = t.name ?? t.apiName
-    traits.set(t.apiName, { name, nameJa: ja.traits.get(t.apiName) ?? name, icon: iconUrl(t.icon) })
     if (t.name) traitNameToApi.set(t.name, t.apiName)
-    // effects の minUnits から発動ブレークポイントを昇順に収集（0以下・undefined は除外）。
-    const bps = [...new Set(
-      (t.effects ?? [])
-        .map((e) => e.minUnits)
-        .filter((v): v is number => typeof v === 'number' && v > 0),
-    )].sort((a, b) => a - b)
-    traitBreakpoints.set(t.apiName, bps)
+    // effects の {minUnits, style} から発動ティアを昇順に収集（minUnits>0・重複除去）。
+    const tierMap = new Map<number, number>()
+    for (const e of t.effects ?? []) {
+      if (typeof e.minUnits === 'number' && e.minUnits > 0) {
+        tierMap.set(e.minUnits, e.style ?? 1)
+      }
+    }
+    const tiers = [...tierMap.entries()].sort((a, b) => a[0] - b[0]) as [number, number][]
+    traits.set(t.apiName, {
+      name,
+      nameJa: ja.traits.get(t.apiName) ?? name,
+      icon: iconUrl(t.icon),
+      tiers,
+    })
+    traitBreakpoints.set(t.apiName, tiers.map((x) => x[0]))
   }
 
   // カバレッジ警告
@@ -231,17 +238,24 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
 
   // units（champions）。プランナーcode は公式の team_planner_code を使う（en_us の並びからは導けない）。
   const plannerCodes = await fetchPlannerCodes(setNumber)
-  const units = new Map<string, { name: string; nameJa: string; cost: number; icon: string; code: number }>()
+  const units = new Map<string, { name: string; nameJa: string; cost: number; icon: string; code: number; traits: string[] }>()
   for (const c of chosen.champions ?? []) {
     if (!c.apiName) continue
     const icon = iconUrl(c.squareIcon ?? c.tileIcon ?? c.icon)
     const name = c.name ?? c.apiName
+    // champion.traits は表示名（"Meeple"等）。apiName へ解決（解決不能は無視）。
+    const unitTraits: string[] = []
+    for (const raw of c.traits ?? []) {
+      if (traits.has(raw)) unitTraits.push(raw)
+      else if (traitNameToApi.has(raw)) unitTraits.push(traitNameToApi.get(raw)!)
+    }
     units.set(c.apiName, {
       name,
       nameJa: ja.units.get(c.apiName) ?? name,
       cost: c.cost ?? 0,
       icon,
       code: plannerCodes.get(c.apiName) ?? 0,
+      traits: unitTraits,
     })
   }
 

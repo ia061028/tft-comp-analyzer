@@ -3,18 +3,25 @@
 
 import type { UnitInfo } from '../../shared/types'
 
-/** style 値 → バッジ配色（3=ゴールド系, 4=プリズム系, 1-2は銅/銀） */
+/**
+ * CDragon の trait effect style 値 → バッジ配色。
+ * 観測値: 1=ブロンズ, 3=シルバー/ゴールド, 5=ゴールド, 6=プリズム（高ティアほど派手）。
+ */
 export function styleClasses(style: number): string {
-  switch (style) {
-    case 4:
-      return 'border-fuchsia-400/60 bg-fuchsia-400/10 text-fuchsia-200'
-    case 3:
-      return 'border-amber-400/60 bg-amber-400/10 text-amber-200'
-    case 2:
-      return 'border-zinc-300/50 bg-zinc-300/10 text-zinc-100'
-    default:
-      return 'border-orange-700/60 bg-orange-700/10 text-orange-300'
-  }
+  if (style >= 6) return 'border-fuchsia-400/60 bg-fuchsia-400/10 text-fuchsia-200'
+  if (style >= 5) return 'border-amber-400/60 bg-amber-400/10 text-amber-200'
+  if (style >= 3) return 'border-zinc-300/50 bg-zinc-300/10 text-zinc-100'
+  return 'border-orange-700/60 bg-orange-700/10 text-orange-300'
+}
+
+/** 発動数 count に対する活性ティア（最大の minUnits<=count）。未発動は null。 */
+export function activeTier(
+  count: number,
+  tiers: [number, number][],
+): { min: number; style: number } | null {
+  let best: { min: number; style: number } | null = null
+  for (const [min, style] of tiers) if (count >= min) best = { min, style }
+  return best
 }
 
 /** スターレベル → ★の配色（3=金,2=銀,1=銅） */
