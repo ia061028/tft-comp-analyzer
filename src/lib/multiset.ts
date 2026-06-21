@@ -61,9 +61,11 @@ export function aggregateUtilized(
     return { usedCount: 0, n, top4, win, p }
   }
 
+  // その行に含まれる「選択紋章の異なり数」。同じ紋章を複数装着していても
+  // 1 種としてのみ数える（例: ブローラー紋章×2 でも overlap=1）。
   const overlap = (row: { e: number[] }): number => {
     let o = 0
-    for (const e of row.e) if (selSet.has(e)) o++
+    for (const e of selSet) if (row.e.includes(e)) o++
     return o
   }
 

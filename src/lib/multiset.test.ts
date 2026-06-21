@@ -76,3 +76,16 @@ test('aggregateUtilized: 同時装着が無ければ usedCount=1 で単独行を
 test('aggregateUtilized: 該当紋章なしは usedCount=0・全0', () => {
   assert.deepEqual(aggregateUtilized(c, [99]), { usedCount: 0, n: 0, top4: 0, win: 0, p: 0 })
 })
+
+test('aggregateUtilized: 同一紋章を複数装着しても異なり数で数える（usedCount水増し防止）', () => {
+  // 紋章3を2個装着した行 [3,3] と、紋章3単独の行。sel=[7,3]（7は未使用）。
+  // 行 [3,3] は 3 が2回出るが選択紋章の異なり数は1 → usedCount は 2 にならない。
+  const dup = comp([
+    { e: [3, 6], n: 9, top4: 4, win: 1, p: 36 },
+    { e: [3, 3, 6], n: 3, top4: 2, win: 0, p: 13 },
+  ])
+  const r = aggregateUtilized(dup, [7, 3])
+  assert.equal(r.usedCount, 1, 'Meeple(7)は未使用・Brawler(3)のみ＝1種')
+  // overlap==1 の両行を合算: n=12
+  assert.equal(r.n, 12)
+})
