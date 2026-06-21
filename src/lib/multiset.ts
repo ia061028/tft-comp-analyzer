@@ -30,3 +30,62 @@ export function emblemGames(comp: CompStats, emblemIdx: number): number {
   for (const row of comp.rows) if (row.e.includes(emblemIdx)) n += row.n
   return n
 }
+
+/**
+ * 「同時装着」ベースの集計。選択紋章のうち実際に同じゲームで一緒に装着された
+ * 最大数（usedCount=最大重なり深さ）を求め、その深さを達成した行（=実際に活用した
+ * ゲーム）のみで成績を合算する。
+ *
+ * - K=1: その紋章を含む行で集計（従来 emblemGames と同等の母数）。
+ * - K=2 で同時装着あり: [A,B] を含む行のみで集計、usedCount=2。
+ * - K=2 で別々のみ: A単独∪B単独の行で集計、usedCount=1。
+ * - 該当行なし: usedCount=0, 全0。
+ */
+export function aggregateUtilized(
+  comp: CompStats,
+  sel: number[],
+): { usedCount: number; n: number; top4: number; win: number; p: number } {
+  const selSet = new Set(sel)
+  if (selSet.size === 0) {
+    // 選択なし: 構成全体を集計（理論上 UI からは呼ばれない）。
+    let n = 0
+    let top4 = 0
+    let win = 0
+    let p = 0
+    for (const row of comp.rows) {
+      n += row.n
+      top4 += row.top4
+      win += row.win
+      p += row.p
+    }
+    return { usedCount: 0, n, top4, win, p }
+  }
+
+  const overlap = (row: { e: number[] }): number => {
+    let o = 0
+    for (const e of row.e) if (selSet.has(e)) o++
+    return o
+  }
+
+  let usedCount = 0
+  for (const row of comp.rows) {
+    const o = overlap(row)
+    if (o > usedCount) usedCount = o
+  }
+
+  let n = 0
+  let top4 = 0
+  let win = 0
+  let p = 0
+  if (usedCount > 0) {
+    for (const row of comp.rows) {
+      if (overlap(row) === usedCount) {
+        n += row.n
+        top4 += row.top4
+        win += row.win
+        p += row.p
+      }
+    }
+  }
+  return { usedCount, n, top4, win, p }
+}
