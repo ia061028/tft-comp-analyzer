@@ -1,93 +1,68 @@
 import type { CompStats } from '../../shared/types'
 
-/**
- * comp.rows のうち row.e が sel と1つでも交差する行（=選択紋章のいずれかを装備）を合算（OR集計）。
- * 空 sel の場合は全行を合算（comp 全体）。
- */
-export function aggregateAny(
-  comp: CompStats,
-  sel: number[],
-): { n: number; top4: number; win: number; p: number } {
-  const selSet = sel.length > 0 ? new Set(sel) : null
-  let n = 0
-  let top4 = 0
-  let win = 0
-  let p = 0
-  for (const row of comp.rows) {
-    if (selSet === null || row.e.some((e) => selSet.has(e))) {
-      n += row.n
-      top4 += row.top4
-      win += row.win
-      p += row.p
-    }
-  }
-  return { n, top4, win, p }
+export interface CompUsage {
+  /** 該当レコード数（選択紋章のいずれかが +1 のレコード）。 */
+  adopt: number
+  top4: number
+  win: number
+  /** 順位合計（平均順位 = p / adopt）。 */
+  p: number
+  /** 活用スコア X = Σ 各選択紋章の最良値（個数考慮）。 */
+  x: number
+  /** N = 選択紋章の総数（同一紋章の複数選択は加算）。 */
+  n: number
+  /** 紋章 → 最良スコア（0 .. その紋章の選択個数）。表示用。 */
+  best: Map<number, number>
+  /** 紋章 → 選択個数。 */
+  req: Map<number, number>
 }
 
-/** comp 内で単一紋章 emblemIdx を装備していたゲーム数（その紋章を含む行の n 合計）。 */
-export function emblemGames(comp: CompStats, emblemIdx: number): number {
-  let n = 0
-  for (const row of comp.rows) if (row.e.includes(emblemIdx)) n += row.n
-  return n
+function countOcc(arr: number[], e: number): number {
+  let c = 0
+  for (const x of arr) if (x === e) c++
+  return c
 }
 
 /**
- * 「同時装着」ベースの集計。選択紋章のうち実際に同じゲームで一緒に装着された
- * 最大数（usedCount=最大重なり深さ）を求め、その深さを達成した行（=実際に活用した
- * ゲーム）のみで成績を合算する。
- *
- * - K=1: その紋章を含む行で集計（従来 emblemGames と同等の母数）。
- * - K=2 で同時装着あり: [A,B] を含む行のみで集計、usedCount=2。
- * - K=2 で別々のみ: A単独∪B単独の行で集計、usedCount=1。
- * - 該当行なし: usedCount=0, 全0。
+ * 構成 comp に対する、選択紋章 sel（マルチセット）の活用状況。
+ * - 「選択紋章のいずれかが +1」のシグネチャ行のみを該当として集計。
+ * - 各紋章 e の score = 該当 sig ごとに min(個数, one内のe数) + 0.5*min(残り, half内のe数) の最大値。
+ * - X = Σ score、N = sel.length（同一紋章の複数選択を加算）。
+ * - 該当行が1つも無ければ null。
  */
-export function aggregateUtilized(
-  comp: CompStats,
-  sel: number[],
-): { usedCount: number; n: number; top4: number; win: number; p: number } {
-  const selSet = new Set(sel)
-  if (selSet.size === 0) {
-    // 選択なし: 構成全体を集計（理論上 UI からは呼ばれない）。
-    let n = 0
-    let top4 = 0
-    let win = 0
-    let p = 0
-    for (const row of comp.rows) {
-      n += row.n
-      top4 += row.top4
-      win += row.win
-      p += row.p
-    }
-    return { usedCount: 0, n, top4, win, p }
-  }
+export function compUsage(comp: CompStats, sel: number[]): CompUsage | null {
+  if (sel.length === 0) return null
+  const req = new Map<number, number>()
+  for (const e of sel) req.set(e, (req.get(e) ?? 0) + 1)
+  const distinct = [...req.keys()]
+  const distinctSet = new Set(distinct)
 
-  // その行に含まれる「選択紋章の異なり数」。同じ紋章を複数装着していても
-  // 1 種としてのみ数える（例: ブローラー紋章×2 でも overlap=1）。
-  const overlap = (row: { e: number[] }): number => {
-    let o = 0
-    for (const e of selSet) if (row.e.includes(e)) o++
-    return o
-  }
-
-  let usedCount = 0
-  for (const row of comp.rows) {
-    const o = overlap(row)
-    if (o > usedCount) usedCount = o
-  }
-
-  let n = 0
+  let adopt = 0
   let top4 = 0
   let win = 0
   let p = 0
-  if (usedCount > 0) {
-    for (const row of comp.rows) {
-      if (overlap(row) === usedCount) {
-        n += row.n
-        top4 += row.top4
-        win += row.win
-        p += row.p
-      }
+  const best = new Map<number, number>()
+  for (const e of distinct) best.set(e, 0)
+
+  let any = false
+  for (const sig of comp.sigs) {
+    if (!sig.one.some((e) => distinctSet.has(e))) continue
+    any = true
+    adopt += sig.n
+    top4 += sig.top4
+    win += sig.win
+    p += sig.p
+    for (const e of distinct) {
+      const m = req.get(e)!
+      const filledOne = Math.min(m, countOcc(sig.one, e))
+      const filledHalf = Math.min(m - filledOne, countOcc(sig.half, e))
+      const score = filledOne + 0.5 * filledHalf
+      if (score > (best.get(e) ?? 0)) best.set(e, score)
     }
   }
-  return { usedCount, n, top4, win, p }
+  if (!any) return null
+
+  let x = 0
+  for (const v of best.values()) x += v
+  return { adopt, top4, win, p, x, n: sel.length, best, req }
 }

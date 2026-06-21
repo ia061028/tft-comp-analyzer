@@ -34,6 +34,8 @@ export interface TraitInfo {
   /** 日本語表示名 */
   nameJa: string
   icon: string
+  /** 発動ティア [minUnits, style]（昇順）。発動数・配色の算出に使う。 */
+  tiers: [number, number][]
 }
 
 export interface EmblemInfo {
@@ -57,6 +59,8 @@ export interface UnitInfo {
   icon: string
   /** チームプランナーのチャンピオンバイト値（ロスター内 apiName 昇順の1始まり位置。非ロスターは0） */
   code: number
+  /** このユニットが所持するトレイト（traits 配列インデックス）。発動数の算出に使う。 */
+  traits: number[]
 }
 
 export interface ItemInfo {
@@ -67,80 +71,60 @@ export interface ItemInfo {
   icon: string
 }
 
-/** 構成クラスタ内の紋章マルチセットごとの成績 */
-export interface EmblemRow {
-  /** emblems 配列インデックスのソート済みマルチセット（空=紋章なし） */
-  e: number[]
+/**
+ * 紋章活用シグネチャ: 1つ以上の紋章を「発動」させたレコード群を、
+ * 発動効率でグループ化したもの。
+ * - one: そのレコードで +1（装備・発動・発動数に余りなし＝ちょうどブレークポイント）の emblem idx 集合。
+ * - half: +0.5（装備・発動・発動数に余りあり）の emblem idx 集合。
+ * - n/top4/win: 該当レコード数・Top4数・1位数。
+ */
+export interface EmblemSig {
+  one: number[]
+  half: number[]
   n: number
   top4: number
   win: number
-  /** この行の順位(placement)合計。平均順位 = p / n */
+  /** 順位合計。平均順位 = p / n。 */
   p: number
 }
 
-export interface CompStats {
-  /** クラスタキー: [traitIdx, 最頻style] のソート済みペア（スタイル上位 clusterMaxKeyTraits 件、label構築用） */
-  traits: [number, number][]
-  /**
-   * この構成で代表的に発動しているシナジー [traitIdx, 最頻style, 代表ユニット数]。
-   * クラスタ内の過半数(>=50%)で発動(tier>=1=ブロンズ以上)しているトレイト。style降順。
-   * 代表ユニット数は最頻 num_units（旧データは 0）。
-   */
-  synergies: [number, number, number][]
-  label: string
-  /** 日本語の構成名（traits の日本語名で構築） */
-  labelJa: string
-  /** クラスタ内最頻ユニット（units 配列インデックス、コスト順） */
-  units: number[]
-  /** units と同インデックスで対応する代表スターレベル(1-3、不明は0)。us ありレコードから集計。 */
-  unitStars: number[]
-  n: number
-  top4: number
-  win: number
-  rows: EmblemRow[]
-  /**
-   * この構成で各紋章を最も多く装備したユニット。
-   * [emblemIdx, unitIdx, count]。holder が分かるレコード（eh あり）からのみ集計。
-   */
-  holders: [number, number, number][]
-  /**
-   * キャリー中心の上位ユニットの推奨完成アイテム。
-   * [unitIdx, itemIdx, count]。ui が分かるレコードからのみ集計。
-   */
-  unitItems: [number, number, number][]
-}
-
 /**
- * オンディスク圧縮形式の構成（stats.json に書き出す形）。
- * - キー名を短縮し、label/labelJa は traits から復元するため持たない。
- * - 空配列フィールド(s/r/h/i)・全0の unitStars(k) は省略してバイト削減。
- * - フロントは data.ts の decodeStats で CompStats（リッチ型）へ復元する。
+ * 構成 = 盤面ユニット集合が完全一致するレコード群（召喚除外）。
+ * 紋章活用は sigs から、選択紋章に応じてランタイムで算出する。
  */
-export interface WireComp {
-  /** traits: [traitIdx, modeStyle] */
-  t: [number, number][]
-  /** synergies: [traitIdx, modeStyle, breakpoint]（空なら省略） */
-  s?: [number, number, number][]
-  /** units（units 配列インデックス、コスト順） */
-  u: number[]
-  /** unitStars（u と同順。全0なら省略） */
-  k?: number[]
+export interface CompStats {
+  /** 盤面ユニット（units 配列インデックス、コスト順）。構成キー兼表示。 */
+  units: number[]
+  /** この盤面の総レコード数。 */
   n: number
-  /** top4 */
-  q: number
-  /** win */
-  w: number
-  /** rows: [e[], n, top4, win, p]（空なら省略） */
-  r?: [number[], number, number, number, number][]
-  /** holders: [emblemIdx, unitIdx, count]（空なら省略） */
-  h?: [number, number, number][]
-  /** unitItems: [unitIdx, itemIdx, count]（空なら省略） */
-  i?: [number, number, number][]
+  /** units と同順の代表スターレベル(1-3、不明は0)。 */
+  unitStars: number[]
+  /** キャリー中心の推奨完成アイテム [unitIdx, itemIdx, count]。 */
+  unitItems: [number, number, number][]
+  /** 各紋章を最も多く装備したユニット [emblemIdx, unitIdx, count]（発動ゲート済み）。 */
+  holders: [number, number, number][]
+  /** 紋章活用シグネチャ群。 */
+  sigs: EmblemSig[]
 }
 
-/** stats.json 全体のオンディスク圧縮形式。decodeStats で StatsFile へ復元。 */
+/** オンディスク圧縮形式の構成（stats.json）。data.ts の decodeStats で CompStats へ復元。 */
+export interface WireComp {
+  /** units */
+  u: number[]
+  n: number
+  /** unitStars（全0なら省略） */
+  k?: number[]
+  /** unitItems（空なら省略） */
+  i?: [number, number, number][]
+  /** holders（空なら省略） */
+  h?: [number, number, number][]
+  /** sigs: [one[], half[], n, top4, win, p] */
+  g: [number[], number[], number, number, number, number][]
+}
+
+/** stats.json 全体のオンディスク圧縮形式。 */
 export interface WireStatsFile {
-  schemaVersion: 2
+  schemaVersion: 3
   generatedAt: string
   patch: string
   tftPatch: string
@@ -155,11 +139,10 @@ export interface WireStatsFile {
   units: UnitInfo[]
   items: ItemInfo[]
   comps: WireComp[]
-  compsByLevel: Record<string, WireComp[]>
   baseItemIcons?: { spatula: string; fryingPan: string }
 }
 
-/** public/data/stats.json をデコードしたフロント内部の表現（リッチ型） */
+/** public/data/stats.json をデコードしたフロント内部の表現。 */
 export interface StatsFile {
   schemaVersion: number
   generatedAt: string
@@ -178,8 +161,6 @@ export interface StatsFile {
   units: UnitInfo[]
   items: ItemInfo[]
   comps: CompStats[]
-  /** レベル別の構成（キー "7".."10"）。全体は comps。 */
-  compsByLevel: Record<string, CompStats[]>
-  /** 合成素材アイテムアイコン（紋章グリッドのカテゴリヘッダ用） */
+  /** 合成素材アイコン（紋章グリッドのカテゴリヘッダ用） */
   baseItemIcons?: { spatula: string; fryingPan: string }
 }

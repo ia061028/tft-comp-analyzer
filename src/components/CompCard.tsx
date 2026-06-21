@@ -1,51 +1,55 @@
 import { useState } from 'react'
 import type { CompStats, StatsFile } from '../../shared/types'
-import { emblemGames } from '../lib/multiset'
-import { buildPlannerCode, costBorder, starColor, styleClasses, tierOf } from '../lib/format'
+import type { CompUsage } from '../lib/multiset'
+import { activeTier, buildPlannerCode, costBorder, starColor, styleClasses, tierOf } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { Tip } from './Tip'
 
-export type SortKey = 'rate' | 'place' | 'top4' | 'win'
+export type SortKey = 'place' | 'top4' | 'win' | 'adopt'
 
 interface CompCardProps {
   stats: StatsFile
   comp: CompStats
-  /** 同時装着ベースで集計した成績（活用ゲームのみ）。 */
-  agg: { n: number; top4: number; win: number; p: number }
-  avgPlace: number
-  /** 選択紋章のうち同時装着できた最大数。 */
-  usedCount: number
-  /** 選択紋章の種類数（バッジ分母）。 */
-  k: number
+  usage: CompUsage
   /** 選択中の紋章インデックス（重複除去済み）。 */
   selList: number[]
   sortKey: SortKey
   lang: Lang
 }
 
-/** 構成一覧の1カード。ティア・構成名・発動特性・ユニット・指標を表示する。 */
-export function CompCard({ stats, comp, agg, avgPlace, usedCount, k, selList, sortKey, lang }: CompCardProps) {
+/** 構成一覧の1カード。 */
+export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCardProps) {
   const { traits, units, emblems, items } = stats
   const [copied, setCopied] = useState(false)
   const selectedEmblemSet = new Set(selList)
 
+  const avgPlace = usage.adopt > 0 ? usage.p / usage.adopt : NaN
   const hasPlace = Number.isFinite(avgPlace)
   const tier = hasPlace ? tierOf(avgPlace) : { label: '?', classes: 'bg-zinc-700 text-zinc-300' }
-  const compName = (lang === 'ja' ? comp.labelJa : comp.label) || comp.label
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
-  const synergies = comp.synergies ?? comp.traits
 
-  // 装備紋章が付与するトレイトのうち、構成の synergies に未掲載のものを「紋章由来」として補完。
-  // （付与トレイトは紋章装備サブセットでのみ発動し、クラスタ過半数に届かず希釈されるため）
-  const baseSynTraitIdxs = new Set(synergies.map((s) => s[0]))
-  const grantedChips: { traitIdx: number; emblemIdx: number }[] = []
-  for (const ei of selList) {
-    if (emblemGames(comp, ei) <= 0) continue
-    const gt = emblems[ei]?.trait
-    if (gt == null || baseSynTraitIdxs.has(gt)) continue
-    if (grantedChips.some((g) => g.traitIdx === gt)) continue
-    grantedChips.push({ traitIdx: gt, emblemIdx: ei })
+  // 発動特性 = 盤面ユニットの所持トレイト ＋ 選択紋章のうち活用された付与分（決定的算出）。
+  const traitCount = new Map<number, number>()
+  for (const ui of comp.units) {
+    for (const ti of units[ui]?.traits ?? []) traitCount.set(ti, (traitCount.get(ti) ?? 0) + 1)
   }
+  for (const ei of usage.req.keys()) {
+    const add = Math.ceil(usage.best.get(ei) ?? 0) // 活用された個数
+    if (add <= 0) continue
+    const ti = emblems[ei]?.trait
+    if (ti == null) continue
+    traitCount.set(ti, (traitCount.get(ti) ?? 0) + add)
+  }
+  // 活性トレイトのみ（発動数 >= 最小ブレークポイント）。[traitIdx, style, 発動段]
+  const traitChips: [number, number, number][] = []
+  for (const [ti, count] of traitCount) {
+    const tr = traits[ti]
+    if (!tr) continue
+    const at = activeTier(count, tr.tiers)
+    if (!at) continue
+    traitChips.push([ti, at.style, at.min])
+  }
+  traitChips.sort((a, b) => b[1] - a[1] || (traits[a[0]].name < traits[b[0]].name ? -1 : 1))
 
   const copy = async () => {
     try {
@@ -80,26 +84,9 @@ export function CompCard({ stats, comp, agg, avgPlace, usedCount, k, selList, so
 
       {/* 構成本体 */}
       <div className="min-w-0 flex-1">
-        <div className="mb-1 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 truncate text-base font-semibold text-zinc-100">{compName}</span>
-          {k >= 2 && (
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                usedCount >= k ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-700/70 text-amber-200'
-              }`}
-              title={t(lang, 'utilizationTitle')}
-            >
-              {t(lang, 'utilization', { n: usedCount, k })}
-            </span>
-          )}
-          <span className="shrink-0 rounded-full bg-zinc-700/60 px-2 py-0.5 text-[11px] font-semibold text-zinc-300">
-            {t(lang, 'activeTraits', { n: synergies.length })}
-          </span>
-        </div>
-
-        {/* 発動中の特性のみの行 */}
+        {/* 発動中の特性（アイコン＋発動数で統一。紋章付与分も特別なマークなし） */}
         <div className="mb-2 flex flex-wrap items-center gap-1">
-          {synergies.map(([traitIdx, style, count]) => {
+          {traitChips.map(([traitIdx, style, count]) => {
             const trait = traits[traitIdx]
             return (
               <Tip key={traitIdx} label={trait ? pickName(lang, trait) : `#${traitIdx}`}>
@@ -120,33 +107,9 @@ export function CompCard({ stats, comp, agg, avgPlace, usedCount, k, selList, so
               </Tip>
             )
           })}
-          {grantedChips.map(({ traitIdx, emblemIdx }) => {
-            const trait = traits[traitIdx]
-            const emblem = emblems[emblemIdx]
-            return (
-              <Tip
-                key={`g${traitIdx}`}
-                label={`${trait ? pickName(lang, trait) : `#${traitIdx}`}（${emblem ? pickName(lang, emblem) : ''}）`}
-              >
-                <span className="relative inline-flex items-center rounded-md border border-amber-400/70 bg-amber-400/10 px-1.5 py-0.5 text-xs font-semibold text-amber-200">
-                  {trait?.icon && (
-                    <img src={trait.icon} alt="" loading="lazy" className="h-5 w-5 object-contain" />
-                  )}
-                  {emblem?.icon && (
-                    <img
-                      src={emblem.icon}
-                      alt=""
-                      loading="lazy"
-                      className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-zinc-900 object-contain ring-1 ring-amber-400"
-                    />
-                  )}
-                </span>
-              </Tip>
-            )
-          })}
         </div>
 
-        {/* ユニット（下に推奨アイテム・装備紋章） */}
+        {/* ユニット */}
         <div className="flex flex-wrap gap-x-3 gap-y-2">
           {comp.units.map((unitIdx, pos) => {
             const unit = units[unitIdx]
@@ -154,7 +117,6 @@ export function CompCard({ stats, comp, agg, avgPlace, usedCount, k, selList, so
             const unitName = pickName(lang, unit)
             const star = comp.unitStars?.[pos] ?? 0
             const unitItemIdxs = comp.unitItems.filter((ui) => ui[0] === unitIdx).map((ui) => ui[1])
-            // 装備紋章は「選択中の紋章」のみ表示（ユーザー指定）。
             const unitEmblemIdxs = comp.holders
               .filter((h) => h[1] === unitIdx)
               .map((h) => h[0])
@@ -200,13 +162,16 @@ export function CompCard({ stats, comp, agg, avgPlace, usedCount, k, selList, so
                         {unitEmblemIdxs.map((ei) => {
                           const emblem = emblems[ei]
                           if (!emblem) return null
+                          const half = (usage.best.get(ei) ?? 0) < (usage.req.get(ei) ?? 1)
                           return (
                             <Tip key={`e${ei}`} label={pickName(lang, emblem)}>
                               <img
                                 src={emblem.icon}
                                 alt={pickName(lang, emblem)}
                                 loading="lazy"
-                                className="h-5 w-5 rounded object-contain ring-1 ring-amber-400"
+                                className={`h-5 w-5 rounded object-contain ring-1 ${
+                                  half ? 'opacity-60 ring-amber-400/40' : 'ring-amber-400'
+                                }`}
                               />
                             </Tip>
                           )
@@ -233,9 +198,9 @@ export function CompCard({ stats, comp, agg, avgPlace, usedCount, k, selList, so
             {hasPlace ? avgPlace.toFixed(2) : '—'}
           </span>
         </div>
-        {metricCell(sortKey === 'rate', t(lang, 'metricRate'), `${agg.n}/${comp.n}`)}
-        {metricCell(sortKey === 'top4', t(lang, 'metricTop4'), `${agg.top4}/${agg.n}`)}
-        {metricCell(sortKey === 'win', t(lang, 'metricWin'), `${agg.win}/${agg.n}`)}
+        {metricCell(sortKey === 'adopt', t(lang, 'metricRate'), `${usage.adopt}`)}
+        {metricCell(sortKey === 'top4', t(lang, 'metricTop4'), `${usage.top4}/${usage.adopt}`)}
+        {metricCell(sortKey === 'win', t(lang, 'metricWin'), `${usage.win}/${usage.adopt}`)}
         <button
           type="button"
           onClick={copy}

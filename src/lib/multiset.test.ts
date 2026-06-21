@@ -1,91 +1,86 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { CompStats, EmblemRow } from '../../shared/types'
-import { aggregateAny, aggregateUtilized, emblemGames } from './multiset'
+import type { CompStats, EmblemSig } from '../../shared/types'
+import { compUsage } from './multiset'
 
-/** rows だけ持つ最小の CompStats を作る（aggregateAny/emblemGames は rows のみ参照）。 */
-function comp(rows: EmblemRow[]): CompStats {
+/** sigs だけ持つ最小の CompStats を作る（compUsage は sigs のみ参照）。 */
+function comp(sigs: EmblemSig[]): CompStats {
   return {
-    traits: [],
-    synergies: [],
-    label: '',
-    labelJa: '',
     units: [],
-    unitStars: [],
     n: 0,
-    top4: 0,
-    win: 0,
-    rows,
-    holders: [],
+    unitStars: [],
     unitItems: [],
+    holders: [],
+    sigs,
   }
 }
 
+const sig = (
+  one: number[],
+  half: number[],
+  n: number,
+  top4: number,
+  win: number,
+  p: number,
+): EmblemSig => ({ one, half, n, top4, win, p })
+
+// 紋章3(ブローラー)が +1 の行、+0.5 の行、紋章7(ミィプル)が +1 の行。
 const c = comp([
-  { e: [], n: 10, top4: 5, win: 1, p: 40 },
-  { e: [1], n: 4, top4: 3, win: 1, p: 12 },
-  { e: [2], n: 2, top4: 1, win: 0, p: 8 },
-  { e: [1, 2], n: 1, top4: 1, win: 1, p: 3 },
+  sig([3], [], 10, 6, 2, 40), // Brawler ちょうど(+1)
+  sig([], [3], 5, 2, 0, 25), // Brawler 余り(+0.5) のみ
+  sig([7], [3], 4, 3, 1, 14), // Meeple +1 ＋ Brawler +0.5
 ])
 
-test('aggregateAny: 単一紋章はその紋章を含む全行を合算', () => {
-  assert.deepEqual(aggregateAny(c, [1]), { n: 5, top4: 4, win: 2, p: 15 })
-  assert.deepEqual(aggregateAny(c, [2]), { n: 3, top4: 2, win: 1, p: 11 })
+test('compUsage: 単一紋章+1の行のみ該当し集計', () => {
+  // sel=[3]: one に3を含む行 = 行1(n10) のみ。行2(+0.5のみ)・行3(3はhalf)は該当しない。
+  const u = compUsage(c, [3])!
+  assert.equal(u.adopt, 10)
+  assert.equal(u.top4, 6)
+  assert.equal(u.win, 2)
+  assert.equal(u.x, 1) // Brawler は +1 が存在 → 1
+  assert.equal(u.n, 1)
 })
 
-test('aggregateAny: 複数紋章はORで、両方含む行も二重計上しない', () => {
-  // [1],[2],[1,2] の3行が交差 → n=4+2+1=7
-  assert.equal(aggregateAny(c, [1, 2]).n, 7)
+test('compUsage: +0.5のみ（一度も+1にならない紋章）単独選択は除外=null', () => {
+  // half にしか現れない紋章 99 を選択 → 該当行なし
+  const only = comp([sig([], [99], 8, 3, 0, 40)])
+  assert.equal(compUsage(only, [99]), null)
 })
 
-test('aggregateAny: 空 sel は全行合算', () => {
-  assert.equal(aggregateAny(c, []).n, 17)
+test('compUsage: 複数選択は「いずれか+1」の行を抽出、Xは紋章ごと最良値の合計', () => {
+  // sel=[7,3]: 該当行 = one に7か3を含む = 行1(3+1) と 行3(7+1, 3 half)。行2は該当せず。
+  const u = compUsage(c, [7, 3])!
+  assert.equal(u.adopt, 14) // 10 + 4
+  // best: 3 は行1で+1→1、7 は行3で+1→1 → X=2
+  assert.equal(u.x, 2)
+  assert.equal(u.n, 2)
 })
 
-test('aggregateAny: 該当紋章なしは 0', () => {
-  assert.deepEqual(aggregateAny(c, [99]), { n: 0, top4: 0, win: 0, p: 0 })
+test('compUsage: 該当行で+0.5止まりの紋章は0.5寄与', () => {
+  // sel=[7,3] だが Brawler(3) が +1 の行を消し、+0.5 と Meeple+1 の行だけにする
+  const c2 = comp([sig([7], [3], 6, 3, 1, 20)])
+  const u = compUsage(c2, [7, 3])!
+  // 7 は +1 → 1、3 はこの該当行で half → 0.5。X=1.5
+  assert.equal(u.x, 1.5)
+  assert.equal(u.adopt, 6)
 })
 
-test('emblemGames: その紋章を含む行の n 合計', () => {
-  assert.equal(emblemGames(c, 1), 5)
-  assert.equal(emblemGames(c, 2), 3)
-  assert.equal(emblemGames(c, 99), 0)
+test('compUsage: 同一紋章×2 は個数を加算（N=2）し複数活用を反映', () => {
+  // one=[3,3]（2体ちょうど発動）の sig と one=[3]（1体）の sig
+  const c2 = comp([sig([3, 3], [], 6, 3, 1, 20), sig([3], [], 10, 5, 2, 40)])
+  const u = compUsage(c2, [3, 3])!
+  assert.equal(u.n, 2) // 選択総数
+  assert.equal(u.x, 2) // 2体活用できる sig があるので X=2
+  assert.equal(u.adopt, 16) // 両 sig とも 3 を含むため該当
 })
 
-test('aggregateUtilized: 単一紋章はその紋章を含む行で集計・usedCount=1', () => {
-  // 紋章1を含む行: [1] n=4, [1,2] n=1 → n=5, top4=4, win=2, p=15
-  assert.deepEqual(aggregateUtilized(c, [1]), { usedCount: 1, n: 5, top4: 4, win: 2, p: 15 })
+test('compUsage: 同一紋章×2 だが1体しか+1にならない構成は X=1（1/2相当）', () => {
+  const c3 = comp([sig([3], [], 10, 5, 2, 40)])
+  const u = compUsage(c3, [3, 3])!
+  assert.equal(u.n, 2)
+  assert.equal(u.x, 1) // min(2,1)=1
 })
 
-test('aggregateUtilized: 同時装着がある場合は最大深さの行のみ集計', () => {
-  // sel=[1,2]: 最大重なりは行 [1,2] の 2 → その行のみ集計（n=1, top4=1, win=1, p=3）
-  assert.deepEqual(aggregateUtilized(c, [1, 2]), { usedCount: 2, n: 1, top4: 1, win: 1, p: 3 })
-})
-
-test('aggregateUtilized: 同時装着が無ければ usedCount=1 で単独行を合算', () => {
-  // [1] と [2] はあるが [1,2] が無い構成
-  const sep = comp([
-    { e: [], n: 10, top4: 5, win: 1, p: 40 },
-    { e: [1], n: 4, top4: 3, win: 1, p: 12 },
-    { e: [2], n: 2, top4: 1, win: 0, p: 8 },
-  ])
-  // 最大重なりは 1（[1] か [2]）→ overlap==1 の両行を合算: n=6, top4=4, win=1, p=20
-  assert.deepEqual(aggregateUtilized(sep, [1, 2]), { usedCount: 1, n: 6, top4: 4, win: 1, p: 20 })
-})
-
-test('aggregateUtilized: 該当紋章なしは usedCount=0・全0', () => {
-  assert.deepEqual(aggregateUtilized(c, [99]), { usedCount: 0, n: 0, top4: 0, win: 0, p: 0 })
-})
-
-test('aggregateUtilized: 同一紋章を複数装着しても異なり数で数える（usedCount水増し防止）', () => {
-  // 紋章3を2個装着した行 [3,3] と、紋章3単独の行。sel=[7,3]（7は未使用）。
-  // 行 [3,3] は 3 が2回出るが選択紋章の異なり数は1 → usedCount は 2 にならない。
-  const dup = comp([
-    { e: [3, 6], n: 9, top4: 4, win: 1, p: 36 },
-    { e: [3, 3, 6], n: 3, top4: 2, win: 0, p: 13 },
-  ])
-  const r = aggregateUtilized(dup, [7, 3])
-  assert.equal(r.usedCount, 1, 'Meeple(7)は未使用・Brawler(3)のみ＝1種')
-  // overlap==1 の両行を合算: n=12
-  assert.equal(r.n, 12)
+test('compUsage: 選択なしは null', () => {
+  assert.equal(compUsage(c, []), null)
 })
