@@ -5,13 +5,13 @@ import type { UnitInfo } from '../../shared/types'
 
 /**
  * CDragon の trait effect style 値 → バッジ配色。
- * 観測値: 1=ブロンズ, 3=シルバー/ゴールド, 5=ゴールド, 6=プリズム（高ティアほど派手）。
+ * MetaTFT風のフラットで視認性の高い配色に変更。
  */
 export function styleClasses(style: number): string {
-  if (style >= 6) return 'border-fuchsia-400/60 bg-fuchsia-400/10 text-fuchsia-200'
-  if (style >= 5) return 'border-amber-400/60 bg-amber-400/10 text-amber-200'
-  if (style >= 3) return 'border-zinc-300/50 bg-zinc-300/10 text-zinc-100'
-  return 'border-orange-700/60 bg-orange-700/10 text-orange-300'
+  if (style >= 6) return 'border-[#f085ba] bg-[#f085ba]/20 text-[#fbd7e9]' // Prismatic
+  if (style >= 5) return 'border-[#f2b968] bg-[#f2b968]/20 text-[#fbe1bb]' // Gold
+  if (style >= 3) return 'border-[#9da7b3] bg-[#9da7b3]/20 text-[#dde1e5]' // Silver
+  return 'border-[#c9755b] bg-[#c9755b]/20 text-[#e9c7bd]' // Bronze
 }
 
 /** 発動数 count に対する活性ティア（最大の minUnits<=count）。未発動は null。 */
@@ -28,44 +28,43 @@ export function activeTier(
 export function starColor(star: number): string {
   switch (star) {
     case 3:
-      return 'text-amber-300'
+      return 'text-[#f2b968]'
     case 2:
-      return 'text-zinc-200'
+      return 'text-[#9da7b3]'
     default:
-      return 'text-orange-400'
+      return 'text-[#c9755b]'
   }
 }
 
-/** コスト → ユニットアイコン枠の配色（1=グレー,2=緑,3=青,4=紫,5=金） */
+/** コスト → ユニットアイコン枠の配色（MetaTFT基準: 1=灰,2=緑,3=青,4=紫,5=金） */
 export function costBorder(cost: number): string {
   switch (cost) {
     case 5:
-      return 'border-amber-400'
+      return 'border-[#e4b238]'
     case 4:
-      return 'border-purple-400'
+      return 'border-[#b630c4]'
     case 3:
-      return 'border-sky-400'
+      return 'border-[#2c76e9]'
     case 2:
-      return 'border-green-400'
+      return 'border-[#11b288]'
     default:
-      return 'border-zinc-500'
+      return 'border-[#696969]'
   }
 }
 
 /**
- * 平均順位 → ティア。しきい値は現行データの分布（中央値≈4.3, p10≈3.3, p90≈5.7）に
- * 合わせて各ティアが偏らないよう設定。配色はグラデーションでモダンに。
+ * 平均順位 → ティア。MetaTFTに合わせたカラーパレット（左端の縦線などに使用）。
  */
-export function tierOf(avgPlace: number): { label: string; classes: string } {
+export function tierOf(avgPlace: number): { label: string; color: string; classes: string } {
   if (avgPlace <= 3.5)
-    return { label: 'S', classes: 'bg-gradient-to-br from-amber-300 to-amber-500 text-zinc-950' }
+    return { label: 'S', color: '#ff7e83', classes: 'bg-[#ff7e83] text-[#222222]' }
   if (avgPlace <= 4.0)
-    return { label: 'A', classes: 'bg-gradient-to-br from-fuchsia-400 to-fuchsia-600 text-zinc-950' }
+    return { label: 'A', color: '#ffbf7f', classes: 'bg-[#ffbf7f] text-[#222222]' }
   if (avgPlace <= 4.5)
-    return { label: 'B', classes: 'bg-gradient-to-br from-sky-400 to-sky-600 text-zinc-950' }
+    return { label: 'B', color: '#ffd572', classes: 'bg-[#ffd572] text-[#222222]' }
   if (avgPlace <= 5.2)
-    return { label: 'C', classes: 'bg-gradient-to-br from-green-400 to-green-600 text-zinc-950' }
-  return { label: 'D', classes: 'bg-gradient-to-br from-zinc-600 to-zinc-700 text-zinc-100' }
+    return { label: 'C', color: '#579e56', classes: 'bg-[#579e56] text-white' }
+  return { label: 'D', color: '#666666', classes: 'bg-[#666666] text-white' }
 }
 
 /**

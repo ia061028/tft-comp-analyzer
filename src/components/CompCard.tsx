@@ -17,7 +17,7 @@ interface CompCardProps {
   lang: Lang
 }
 
-/** 構成一覧の1カード。 */
+/** 構成一覧の1カード。MetaTFTライクなUI */
 export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCardProps) {
   const { traits, units, emblems, items } = stats
   const [copied, setCopied] = useState(false)
@@ -25,15 +25,8 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
 
   const avgPlace = usage.adopt > 0 ? usage.p / usage.adopt : NaN
   const hasPlace = Number.isFinite(avgPlace)
-  const tier = hasPlace ? tierOf(avgPlace) : { label: '?', classes: 'bg-slate-700 text-slate-300' }
+  const tier = hasPlace ? tierOf(avgPlace) : { label: '?', color: '#666666', classes: 'bg-[#666666] text-white' }
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
-
-  const tierAura =
-    tier.label === 'S'
-      ? 'border-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.15)] bg-gradient-to-r from-amber-400/10 to-slate-900/40 hover:border-amber-400/80 hover:shadow-[0_0_25px_rgba(251,191,36,0.25)]'
-      : tier.label === 'A'
-        ? 'border-fuchsia-500/40 shadow-[0_0_15px_rgba(217,70,239,0.1)] bg-gradient-to-r from-fuchsia-500/10 to-slate-900/40 hover:border-fuchsia-500/60 hover:shadow-[0_0_20px_rgba(217,70,239,0.2)]'
-        : 'border-slate-800 bg-slate-900/50 hover:border-slate-600 hover:bg-slate-800/80 hover:shadow-lg'
 
   // 発動特性 = 盤面ユニットの所持トレイト ＋ 選択紋章のうち活用された付与分（決定的算出）。
   const traitCount = new Map<number, number>()
@@ -68,156 +61,137 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
     }
   }
 
-  const metricCell = (active: boolean, label: string, value: string) => (
-    <div
-      className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 transition-colors ${
-        active ? 'bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/40 font-medium' : 'bg-slate-800/40 text-slate-400'
-      }`}
-    >
-      <span className="text-[10px] uppercase tracking-wider">{label}</span>
-      <span className="text-xs font-bold tabular-nums text-slate-100">{value}</span>
-    </div>
-  )
+  // 指標のハイライト判定
+  const isGoodPlace = avgPlace <= 4.3
+  const winRate = usage.adopt > 0 ? (usage.win / usage.adopt) * 100 : 0
+  const top4Rate = usage.adopt > 0 ? (usage.top4 / usage.adopt) * 100 : 0
 
   return (
-    <div className={`group flex items-stretch gap-4 rounded-xl border p-3.5 transition-all duration-300 hover:-translate-y-0.5 ${tierAura}`}>
-      {/* ティアバッジ */}
+    <div className="my-2 flex flex-col rounded-[2px_5px_5px_2px] bg-gradient-to-b from-[#27282b] to-[#222326] shadow-md transition-transform hover:translate-y-[-1px]">
       <div
-        className={`flex w-12 shrink-0 items-center justify-center rounded-lg text-2xl font-black shadow-lg ${tier.classes}`}
-        title={hasPlace ? t(lang, 'tierTitle', { x: avgPlace.toFixed(2) }) : t(lang, 'tierNoData')}
+        className="flex min-h-[100px] flex-col sm:flex-row items-stretch"
+        style={{ borderLeft: `5px solid ${tier.color}` }}
       >
-        {tier.label}
-      </div>
-
-      {/* 構成本体 */}
-      <div className="min-w-0 flex-1">
-        {/* 発動中の特性（アイコン＋発動数で統一。紋章付与分も特別なマークなし） */}
-        <div className="mb-2 flex flex-wrap items-center gap-1">
-          {traitChips.map(([traitIdx, style, count]) => {
-            const trait = traits[traitIdx]
-            return (
-              <Tip key={traitIdx} label={trait ? pickName(lang, trait) : `#${traitIdx}`}>
-                <span
-                  className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-xs font-semibold ${styleClasses(
-                    style,
-                  )}`}
-                >
-                  {trait?.icon && (
-                    <img src={trait.icon} alt="" loading="lazy" className="h-5 w-5 object-contain drop-shadow" />
-                  )}
-                  {count ? (
-                    <span className="rounded bg-slate-950/60 px-1 text-xs font-bold tabular-nums shadow-inner">
-                      {count}
-                    </span>
-                  ) : null}
-                </span>
-              </Tip>
-            )
-          })}
+        {/* 左端：ティアバッジ */}
+        <div className="hidden sm:flex w-[27px] shrink-0 mx-3 my-auto items-center justify-center rounded-[3px] h-[89.5px] font-bold text-[13px] shadow-sm" className={tier.classes + " hidden sm:flex w-[27px] shrink-0 mx-3 my-auto items-center justify-center rounded-[3px] h-[89.5px] font-bold text-[13px] shadow-sm"}>
+          {tier.label}
         </div>
 
-        {/* ユニット */}
-        <div className="flex flex-wrap gap-x-3 gap-y-2">
-          {comp.units.map((unitIdx, pos) => {
-            const unit = units[unitIdx]
-            if (!unit) return null
-            const unitName = pickName(lang, unit)
-            const star = comp.unitStars?.[pos] ?? 0
-            const unitItemIdxs = comp.unitItems.filter((ui) => ui[0] === unitIdx).map((ui) => ui[1])
-            const unitEmblemIdxs = comp.holders
-              .filter((h) => h[1] === unitIdx)
-              .map((h) => h[0])
-              .filter((ei) => selectedEmblemSet.has(ei))
-            const hasUnder = unitItemIdxs.length > 0 || unitEmblemIdxs.length > 0
-            return (
-              <div key={unitIdx} className="flex w-14 flex-col items-center gap-0.5">
-                <div className={`h-3 text-[11px] leading-3 ${starColor(star)}`}>
-                  {star > 0 ? '★'.repeat(star) : ''}
-                </div>
-                <Tip label={star > 0 ? `${unitName} ★${star}` : unitName}>
-                  <img
-                    src={unit.icon}
-                    alt={unitName}
-                    loading="lazy"
-                    className={`h-14 w-14 rounded-md border-2 object-cover transition-transform duration-150 group-hover:scale-[1.03] ${costBorder(
-                      unit.cost,
+        {/* 中央：特性とチャンピオン */}
+        <div className="flex-1 flex flex-col justify-center py-3 px-3 sm:px-0 min-w-0 border-b border-[#333] sm:border-b-0 sm:border-r border-dashed">
+          {/* 特性バッジ */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+            <span className="sm:hidden mr-1 px-1.5 py-0.5 rounded text-xs font-bold" className={tier.classes + " sm:hidden mr-1 px-1.5 py-0.5 rounded text-xs font-bold"}>{tier.label}</span>
+            {traitChips.map(([traitIdx, style, count]) => {
+              const trait = traits[traitIdx]
+              return (
+                <Tip key={traitIdx} label={trait ? pickName(lang, trait) : `#${traitIdx}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 h-[18.5px] px-1.5 text-[11px] font-semibold rounded-[4px] border ${styleClasses(
+                      style,
                     )}`}
-                  />
+                  >
+                    {trait?.icon && (
+                      <img src={trait.icon} alt="" loading="lazy" className="h-3.5 w-3.5 object-contain" />
+                    )}
+                    {count ? <span>{count}</span> : null}
+                  </span>
                 </Tip>
-                {hasUnder && (
-                  <div className="flex flex-col items-center gap-0.5">
-                    {unitItemIdxs.length > 0 && (
-                      <div className="grid grid-cols-3 justify-items-center gap-0.5">
-                        {unitItemIdxs.map((ii, idx) => {
-                          const item = items?.[ii]
-                          if (!item) return null
-                          return (
-                            <Tip key={`i${ii}-${idx}`} label={pickName(lang, item)}>
-                              <img
-                                src={item.icon}
-                                alt={pickName(lang, item)}
-                                loading="lazy"
-                                className="h-5 w-5 rounded object-cover"
-                              />
-                            </Tip>
-                          )
-                        })}
-                      </div>
-                    )}
-                    {unitEmblemIdxs.length > 0 && (
-                      <div className="flex flex-wrap justify-center gap-0.5">
-                        {unitEmblemIdxs.map((ei) => {
-                          const emblem = emblems[ei]
-                          if (!emblem) return null
-                          const half = (usage.best.get(ei) ?? 0) < (usage.req.get(ei) ?? 1)
-                          return (
-                            <Tip key={`e${ei}`} label={pickName(lang, emblem)}>
-                              <img
-                                src={emblem.icon}
-                                alt={pickName(lang, emblem)}
-                                loading="lazy"
-                                className={`h-5 w-5 rounded object-contain ring-1 ${
-                                  half ? 'opacity-60 ring-amber-400/40' : 'ring-amber-400'
-                                }`}
-                              />
-                            </Tip>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+              )
+            })}
+          </div>
 
-      {/* 指標ブロック */}
-      <div className="flex w-36 shrink-0 flex-col justify-center gap-1">
-        <div className="mb-1 flex items-baseline justify-between gap-2 px-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t(lang, 'avg')}</span>
-          <span
-            className={`text-[28px] leading-none font-black tabular-nums drop-shadow-sm ${
-              sortKey === 'place' ? 'text-amber-400' : 'text-slate-100'
-            }`}
-          >
-            {hasPlace ? avgPlace.toFixed(2) : '—'}
-          </span>
+          {/* チャンピオン */}
+          <div className="flex flex-wrap gap-x-2.5 gap-y-3">
+            {comp.units.map((unitIdx, pos) => {
+              const unit = units[unitIdx]
+              if (!unit) return null
+              const unitName = pickName(lang, unit)
+              const star = comp.unitStars?.[pos] ?? 0
+              const unitItemIdxs = comp.unitItems.filter((ui) => ui[0] === unitIdx).map((ui) => ui[1])
+              const unitEmblemIdxs = comp.holders
+                .filter((h) => h[1] === unitIdx)
+                .map((h) => h[0])
+                .filter((ei) => selectedEmblemSet.has(ei))
+              
+              // 全ての装備アイテム（通常アイテム + 紋章）
+              const allEquips = [
+                ...unitItemIdxs.map(ii => ({ icon: items?.[ii]?.icon, label: pickName(lang, items?.[ii]!) })),
+                ...unitEmblemIdxs.map(ei => ({ icon: emblems[ei]?.icon, label: pickName(lang, emblems[ei]!) }))
+              ]
+
+              return (
+                <div key={unitIdx} className="flex flex-col items-center w-[42px]">
+                  {/* スター（画像の上に配置、11px） */}
+                  <div className={`h-2.5 text-[11px] leading-none mb-0.5 ${starColor(star)} tracking-[1px]`}>
+                    {star > 0 ? '★'.repeat(star) : ''}
+                  </div>
+                  
+                  {/* チャンピオンアイコン（42x42, 角丸3px） */}
+                  <Tip label={star > 0 ? `${unitName} ★${star}` : unitName}>
+                    <img
+                      src={unit.icon}
+                      alt={unitName}
+                      loading="lazy"
+                      className={`h-[42px] w-[42px] rounded-[3px] border-2 object-cover ${costBorder(unit.cost)}`}
+                    />
+                  </Tip>
+
+                  {/* アイテム（チャンピオン画像の下部にめり込む） */}
+                  <div className="flex justify-center -mt-[12px] z-10 w-[42px] px-0.5 gap-[1px]">
+                    {allEquips.map((eq, idx) => eq.icon ? (
+                      <Tip key={idx} label={eq.label}>
+                        <img
+                          src={eq.icon}
+                          alt=""
+                          loading="lazy"
+                          className="h-[15px] w-[15px] rounded-[2px] border border-[#111] object-cover bg-black"
+                        />
+                      </Tip>
+                    ) : null)}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
-        <div className="flex flex-col gap-0.5">
-          {metricCell(sortKey === 'adopt', t(lang, 'metricRate'), `${usage.adopt}`)}
-          {metricCell(sortKey === 'top4', t(lang, 'metricTop4'), `${usage.top4}/${usage.adopt}`)}
-          {metricCell(sortKey === 'win', t(lang, 'metricWin'), `${usage.win}/${usage.adopt}`)}
+
+        {/* 右端：指標ブロック */}
+        <div className="flex shrink-0 items-center gap-x-6 sm:gap-x-8 px-4 py-3 sm:py-0 justify-between sm:justify-end">
+          <div className="flex flex-col text-center sm:text-right">
+            <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'avg')}</span>
+            <span className={`text-[16px] font-bold ${isGoodPlace ? 'text-[#bffe7f]' : 'text-[#ede9ca]'}`}>
+              {hasPlace ? avgPlace.toFixed(2) : '—'}
+            </span>
+          </div>
+
+          <div className="flex flex-col text-center sm:text-right">
+            <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'metricTop4')}</span>
+            <span className="text-[14px] font-bold text-[#ede9ca]">{top4Rate.toFixed(1)}%</span>
+          </div>
+
+          <div className="flex flex-col text-center sm:text-right">
+            <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'metricWin')}</span>
+            <span className="text-[14px] font-bold text-[#ede9ca]">{winRate.toFixed(1)}%</span>
+          </div>
+
+          <div className="flex flex-col text-center sm:text-right">
+            <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'metricRate')}</span>
+            <span className="text-[14px] font-bold text-[#ede9ca]">{usage.adopt}</span>
+          </div>
+
+          {/* コードコピーボタン */}
+          <div className="hidden lg:flex flex-col items-center justify-center ml-2">
+            <button
+              type="button"
+              onClick={copy}
+              className="flex h-[32px] items-center justify-center rounded bg-[#36383e] hover:bg-[#46484e] px-3 text-[12px] font-bold text-[#eeeeee] transition-colors"
+              title={t(lang, 'copyCodeTitle')}
+            >
+              {copied ? `✓` : t(lang, 'copyCode')}
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={copy}
-          className="mt-1 rounded-md border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-300 transition-colors hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
-          title={t(lang, 'copyCodeTitle')}
-        >
-          {copied ? `✓ ${t(lang, 'copied')}` : t(lang, 'copyCode')}
-        </button>
       </div>
     </div>
   )

@@ -5,8 +5,9 @@ html {
 }
 
 body {
-  /* Use slate for a deeper, slightly bluish dark theme instead of plain zinc */
-  @apply bg-slate-950 text-slate-200 antialiased;
+  /* MetaTFT-like solid dark gray background */
+  background-color: #1d1e20;
+  @apply text-slate-200 antialiased;
 }
 
 /* ダークテーマに馴染む細めのスクロールバー（Firefox / WebKit 両対応）。 */
