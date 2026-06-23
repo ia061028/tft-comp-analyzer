@@ -73,7 +73,7 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
         style={{ borderLeft: `5px solid ${tier.color}` }}
       >
         {/* 左端：ティアバッジ */}
-        <div className="hidden sm:flex w-[27px] shrink-0 mx-3 my-auto items-center justify-center rounded-[3px] h-[89.5px] font-bold text-[13px] shadow-sm" className={tier.classes + " hidden sm:flex w-[27px] shrink-0 mx-3 my-auto items-center justify-center rounded-[3px] h-[89.5px] font-bold text-[13px] shadow-sm"}>
+        <div className={`${tier.classes} hidden sm:flex w-[27px] shrink-0 mx-3 my-auto items-center justify-center rounded-[3px] h-[89.5px] font-bold text-[13px] shadow-sm`}>
           {tier.label}
         </div>
 
@@ -81,7 +81,7 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
         <div className="flex-1 flex flex-col justify-center py-3 px-3 sm:px-0 min-w-0 border-b border-[#333] sm:border-b-0 sm:border-r border-dashed">
           {/* 特性バッジ */}
           <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-            <span className="sm:hidden mr-1 px-1.5 py-0.5 rounded text-xs font-bold" className={tier.classes + " sm:hidden mr-1 px-1.5 py-0.5 rounded text-xs font-bold"}>{tier.label}</span>
+            <span className={`${tier.classes} sm:hidden mr-1 px-1.5 py-0.5 rounded text-xs font-bold`}>{tier.label}</span>
             {traitChips.map(([traitIdx, style, count]) => {
               const trait = traits[traitIdx]
               return (
@@ -158,26 +158,26 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
 
         {/* 右端：指標ブロック */}
         <div className="flex shrink-0 items-center gap-x-6 sm:gap-x-8 px-4 py-3 sm:py-0 justify-between sm:justify-end">
-          <div className="flex flex-col text-center sm:text-right">
+          <div className={`flex flex-col text-center sm:text-right ${sortKey === 'place' ? 'opacity-100' : 'opacity-80'}`}>
             <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'avg')}</span>
             <span className={`text-[16px] font-bold ${isGoodPlace ? 'text-[#bffe7f]' : 'text-[#ede9ca]'}`}>
               {hasPlace ? avgPlace.toFixed(2) : '—'}
             </span>
           </div>
 
-          <div className="flex flex-col text-center sm:text-right">
+          <div className={`flex flex-col text-center sm:text-right ${sortKey === 'top4' ? 'opacity-100' : 'opacity-80'}`}>
             <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'metricTop4')}</span>
-            <span className="text-[14px] font-bold text-[#ede9ca]">{top4Rate.toFixed(1)}%</span>
+            <span className={`text-[14px] font-bold ${sortKey === 'top4' ? 'text-amber-300' : 'text-[#ede9ca]'}`}>{top4Rate.toFixed(1)}%</span>
           </div>
 
-          <div className="flex flex-col text-center sm:text-right">
+          <div className={`flex flex-col text-center sm:text-right ${sortKey === 'win' ? 'opacity-100' : 'opacity-80'}`}>
             <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'metricWin')}</span>
-            <span className="text-[14px] font-bold text-[#ede9ca]">{winRate.toFixed(1)}%</span>
+            <span className={`text-[14px] font-bold ${sortKey === 'win' ? 'text-amber-300' : 'text-[#ede9ca]'}`}>{winRate.toFixed(1)}%</span>
           </div>
 
-          <div className="flex flex-col text-center sm:text-right">
+          <div className={`flex flex-col text-center sm:text-right ${sortKey === 'adopt' ? 'opacity-100' : 'opacity-80'}`}>
             <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'metricRate')}</span>
-            <span className="text-[14px] font-bold text-[#ede9ca]">{usage.adopt}</span>
+            <span className={`text-[14px] font-bold ${sortKey === 'adopt' ? 'text-amber-300' : 'text-[#ede9ca]'}`}>{usage.adopt}</span>
           </div>
 
           {/* コードコピーボタン */}
