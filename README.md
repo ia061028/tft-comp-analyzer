@@ -1,8 +1,8 @@
 # TFT 紋章構成アナライザー
 
-TFT（Teamfight Tactics）のプレイ支援用Webアプリ。Riot API から高ランク帯（Master以上）のランク戦績を収集・集計し、**紋章(emblem)を選ぶと、その紋章を活用している構成**を平均順位・Top4率・採用率などで提示する自分専用ツール。データ収集は GitHub Actions、配信は Netlify（静的 `stats.json` を読むSPA）。
+TFT（Teamfight Tactics）のプレイ支援用Webアプリ。Riot API から高ランク帯（Master以上）のランク戦績を収集・集計し、**紋章(emblem)を選ぶと、その紋章を活用している構成**を平均順位・Top4率・採用率などで提示する自分専用ツール。データ収集は GitHub Actions、配信は Cloudflare Pages（静的 `stats.json` を読むSPA）。
 
-ライブ: https://tft-comp-analyzer.netlify.app/ ／ 初期設計は [PLAN.md](PLAN.md) を参照。
+ライブ: https://tft-comp-analyzer.pages.dev/ ／ 初期設計は [PLAN.md](PLAN.md) を参照。
 
 ## 主な機能
 
@@ -21,7 +21,7 @@ collector/ (GitHub Actions, 6時間ごと)
   collect.ts   Riot API → data/state/records/{route}.ndjson（参加者1人=1レコード）に追記
   aggregate.ts records → public/data/stats.json（クラスタリング・集計）
   cdragon.ts   Community Dragon から trait/unit/emblem/item 辞書（日英名・アイコン・プランナーcode）
-src/ (Vite + React, Netlify配信)
+src/ (Vite + React, Cloudflare Pages配信)
   stats.json を fetch して表示（クライアント側で再集計・絞り込み）
 shared/types.ts  収集側とフロントの共有型（ParticipantRecord, StatsFile, CompStats ...）
 ```
@@ -51,7 +51,7 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 
 ## 運用・デプロイ
 
-- **CI 収集**: `.github/workflows/collect.yml` が6時間ごとに collect→aggregate→commit。Netlify が push で再デプロイ。
+- **CI 収集**: `.github/workflows/collect.yml` が6時間ごとに collect→aggregate→commit。Cloudflare Pages が push で自動再デプロイ。
 - **APIキー**: CI が使うのは **GitHubリポジトリ Secret `RIOT_API_KEY`**（ローカル `.env` ではない）。開発キーは**24時間で失効**するので、失効すると collect が 401 で失敗し収集が止まる。`gh secret set RIOT_API_KEY --body "RGAPI-..."`（パイプ流し込みは BOM/改行混入の恐れがあるため `--body`）または Settings→Secrets→Actions で更新。恒久対応は**本番APIキー**への切替。
 - 手動収集: ローカルで有効な `.env` があれば `npm run collect && npm run aggregate` で更新→commit も可能。
 
