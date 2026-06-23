@@ -114,8 +114,8 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
                 .map((h) => h[0])
                 .filter((ei) => selectedEmblemSet.has(ei))
               
-              const normalItems = unitItemIdxs.map(ii => ({ icon: items?.[ii]?.icon, label: pickName(lang, items?.[ii]!) }))
-              const emblemItems = unitEmblemIdxs.map(ei => ({ icon: emblems[ei]?.icon, label: pickName(lang, emblems[ei]!) }))
+              const normalItems = unitItemIdxs.map(ii => ({ icon: items?.[ii]?.icon, label: pickName(lang, items?.[ii]!), recipe: items?.[ii]?.recipe }))
+              const emblemItems = unitEmblemIdxs.map(ei => ({ icon: emblems[ei]?.icon, label: pickName(lang, emblems[ei]!), recipe: emblems[ei]?.recipe }))
 
               return (
                 <div key={unitIdx} className="flex flex-col items-center w-[48px]">
@@ -138,7 +138,18 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
                   {normalItems.length > 0 && (
                     <div className="flex justify-center -mt-[14px] z-10 w-[48px] px-0.5 gap-[1px]">
                       {normalItems.slice(0, 3).map((eq, idx) => eq.icon ? (
-                        <Tip key={`item-${idx}`} label={eq.label}>
+                        <Tip key={`item-${idx}`} label={
+                          eq.recipe ? (
+                            <div className="flex flex-col items-center gap-1 px-1 py-0.5">
+                              <span className="font-bold text-[11px]">{eq.label}</span>
+                              <div className="flex items-center gap-1.5">
+                                <img src={eq.recipe[0]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
+                                <span className="text-slate-400 text-xs leading-none">+</span>
+                                <img src={eq.recipe[1]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
+                              </div>
+                            </div>
+                          ) : eq.label
+                        }>
                           <img
                             src={eq.icon}
                             alt=""
@@ -154,7 +165,18 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
                   {emblemItems.length > 0 && (
                     <div className={`flex justify-center z-10 w-[48px] px-0.5 gap-[1px] ${normalItems.length > 0 ? 'mt-[2px]' : '-mt-[14px]'}`}>
                       {emblemItems.map((eq, idx) => eq.icon ? (
-                        <Tip key={`emblem-${idx}`} label={eq.label}>
+                        <Tip key={`emblem-${idx}`} label={
+                          eq.recipe ? (
+                            <div className="flex flex-col items-center gap-1 px-1 py-0.5">
+                              <span className="font-bold text-[11px]">{eq.label}</span>
+                              <div className="flex items-center gap-1.5">
+                                <img src={eq.recipe[0]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
+                                <span className="text-slate-400 text-xs leading-none">+</span>
+                                <img src={eq.recipe[1]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
+                              </div>
+                            </div>
+                          ) : eq.label
+                        }>
                           <img
                             src={eq.icon}
                             alt=""

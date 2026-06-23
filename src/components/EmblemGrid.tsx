@@ -53,8 +53,19 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                 const count = counts[i] ?? 0
                 const selected = count > 0
                 const label = pickName(lang, emblem)
+                const recipeLabel = emblem.recipe ? (
+                  <div className="flex flex-col items-center gap-1 px-1 py-0.5">
+                    <span className="font-bold text-[11px]">{label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <img src={emblem.recipe[0]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
+                      <span className="text-slate-400 text-xs leading-none">+</span>
+                      <img src={emblem.recipe[1]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
+                    </div>
+                  </div>
+                ) : label
+
                 return (
-                  <Tip key={emblem.api} label={label}>
+                  <Tip key={emblem.api} label={recipeLabel}>
                     <button
                       type="button"
                       onClick={() => onAdd(i)}

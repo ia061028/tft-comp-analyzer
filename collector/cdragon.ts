@@ -109,9 +109,9 @@ export interface StaticData {
    * traitApi は表示/クラスタ参照用の単一トレイト（先頭の解決トレイト）。
    * traitApis は発動判定用の全付与トレイト集合（Stargazer 等は基底＋変種が全て入る）。
    */
-  emblems: Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string; base: 'none' | 'spatula' | 'fryingpan' }>
+  emblems: Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string; base: 'none' | 'spatula' | 'fryingpan'; recipe?: [string, string] }>
   /** 完成アイテム apiName → 表示名(en/ja)・アイコンURL */
-  items: Map<string, { name: string; nameJa: string; icon: string }>
+  items: Map<string, { name: string; nameJa: string; icon: string; recipe?: [string, string] }>
   /** 合成素材アイテムアイコン（紋章グリッドのカテゴリヘッダ用） */
   baseItemIcons: { spatula: string; fryingPan: string }
   warnings: string[]
@@ -262,7 +262,14 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
   // emblems（incompatibleTraits で付与トレイトを示すアイテム）
   // 付与トレイトが選定セットのトレイトに解決できるものだけを紋章として採用する。
   // これにより他セットのスパチュラ系アイテムや、別機構（オーグメント/Anima 系）は自然に除外される。
-  const emblems = new Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string; base: 'none' | 'spatula' | 'fryingpan' }>()
+  const allIconsMap = new Map<string, string>()
+  for (const item of data.items ?? []) {
+    if (item.apiName && item.icon) {
+      allIconsMap.set(item.apiName, iconUrl(item.icon))
+    }
+  }
+
+  const emblems = new Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string; base: 'none' | 'spatula' | 'fryingpan'; recipe?: [string, string] }>()
   let unresolvedEmblemCount = 0
   for (const item of data.items ?? []) {
     if (!item.apiName) continue
@@ -295,6 +302,7 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
       traitApis,
       icon: iconUrl(item.icon),
       base,
+      recipe: comp.length === 2 ? [allIconsMap.get(comp[0]) ?? '', allIconsMap.get(comp[1]) ?? ''] : undefined,
     })
   }
   if (unresolvedEmblemCount > 0) {
@@ -304,14 +312,20 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
   }
 
   // items（完成アイテム = composition 2要素 かつ 非紋章）。推奨アイテム表示用。
-  const items = new Map<string, { name: string; nameJa: string; icon: string }>()
+  const items = new Map<string, { name: string; nameJa: string; icon: string; recipe?: [string, string] }>()
   for (const item of data.items ?? []) {
     if (!item.apiName) continue
     const isEmblem = Array.isArray(item.incompatibleTraits) && item.incompatibleTraits.length > 0
     if (isEmblem) continue
     if (!Array.isArray(item.composition) || item.composition.length !== 2) continue
     const name = item.name ?? item.apiName
-    items.set(item.apiName, { name, nameJa: ja.items.get(item.apiName) ?? name, icon: iconUrl(item.icon) })
+    const comp = item.composition ?? []
+    items.set(item.apiName, { 
+      name, 
+      nameJa: ja.items.get(item.apiName) ?? name, 
+      icon: iconUrl(item.icon),
+      recipe: comp.length === 2 ? [allIconsMap.get(comp[0]) ?? '', allIconsMap.get(comp[1]) ?? ''] : undefined
+    })
   }
 
   // 合成素材アイコン（紋章グリッドのカテゴリヘッダ用）。

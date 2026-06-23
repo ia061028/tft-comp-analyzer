@@ -48,6 +48,8 @@ export interface EmblemInfo {
   icon: string
   /** 合成素材分類: none=合成不可, spatula=へら系, fryingpan=フライパン系 */
   base: 'none' | 'spatula' | 'fryingpan'
+  /** 合成レシピ（コンポーネントのアイコンURL 2つ）。合成不可は undefined */
+  recipe?: [string, string]
 }
 
 export interface UnitInfo {
@@ -69,6 +71,8 @@ export interface ItemInfo {
   /** 日本語表示名 */
   nameJa: string
   icon: string
+  /** 合成レシピ（コンポーネントのアイコンURL 2つ） */
+  recipe?: [string, string]
 }
 
 /**

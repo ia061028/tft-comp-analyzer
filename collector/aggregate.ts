@@ -476,7 +476,7 @@ async function main(): Promise<void> {
   const emblemsOut: EmblemInfo[] = emblemApisSorted.map((api, i) => {
     emblemIndex.set(api, i)
     const e = staticData.emblems.get(api)!
-    return { api, name: e.name, nameJa: e.nameJa, trait: traitIndex.get(e.traitApi)!, icon: e.icon, base: e.base }
+    return { api, name: e.name, nameJa: e.nameJa, trait: traitIndex.get(e.traitApi)!, icon: e.icon, base: e.base, recipe: e.recipe }
   })
 
   const itemApisSorted = [...usedItemApis].sort((a, b) => {
@@ -488,7 +488,7 @@ async function main(): Promise<void> {
   const itemsOut: ItemInfo[] = itemApisSorted.map((api, i) => {
     itemIndex.set(api, i)
     const it = staticData.items.get(api)!
-    return { api, name: it.name, nameJa: it.nameJa, icon: it.icon }
+    return { api, name: it.name, nameJa: it.nameJa, icon: it.icon, recipe: it.recipe }
   })
 
   // 8. PreComp → WireComp。
