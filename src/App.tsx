@@ -103,8 +103,8 @@ function App() {
   return (
     <div className="mx-auto flex h-screen w-full max-w-[1440px] flex-col">
       {/* Title & Info Header */}
-      <header className="flex flex-wrap items-baseline gap-x-4 gap-y-2 border-b border-slate-800/50 bg-slate-900/50 px-5 py-4">
-        <h1 className="bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-2xl font-black tracking-tight text-transparent drop-shadow-sm">
+      <header className="flex flex-wrap items-baseline gap-x-4 gap-y-2 border-b border-slate-800/50 bg-[#27282b] px-5 py-4">
+        <h1 className="text-xl font-bold tracking-tight text-slate-100">
           {t(lang, 'title')}
         </h1>
         <div className="flex items-center gap-3">
@@ -125,10 +125,9 @@ function App() {
           <button
             type="button"
             onClick={() => setLang((l) => (l === 'ja' ? 'en' : 'ja'))}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-3 font-semibold text-slate-200 shadow-sm transition-all hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+            className="flex h-8 items-center justify-center rounded-lg border border-slate-700 bg-[#36383e] px-3 font-semibold text-slate-200 shadow-sm transition-all hover:bg-[#46484e] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/60"
             title={t(lang, 'langSwitchTitle')}
           >
-            <span aria-hidden className="text-lg leading-none opacity-80">🌐</span>
             {lang === 'ja' ? 'EN' : 'JP'}
           </button>
         </div>
@@ -170,17 +169,13 @@ function App() {
 
           <div className="ml-auto flex items-center gap-3 text-sm">
             <span className="font-medium text-slate-400">{t(lang, 'adoptionRate')}</span>
-            <div className="group relative flex items-center gap-2 rounded-lg border border-slate-700/50 bg-slate-900/50 px-3 py-1.5 transition-colors hover:border-slate-600 hover:bg-slate-800/50">
-              <input
-                type="range"
-                min={0}
-                max={50}
-                value={minAdopt}
-                onChange={(e) => setMinAdopt(Number(e.target.value))}
-                className="w-24 cursor-pointer accent-amber-400 opacity-80 transition-opacity group-hover:opacity-100"
-              />
-              <span className="w-10 text-right font-semibold tabular-nums text-amber-100">{minAdopt}%+</span>
-            </div>
+            <input
+              type="number"
+              min={0}
+              value={minAdopt}
+              onChange={(e) => setMinAdopt(Math.max(0, Number(e.target.value)))}
+              className="w-20 rounded border border-slate-700 bg-[#27282b] px-2 py-1.5 text-slate-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/60"
+            />
           </div>
         </div>
       </div>

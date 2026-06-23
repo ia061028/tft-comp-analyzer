@@ -20,7 +20,6 @@ export function SelectionBar({ emblems, counts, lang, onClear, onRemove }: Selec
   if (selected.length === 0) {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3 text-sm text-slate-500 shadow-sm">
-        <span aria-hidden>✨</span>
         {t(lang, 'selectEmblemHint')}
       </div>
     )

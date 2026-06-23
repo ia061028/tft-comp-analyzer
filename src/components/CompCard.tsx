@@ -133,19 +133,19 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
                       src={unit.icon}
                       alt={unitName}
                       loading="lazy"
-                      className={`h-[42px] w-[42px] rounded-[3px] border-2 object-cover ${costBorder(unit.cost)}`}
+                      className={`h-[42px] w-[42px] shrink-0 rounded-[3px] border-2 object-cover ${costBorder(unit.cost)}`}
                     />
                   </Tip>
 
                   {/* アイテム（チャンピオン画像の下部にめり込む） */}
-                  <div className="flex justify-center -mt-[12px] z-10 w-[42px] px-0.5 gap-[1px]">
+                  <div className="flex justify-center -mt-[14px] z-10 w-[42px] px-0.5 gap-[1px]">
                     {allEquips.map((eq, idx) => eq.icon ? (
                       <Tip key={idx} label={eq.label}>
                         <img
                           src={eq.icon}
                           alt=""
                           loading="lazy"
-                          className="h-[15px] w-[15px] rounded-[2px] border border-[#111] object-cover bg-black"
+                          className="h-[17px] w-[17px] shrink-0 rounded-[2px] border border-[#111] bg-[#1d1e20] object-cover"
                         />
                       </Tip>
                     ) : null)}
@@ -185,10 +185,14 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
             <button
               type="button"
               onClick={copy}
-              className="flex h-[32px] items-center justify-center rounded bg-[#36383e] hover:bg-[#46484e] px-3 text-[12px] font-bold text-[#eeeeee] transition-colors"
+              className="flex h-[32px] w-[32px] items-center justify-center rounded bg-[#36383e] hover:bg-[#46484e] text-[#eeeeee] transition-colors"
               title={t(lang, 'copyCodeTitle')}
             >
-              {copied ? `✓` : t(lang, 'copyCode')}
+              {copied ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#bffe7f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              )}
             </button>
           </div>
         </div>

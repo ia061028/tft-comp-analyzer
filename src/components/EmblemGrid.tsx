@@ -1,5 +1,5 @@
 import type { EmblemInfo } from '../../shared/types'
-import { pickName, t, type Lang } from '../lib/i18n'
+import { pickName, type Lang } from '../lib/i18n'
 import { Tip } from './Tip'
 
 interface EmblemGridProps {
@@ -15,87 +15,41 @@ interface EmblemGridProps {
   baseItemIcons?: { spatula: string; fryingPan: string }
 }
 
-type EmblemBase = 'spatula' | 'fryingpan' | 'none'
-
-const GROUPS: EmblemBase[] = ['spatula', 'fryingpan', 'none']
-
-export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIcons }: EmblemGridProps) {
-  // Preserve original index while grouping.
-  const indexed = emblems.map((emblem, i) => ({ emblem, i }))
-
+export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove }: EmblemGridProps) {
   return (
-    <div className="flex flex-col gap-4">
-      {GROUPS.map((group) => {
-        const members = indexed.filter((x) => (x.emblem.base ?? 'none') === group)
-        if (members.length === 0) return null
-
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-2">
+      {emblems.map((emblem, i) => {
+        const count = counts[i] ?? 0
+        const selected = count > 0
+        const label = pickName(lang, emblem)
         return (
-          <div key={group}>
-            {/* Section header */}
-            <div
-              className={`mb-1.5 flex items-center gap-1.5 border-l-2 pl-2 text-xs font-semibold ${
-                group === 'spatula'
-                  ? 'border-amber-400 text-amber-300'
-                  : group === 'fryingpan'
-                    ? 'border-sky-400 text-sky-300'
-                    : 'border-fuchsia-400 text-fuchsia-300'
+          <Tip key={emblem.api} label={label}>
+            <button
+              type="button"
+              onClick={() => onAdd(i)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                onRemove(i)
+              }}
+              className={`group relative flex w-full items-center justify-center rounded-xl border p-1.5 transition-all duration-200 hover:scale-[1.08] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
+                selected
+                  ? 'border-amber-400/80 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.15)]'
+                  : 'border-slate-700/60 bg-slate-800/40 hover:border-slate-500 hover:bg-slate-700/60'
               }`}
             >
-              {group === 'spatula' && baseItemIcons?.spatula && (
-                <img src={baseItemIcons.spatula} alt="" className="h-4 w-4 object-contain" />
+              <img
+                src={emblem.icon}
+                alt={label}
+                loading="lazy"
+                className="h-12 w-12 object-contain"
+              />
+              {selected && (
+                <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border border-amber-200/50 bg-gradient-to-br from-amber-300 to-amber-500 px-1 text-xs font-black text-amber-950 shadow-md">
+                  {count}
+                </span>
               )}
-              {group === 'fryingpan' && baseItemIcons?.fryingPan && (
-                <img src={baseItemIcons.fryingPan} alt="" className="h-4 w-4 object-contain" />
-              )}
-              {group === 'none' && <span aria-hidden>🔒</span>}
-              <span>
-                {group === 'spatula'
-                  ? t(lang, 'emblemCatSpatula')
-                  : group === 'fryingpan'
-                    ? t(lang, 'emblemCatPan')
-                    : t(lang, 'emblemCatNone')}
-              </span>
-            </div>
-
-            {/* Emblem grid for this group */}
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-2">
-              {members.map(({ emblem, i }) => {
-                const count = counts[i] ?? 0
-                const selected = count > 0
-                const label = pickName(lang, emblem)
-                const tipLabel = `${label} (Click: +, Right-Click: -)`
-                return (
-                  <Tip key={emblem.api} label={tipLabel}>
-                    <button
-                      type="button"
-                      onClick={() => onAdd(i)}
-                      onContextMenu={(e) => {
-                        e.preventDefault()
-                        onRemove(i)
-                      }}
-                      className={`group relative flex w-full items-center justify-center rounded-xl border p-1.5 transition-all duration-200 hover:scale-[1.08] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
-                        selected
-                          ? 'border-amber-400/80 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.15)]'
-                          : 'border-slate-700/60 bg-slate-800/40 hover:border-slate-500 hover:bg-slate-700/60'
-                      }`}
-                    >
-                      <img
-                        src={emblem.icon}
-                        alt={label}
-                        loading="lazy"
-                        className="h-12 w-12 object-contain"
-                      />
-                      {selected && (
-                        <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border border-amber-200/50 bg-gradient-to-br from-amber-300 to-amber-500 px-1 text-xs font-black text-amber-950 shadow-md">
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  </Tip>
-                )
-              })}
-            </div>
-          </div>
+            </button>
+          </Tip>
         )
       })}
     </div>
