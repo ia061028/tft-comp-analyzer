@@ -44,8 +44,8 @@ const ja = {
   resultCount: '{n} 構成',
   utilization: '活用 {n}/{k}',
   utilizationTitle: '選択した紋章のうち、この構成が活用している数',
-  emblemCatSpatula: 'へら系統',
-  emblemCatPan: 'フライパン系統',
+  emblemCatSpatula: 'へら',
+  emblemCatPan: 'フライパン',
   emblemCatNone: '合成不可',
 }
 

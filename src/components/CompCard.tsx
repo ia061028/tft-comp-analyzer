@@ -102,7 +102,7 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
           </div>
 
           {/* チャンピオン */}
-          <div className="flex flex-wrap gap-x-2.5 gap-y-3">
+          <div className="flex flex-wrap gap-x-3 gap-y-4">
             {comp.units.map((unitIdx, pos) => {
               const unit = units[unitIdx]
               if (!unit) return null
@@ -114,42 +114,57 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
                 .map((h) => h[0])
                 .filter((ei) => selectedEmblemSet.has(ei))
               
-              // 全ての装備アイテム（通常アイテム + 紋章）
-              const allEquips = [
-                ...unitItemIdxs.map(ii => ({ icon: items?.[ii]?.icon, label: pickName(lang, items?.[ii]!) })),
-                ...unitEmblemIdxs.map(ei => ({ icon: emblems[ei]?.icon, label: pickName(lang, emblems[ei]!) }))
-              ]
+              const normalItems = unitItemIdxs.map(ii => ({ icon: items?.[ii]?.icon, label: pickName(lang, items?.[ii]!) }))
+              const emblemItems = unitEmblemIdxs.map(ei => ({ icon: emblems[ei]?.icon, label: pickName(lang, emblems[ei]!) }))
 
               return (
-                <div key={unitIdx} className="flex flex-col items-center w-[42px]">
+                <div key={unitIdx} className="flex flex-col items-center w-[48px]">
                   {/* スター（画像の上に配置、11px） */}
                   <div className={`h-2.5 text-[11px] leading-none mb-0.5 ${starColor(star)} tracking-[1px]`}>
                     {star > 0 ? '★'.repeat(star) : ''}
                   </div>
                   
-                  {/* チャンピオンアイコン（42x42, 角丸3px） */}
+                  {/* チャンピオンアイコン（48x48, 角丸3px） */}
                   <Tip label={star > 0 ? `${unitName} ★${star}` : unitName}>
                     <img
                       src={unit.icon}
                       alt={unitName}
                       loading="lazy"
-                      className={`h-[42px] w-[42px] shrink-0 rounded-[3px] border-2 object-cover ${costBorder(unit.cost)}`}
+                      className={`h-[48px] w-[48px] shrink-0 rounded-[3px] border-2 object-cover ${costBorder(unit.cost)}`}
                     />
                   </Tip>
 
-                  {/* アイテム（チャンピオン画像の下部にめり込む） */}
-                  <div className="flex justify-center -mt-[14px] z-10 w-[42px] px-0.5 gap-[1px]">
-                    {allEquips.map((eq, idx) => eq.icon ? (
-                      <Tip key={idx} label={eq.label}>
-                        <img
-                          src={eq.icon}
-                          alt=""
-                          loading="lazy"
-                          className="h-[17px] w-[17px] shrink-0 rounded-[2px] border border-[#111] bg-[#1d1e20] object-cover"
-                        />
-                      </Tip>
-                    ) : null)}
-                  </div>
+                  {/* 通常アイテム（チャンピオン画像の下部にめり込む、最大3つ） */}
+                  {normalItems.length > 0 && (
+                    <div className="flex justify-center -mt-[14px] z-10 w-[48px] px-0.5 gap-[1px]">
+                      {normalItems.slice(0, 3).map((eq, idx) => eq.icon ? (
+                        <Tip key={`item-${idx}`} label={eq.label}>
+                          <img
+                            src={eq.icon}
+                            alt=""
+                            loading="lazy"
+                            className="h-[17px] w-[17px] shrink-0 rounded-[2px] border border-[#111] bg-[#1d1e20] object-cover"
+                          />
+                        </Tip>
+                      ) : null)}
+                    </div>
+                  )}
+
+                  {/* 紋章アイテム（一段下げる） */}
+                  {emblemItems.length > 0 && (
+                    <div className={`flex justify-center z-10 w-[48px] px-0.5 gap-[1px] ${normalItems.length > 0 ? 'mt-[2px]' : '-mt-[14px]'}`}>
+                      {emblemItems.map((eq, idx) => eq.icon ? (
+                        <Tip key={`emblem-${idx}`} label={eq.label}>
+                          <img
+                            src={eq.icon}
+                            alt=""
+                            loading="lazy"
+                            className="h-[17px] w-[17px] shrink-0 rounded-[2px] border border-[#111] bg-[#1d1e20] object-cover"
+                          />
+                        </Tip>
+                      ) : null)}
+                    </div>
+                  )}
                 </div>
               )
             })}
