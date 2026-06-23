@@ -18,7 +18,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={ariaLabel}
-      className="inline-flex overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900"
+      className="inline-flex overflow-hidden rounded-lg border border-slate-700/60 bg-slate-900/50 p-0.5 shadow-inner"
     >
       {options.map(({ key, label }) => {
         const active = value === key
@@ -28,10 +28,10 @@ export function SegmentedControl<T extends string>({
             type="button"
             aria-pressed={active}
             onClick={() => onChange(key)}
-            className={`px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400/60 ${
+            className={`rounded-md px-3 py-1 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
               active
-                ? 'bg-amber-400 font-semibold text-zinc-950'
-                : 'text-zinc-300 hover:bg-zinc-800'
+                ? 'bg-amber-400 text-slate-950 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             {label}

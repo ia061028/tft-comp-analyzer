@@ -43,9 +43,9 @@ function App() {
 
   if (load.status === 'loading') {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 text-zinc-400">
+      <div className="flex h-screen flex-col items-center justify-center gap-3 text-slate-400">
         <div
-          className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-amber-400"
+          className="h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-amber-400"
           aria-hidden
         />
         <span className="text-sm">{t(lang, 'loading')}</span>
@@ -55,20 +55,20 @@ function App() {
 
   if (load.status === 'error') {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 px-4 text-zinc-300">
-        <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 text-center">
+      <div className="flex h-screen flex-col items-center justify-center gap-3 px-4 text-slate-300">
+        <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-6 text-center shadow-xl">
           <span className="text-3xl" aria-hidden>
             ⚠️
           </span>
-          <p className="text-sm font-semibold text-zinc-200">{t(lang, 'loadFailed')}</p>
-          <p className="break-all text-xs text-red-400">{load.message}</p>
+          <p className="text-sm font-semibold text-slate-200">{t(lang, 'loadFailed')}</p>
+          <p className="break-all text-xs text-red-400/80">{load.message}</p>
           <button
             type="button"
             onClick={() => {
               setLoad({ status: 'loading' })
               setReloadKey((k) => k + 1)
             }}
-            className="rounded-lg border border-zinc-600 px-3 py-1.5 text-sm transition-colors hover:border-zinc-400 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+            className="mt-2 rounded-lg border border-slate-600 bg-slate-800 px-4 py-1.5 text-sm font-medium transition-colors hover:border-slate-400 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
           >
             {t(lang, 'retry')}
           </button>
@@ -102,32 +102,43 @@ function App() {
 
   return (
     <div className="mx-auto flex h-screen w-full max-w-[1440px] flex-col">
-      <header className="border-b border-zinc-800 bg-zinc-950/60 px-4 py-3 backdrop-blur">
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h1 className="bg-gradient-to-r from-amber-200 to-amber-400 bg-clip-text text-xl font-bold text-transparent">
-            {t(lang, 'title')}
-          </h1>
-          <span className="text-sm text-zinc-400">
-            Set {stats.setNumber} ・ TFT {stats.tftPatch ?? stats.patch}
+      {/* Title & Info Header */}
+      <header className="flex flex-wrap items-baseline gap-x-4 gap-y-2 border-b border-slate-800/50 bg-slate-900/50 px-5 py-4">
+        <h1 className="bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-2xl font-black tracking-tight text-transparent drop-shadow-sm">
+          {t(lang, 'title')}
+        </h1>
+        <div className="flex items-center gap-3">
+          <span className="rounded-md bg-slate-800/80 px-2 py-0.5 text-xs font-medium text-slate-300 ring-1 ring-inset ring-slate-700">
+            Set {stats.setNumber}
           </span>
-          <span className="text-sm text-zinc-400">
-            {t(lang, 'matchesCount', { n: stats.totals.matches.toLocaleString() })}
+          <span className="rounded-md bg-slate-800/80 px-2 py-0.5 text-xs font-medium text-slate-300 ring-1 ring-inset ring-slate-700">
+            Patch {stats.tftPatch ?? stats.patch}
           </span>
-          <span className="text-xs text-zinc-500">{t(lang, 'generated', { time: generatedAt })}</span>
+        </div>
+        <div className="ml-auto flex items-center gap-4 text-xs">
+          <div className="flex flex-col items-end">
+            <span className="font-semibold text-slate-300">
+              {t(lang, 'matchesCount', { n: stats.totals.matches.toLocaleString() })}
+            </span>
+            <span className="text-[10px] text-slate-500">{t(lang, 'generated', { time: generatedAt })}</span>
+          </div>
           <button
             type="button"
             onClick={() => setLang((l) => (l === 'ja' ? 'en' : 'ja'))}
-            className="ml-auto inline-flex items-center gap-1 rounded-lg border border-zinc-600 bg-zinc-800/60 px-2.5 py-1 text-xs font-semibold text-zinc-200 transition-colors hover:border-zinc-400 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-3 font-semibold text-slate-200 shadow-sm transition-all hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
             title={t(lang, 'langSwitchTitle')}
           >
-            <span aria-hidden>🌐</span>
+            <span aria-hidden className="text-lg leading-none opacity-80">🌐</span>
             {lang === 'ja' ? 'EN' : 'JP'}
           </button>
         </div>
+      </header>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
-          <div className="flex items-center gap-2 text-sm text-zinc-300">
-            <span className="shrink-0">{t(lang, 'level')}</span>
+      {/* Sticky Filter Bar */}
+      <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/80 px-5 py-3 backdrop-blur-md">
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+          <div className="flex items-center gap-3 text-sm">
+            <span className="font-medium text-slate-400">{t(lang, 'level')}</span>
             <SegmentedControl<LevelKey>
               ariaLabel={t(lang, 'level')}
               value={level}
@@ -142,8 +153,8 @@ function App() {
             />
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-zinc-300">
-            <span className="shrink-0">{t(lang, 'sort')}</span>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="font-medium text-slate-400">{t(lang, 'sort')}</span>
             <SegmentedControl<SortKey>
               ariaLabel={t(lang, 'sort')}
               value={sortKey}
@@ -157,24 +168,26 @@ function App() {
             />
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <span className="shrink-0">{t(lang, 'adoptionRate')}</span>
-            <input
-              type="range"
-              min={0}
-              max={50}
-              value={minAdopt}
-              onChange={(e) => setMinAdopt(Number(e.target.value))}
-              className="w-32 accent-amber-400"
-            />
-            <span className="w-8 text-right tabular-nums text-zinc-100">{minAdopt}</span>
-          </label>
+          <div className="ml-auto flex items-center gap-3 text-sm">
+            <span className="font-medium text-slate-400">{t(lang, 'adoptionRate')}</span>
+            <div className="group relative flex items-center gap-2 rounded-lg border border-slate-700/50 bg-slate-900/50 px-3 py-1.5 transition-colors hover:border-slate-600 hover:bg-slate-800/50">
+              <input
+                type="range"
+                min={0}
+                max={50}
+                value={minAdopt}
+                onChange={(e) => setMinAdopt(Number(e.target.value))}
+                className="w-24 cursor-pointer accent-amber-400 opacity-80 transition-opacity group-hover:opacity-100"
+              />
+              <span className="w-10 text-right font-semibold tabular-nums text-amber-100">{minAdopt}%+</span>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-[400px] shrink-0 overflow-y-auto border-r border-zinc-800 p-3">
-          <h2 className="mb-2 text-sm font-semibold text-zinc-400">{t(lang, 'emblems')}</h2>
+        <aside className="w-[380px] shrink-0 overflow-y-auto border-r border-slate-800 bg-slate-900/20 p-4">
+          <h2 className="mb-3 text-sm font-bold tracking-wide text-slate-400">{t(lang, 'emblems')}</h2>
           <EmblemGrid
             emblems={stats.emblems}
             counts={counts}

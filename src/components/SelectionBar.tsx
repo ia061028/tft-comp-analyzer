@@ -19,15 +19,16 @@ export function SelectionBar({ emblems, counts, lang, onClear, onRemove }: Selec
 
   if (selected.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-400">
+      <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3 text-sm text-slate-500 shadow-sm">
+        <span aria-hidden>✨</span>
         {t(lang, 'selectEmblemHint')}
       </div>
     )
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-slate-900/80 px-4 py-3 shadow-[0_0_15px_rgba(251,191,36,0.05)]">
+      <div className="flex flex-wrap items-center gap-2.5">
         {selected.map(({ count, index }) => {
           const emblem = emblems[index]
           const label = pickName(lang, emblem)
@@ -36,10 +37,10 @@ export function SelectionBar({ emblems, counts, lang, onClear, onRemove }: Selec
               <button
                 type="button"
                 onClick={() => onRemove(index)}
-                className="flex items-center gap-1 rounded-lg bg-zinc-800 px-1.5 py-1 transition-colors hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+                className="group flex items-center gap-1.5 rounded-lg border border-slate-700/50 bg-slate-800/80 px-2 py-1 transition-all hover:border-amber-500/40 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
               >
-                <img src={emblem.icon} alt={label} loading="lazy" className="h-7 w-7 object-contain" />
-                <span className="text-sm font-semibold text-amber-300">×{count}</span>
+                <img src={emblem.icon} alt={label} loading="lazy" className="h-7 w-7 object-contain transition-transform group-hover:scale-110" />
+                <span className="text-sm font-bold text-amber-300">×{count}</span>
               </button>
             </Tip>
           )
@@ -48,10 +49,11 @@ export function SelectionBar({ emblems, counts, lang, onClear, onRemove }: Selec
       <button
         type="button"
         onClick={onClear}
-        className="ml-auto shrink-0 rounded-lg border border-zinc-700 px-2 py-1 text-sm text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+        className="ml-auto shrink-0 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold tracking-wide text-slate-300 transition-colors hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
       >
         {t(lang, 'clear')}
       </button>
     </div>
   )
 }
+

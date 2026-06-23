@@ -25,8 +25,15 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
 
   const avgPlace = usage.adopt > 0 ? usage.p / usage.adopt : NaN
   const hasPlace = Number.isFinite(avgPlace)
-  const tier = hasPlace ? tierOf(avgPlace) : { label: '?', classes: 'bg-zinc-700 text-zinc-300' }
+  const tier = hasPlace ? tierOf(avgPlace) : { label: '?', classes: 'bg-slate-700 text-slate-300' }
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
+
+  const tierAura =
+    tier.label === 'S'
+      ? 'border-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.15)] bg-gradient-to-r from-amber-400/10 to-slate-900/40 hover:border-amber-400/80 hover:shadow-[0_0_25px_rgba(251,191,36,0.25)]'
+      : tier.label === 'A'
+        ? 'border-fuchsia-500/40 shadow-[0_0_15px_rgba(217,70,239,0.1)] bg-gradient-to-r from-fuchsia-500/10 to-slate-900/40 hover:border-fuchsia-500/60 hover:shadow-[0_0_20px_rgba(217,70,239,0.2)]'
+        : 'border-slate-800 bg-slate-900/50 hover:border-slate-600 hover:bg-slate-800/80 hover:shadow-lg'
 
   // 発動特性 = 盤面ユニットの所持トレイト ＋ 選択紋章のうち活用された付与分（決定的算出）。
   const traitCount = new Map<number, number>()
@@ -63,20 +70,20 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
 
   const metricCell = (active: boolean, label: string, value: string) => (
     <div
-      className={`flex items-baseline justify-between gap-2 rounded-md px-1.5 py-0.5 transition-colors ${
-        active ? 'bg-amber-400/15 text-amber-200 ring-1 ring-amber-400/30' : 'text-zinc-400'
+      className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 transition-colors ${
+        active ? 'bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/40 font-medium' : 'bg-slate-800/40 text-slate-400'
       }`}
     >
-      <span className="text-[11px]">{label}</span>
-      <span className="text-xs font-semibold tabular-nums text-zinc-100">{value}</span>
+      <span className="text-[10px] uppercase tracking-wider">{label}</span>
+      <span className="text-xs font-bold tabular-nums text-slate-100">{value}</span>
     </div>
   )
 
   return (
-    <div className="group flex items-stretch gap-4 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 transition-all duration-150 hover:border-zinc-700 hover:bg-zinc-900/80 hover:shadow-lg hover:shadow-black/30">
+    <div className={`group flex items-stretch gap-4 rounded-xl border p-3.5 transition-all duration-300 hover:-translate-y-0.5 ${tierAura}`}>
       {/* ティアバッジ */}
       <div
-        className={`flex w-12 shrink-0 items-center justify-center rounded-lg text-2xl font-black shadow-inner ${tier.classes}`}
+        className={`flex w-12 shrink-0 items-center justify-center rounded-lg text-2xl font-black shadow-lg ${tier.classes}`}
         title={hasPlace ? t(lang, 'tierTitle', { x: avgPlace.toFixed(2) }) : t(lang, 'tierNoData')}
       >
         {tier.label}
@@ -96,10 +103,10 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
                   )}`}
                 >
                   {trait?.icon && (
-                    <img src={trait.icon} alt="" loading="lazy" className="h-5 w-5 object-contain" />
+                    <img src={trait.icon} alt="" loading="lazy" className="h-5 w-5 object-contain drop-shadow" />
                   )}
                   {count ? (
-                    <span className="rounded bg-zinc-950/40 px-1 text-xs font-bold tabular-nums">
+                    <span className="rounded bg-slate-950/60 px-1 text-xs font-bold tabular-nums shadow-inner">
                       {count}
                     </span>
                   ) : null}
@@ -187,24 +194,26 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
       </div>
 
       {/* 指標ブロック */}
-      <div className="flex w-36 shrink-0 flex-col justify-center gap-0.5">
-        <div className="mb-0.5 flex items-baseline justify-between gap-2 px-1.5">
-          <span className="text-[11px] text-zinc-400">{t(lang, 'avg')}</span>
+      <div className="flex w-36 shrink-0 flex-col justify-center gap-1">
+        <div className="mb-1 flex items-baseline justify-between gap-2 px-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t(lang, 'avg')}</span>
           <span
-            className={`text-2xl font-bold tabular-nums ${
-              sortKey === 'place' ? 'text-amber-300' : 'text-zinc-100'
+            className={`text-[28px] leading-none font-black tabular-nums drop-shadow-sm ${
+              sortKey === 'place' ? 'text-amber-400' : 'text-slate-100'
             }`}
           >
             {hasPlace ? avgPlace.toFixed(2) : '—'}
           </span>
         </div>
-        {metricCell(sortKey === 'adopt', t(lang, 'metricRate'), `${usage.adopt}`)}
-        {metricCell(sortKey === 'top4', t(lang, 'metricTop4'), `${usage.top4}/${usage.adopt}`)}
-        {metricCell(sortKey === 'win', t(lang, 'metricWin'), `${usage.win}/${usage.adopt}`)}
+        <div className="flex flex-col gap-0.5">
+          {metricCell(sortKey === 'adopt', t(lang, 'metricRate'), `${usage.adopt}`)}
+          {metricCell(sortKey === 'top4', t(lang, 'metricTop4'), `${usage.top4}/${usage.adopt}`)}
+          {metricCell(sortKey === 'win', t(lang, 'metricWin'), `${usage.win}/${usage.adopt}`)}
+        </div>
         <button
           type="button"
           onClick={copy}
-          className="mt-0.5 rounded-md border border-zinc-700 px-1.5 py-1 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+          className="mt-1 rounded-md border border-slate-700 bg-slate-800/50 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-300 transition-colors hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
           title={t(lang, 'copyCodeTitle')}
         >
           {copied ? `✓ ${t(lang, 'copied')}` : t(lang, 'copyCode')}

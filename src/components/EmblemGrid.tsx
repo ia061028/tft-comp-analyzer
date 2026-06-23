@@ -63,8 +63,9 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                 const count = counts[i] ?? 0
                 const selected = count > 0
                 const label = pickName(lang, emblem)
+                const tipLabel = `${label} (Click: +, Right-Click: -)`
                 return (
-                  <Tip key={emblem.api} label={label}>
+                  <Tip key={emblem.api} label={tipLabel}>
                     <button
                       type="button"
                       onClick={() => onAdd(i)}
@@ -72,10 +73,10 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                         e.preventDefault()
                         onRemove(i)
                       }}
-                      className={`relative flex w-full items-center justify-center rounded-lg border p-1 transition-all duration-150 hover:scale-[1.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
+                      className={`group relative flex w-full items-center justify-center rounded-xl border p-1.5 transition-all duration-200 hover:scale-[1.08] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
                         selected
-                          ? 'border-amber-400 bg-amber-400/10 ring-1 ring-amber-400/50'
-                          : 'border-zinc-700 bg-zinc-800/40 hover:border-zinc-500 hover:bg-zinc-800'
+                          ? 'border-amber-400/80 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.15)]'
+                          : 'border-slate-700/60 bg-slate-800/40 hover:border-slate-500 hover:bg-slate-700/60'
                       }`}
                     >
                       <img
@@ -85,7 +86,7 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                         className="h-12 w-12 object-contain"
                       />
                       {selected && (
-                        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-xs font-bold text-zinc-950 shadow">
+                        <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border border-amber-200/50 bg-gradient-to-br from-amber-300 to-amber-500 px-1 text-xs font-black text-amber-950 shadow-md">
                           {count}
                         </span>
                       )}
