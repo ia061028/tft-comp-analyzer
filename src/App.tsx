@@ -57,9 +57,20 @@ function App() {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 px-4 text-slate-300">
         <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-6 text-center shadow-xl">
-          <span className="text-3xl" aria-hidden>
-            ⚠️
-          </span>
+          <svg
+            className="h-9 w-9 text-amber-400"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.42 0z" />
+            <path d="M12 9v4" />
+            <path d="M12 17h.01" />
+          </svg>
           <p className="text-sm font-semibold text-slate-200">{t(lang, 'loadFailed')}</p>
           <p className="break-all text-xs text-red-400/80">{load.message}</p>
           <button
