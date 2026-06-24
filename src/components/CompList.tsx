@@ -1,5 +1,6 @@
 import type { CompStats, StatsFile } from '../../shared/types'
 import { compUsage, type CompUsage } from '../lib/multiset'
+import { activeTraitCounts, bronzeTraitCount } from '../lib/format'
 import { t, type Lang } from '../lib/i18n'
 import { CompCard, type SortKey } from './CompCard'
 
@@ -12,12 +13,14 @@ interface CompListProps {
   /** 採用数（該当レコード数）の下限。 */
   minAdopt: number
   lang: Lang
+  /** 生涯ブロンズモード: ブロンズ特性数でグループ化・降順表示。 */
+  bronzeMode: boolean
 }
 
 /** 統計の信頼性のための最小サンプル（該当レコードがこの未満は除外）。 */
 const MIN_SAMPLE = 3
 
-export function CompList({ stats, comps, sel, sortKey, minAdopt, lang }: CompListProps) {
+export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMode }: CompListProps) {
   if (sel.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-zinc-800 bg-zinc-900/30 px-4 py-16 text-center text-sm text-zinc-400">
@@ -41,9 +44,17 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang }: CompLis
 
   const floor = Math.max(MIN_SAMPLE, minAdopt)
 
-  const rows = comps
+  type Row = { comp: CompStats; usage: CompUsage; bronze: number }
+  const rows: Row[] = comps
     .map((comp) => ({ comp, usage: compUsage(comp, sel) }))
     .filter((r): r is { comp: CompStats; usage: CompUsage } => r.usage !== null && r.usage.adopt >= floor)
+    .map((r) => ({
+      ...r,
+      bronze: bronzeTraitCount(
+        activeTraitCounts(r.comp, r.usage, stats.units, stats.emblems),
+        stats.traits,
+      ),
+    }))
 
   if (rows.length === 0) {
     return (
@@ -68,15 +79,16 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang }: CompLis
     }
   }
 
-  // 活用 X でグループ化（N は選択数で一定）。X 降順でグループ表示、群内は指標でソート。
+  // グループ化キー: 通常は活用 X、生涯ブロンズ時はブロンズ特性数。どちらも降順表示・群内は指標ソート。
   const N = rows[0].usage.n
-  const byX = new Map<number, { comp: CompStats; usage: CompUsage }[]>()
+  const byKey = new Map<number, Row[]>()
   for (const r of rows) {
-    const arr = byX.get(r.usage.x) ?? []
+    const key = bronzeMode ? r.bronze : r.usage.x
+    const arr = byKey.get(key) ?? []
     arr.push(r)
-    byX.set(r.usage.x, arr)
+    byKey.set(key, arr)
   }
-  const groups = [...byX.entries()].sort((a, b) => b[0] - a[0])
+  const groups = [...byKey.entries()].sort((a, b) => b[0] - a[0])
   for (const [, arr] of groups) arr.sort((a, b) => cmp(a.usage, b.usage))
 
   // X の表示（整数はそのまま、0.5 刻みは小数1桁）。
@@ -91,8 +103,14 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang }: CompLis
         <div key={x} className="flex flex-col gap-2">
           {N >= 1 && (
             <div className="flex items-center gap-2 px-1">
-              <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-200 ring-1 ring-amber-400/30">
-                {t(lang, 'utilization', { n: fmtX(x), k: N })}
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${
+                  bronzeMode
+                    ? 'bg-[#c9755b]/20 text-[#e9c7bd] ring-[#c9755b]/40'
+                    : 'bg-amber-400/15 text-amber-200 ring-amber-400/30'
+                }`}
+              >
+                {bronzeMode ? t(lang, 'bronzeGroup', { n: x }) : t(lang, 'utilization', { n: fmtX(x), k: N })}
               </span>
               <span className="text-[11px] text-zinc-500">{t(lang, 'resultCount', { n: arr.length })}</span>
               <div className="h-px flex-1 bg-zinc-800" />
@@ -107,6 +125,7 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang }: CompLis
               selList={[...new Set(sel)]}
               sortKey={sortKey}
               lang={lang}
+              bronzeMode={bronzeMode}
             />
           ))}
         </div>

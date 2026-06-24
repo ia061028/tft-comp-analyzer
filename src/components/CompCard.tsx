@@ -1,7 +1,16 @@
 import { useState } from 'react'
 import type { CompStats, StatsFile } from '../../shared/types'
 import type { CompUsage } from '../lib/multiset'
-import { activeTier, buildPlannerCode, costBorder, starColor, styleClasses, tierOf } from '../lib/format'
+import {
+  activeTier,
+  activeTraitCounts,
+  bronzeTraitCount,
+  buildPlannerCode,
+  costBorder,
+  starColor,
+  styleClasses,
+  tierOf,
+} from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { Tip } from './Tip'
 
@@ -15,10 +24,12 @@ interface CompCardProps {
   selList: number[]
   sortKey: SortKey
   lang: Lang
+  /** 生涯ブロンズモード時、ブロンズ特性数バッジを表示。 */
+  bronzeMode?: boolean
 }
 
 /** 構成一覧の1カード。MetaTFTライクなUI */
-export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCardProps) {
+export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMode }: CompCardProps) {
   const { traits, units, emblems, items } = stats
   const [copied, setCopied] = useState(false)
   const selectedEmblemSet = new Set(selList)
@@ -29,17 +40,8 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
 
   // 発動特性 = 盤面ユニットの所持トレイト ＋ 選択紋章のうち活用された付与分（決定的算出）。
-  const traitCount = new Map<number, number>()
-  for (const ui of comp.units) {
-    for (const ti of units[ui]?.traits ?? []) traitCount.set(ti, (traitCount.get(ti) ?? 0) + 1)
-  }
-  for (const ei of usage.req.keys()) {
-    const add = Math.ceil(usage.best.get(ei) ?? 0) // 活用された個数
-    if (add <= 0) continue
-    const ti = emblems[ei]?.trait
-    if (ti == null) continue
-    traitCount.set(ti, (traitCount.get(ti) ?? 0) + add)
-  }
+  const traitCount = activeTraitCounts(comp, usage, units, emblems)
+  const bronzeCount = bronzeMode ? bronzeTraitCount(traitCount, traits) : 0
   // 活性トレイトのみ（発動数 >= 最小ブレークポイント）。[traitIdx, style, 発動段]
   const traitChips: [number, number, number][] = []
   for (const [ti, count] of traitCount) {
@@ -82,6 +84,11 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
           {/* 特性バッジ */}
           <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
             <span className={`${tier.classes} sm:hidden mr-1 px-1.5 py-0.5 rounded text-xs font-bold`}>{tier.label}</span>
+            {bronzeMode && (
+              <span className="inline-flex items-center h-[18.5px] px-1.5 text-[11px] font-bold rounded-[4px] border border-[#c9755b] bg-[#c9755b]/20 text-[#e9c7bd]">
+                {t(lang, 'bronzeBadge', { n: bronzeCount })}
+              </span>
+            )}
             {traitChips.map(([traitIdx, style, count]) => {
               const trait = traits[traitIdx]
               return (

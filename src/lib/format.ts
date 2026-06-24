@@ -1,7 +1,8 @@
 // 構成カードの見た目に関する純粋なヘルパ群（配色・ティア判定・チームコード生成）。
 // CompList/CompCard から共有する。
 
-import type { UnitInfo } from '../../shared/types'
+import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/types'
+import type { CompUsage } from './multiset'
 
 /**
  * CDragon の trait effect style 値 → バッジ配色。
@@ -22,6 +23,45 @@ export function activeTier(
   let best: { min: number; style: number } | null = null
   for (const [min, style] of tiers) if (count >= min) best = { min, style }
   return best
+}
+
+/**
+ * 構成＋活用紋章の発動特性数（盤面ユニットの所持特性 ＋ 活用紋章の付与分）。
+ * trait idx → 発動数。CompCard の特性チップ表示と CompList のブロンズ集計で共有する。
+ */
+export function activeTraitCounts(
+  comp: CompStats,
+  usage: CompUsage,
+  units: UnitInfo[],
+  emblems: EmblemInfo[],
+): Map<number, number> {
+  const counts = new Map<number, number>()
+  for (const ui of comp.units) {
+    for (const ti of units[ui]?.traits ?? []) counts.set(ti, (counts.get(ti) ?? 0) + 1)
+  }
+  for (const ei of usage.req.keys()) {
+    const add = Math.ceil(usage.best.get(ei) ?? 0) // 活用された個数
+    if (add <= 0) continue
+    const ti = emblems[ei]?.trait
+    if (ti == null) continue
+    counts.set(ti, (counts.get(ti) ?? 0) + add)
+  }
+  return counts
+}
+
+/**
+ * 生涯ブロンズ用: 固有特性（単一ティア）を除き、最小（先頭）ティアで発動中の特性数。
+ * 例 Brawler [[2,1],[4,3],[6,5]] は発動数2-3でブロンズ計上、4以上は非計上。
+ */
+export function bronzeTraitCount(counts: Map<number, number>, traits: TraitInfo[]): number {
+  let c = 0
+  for (const [ti, n] of counts) {
+    const tr = traits[ti]
+    if (!tr || tr.tiers.length < 2) continue // 固有特性（単一ティア）は除外
+    const at = activeTier(n, tr.tiers)
+    if (at && at.min === tr.tiers[0][0]) c++ // 先頭ティアで発動＝ブロンズ
+  }
+  return c
 }
 
 /** スターレベル → ★の配色（3=金,2=銀,1=銅） */

@@ -23,6 +23,7 @@ function App() {
   const [minAdopt, setMinAdopt] = useState(5)
   const [lang, setLang] = useState<Lang>('ja')
   const [level, setLevel] = useState<LevelKey>('all')
+  const [bronzeMode, setBronzeMode] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -178,6 +179,22 @@ function App() {
             />
           </div>
 
+          <div className="flex items-center gap-3 text-sm">
+            <button
+              type="button"
+              aria-pressed={bronzeMode}
+              onClick={() => setBronzeMode((b) => !b)}
+              title={t(lang, 'bronzeModeTitle')}
+              className={`rounded-lg border px-3 py-1 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
+                bronzeMode
+                  ? 'border-[#c9755b] bg-[#c9755b] text-slate-950 shadow-sm'
+                  : 'border-slate-700/60 bg-slate-900/50 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t(lang, 'bronzeMode')}
+            </button>
+          </div>
+
           <div className="ml-auto flex items-center gap-3 text-sm">
             <span className="font-medium text-slate-400">{t(lang, 'adoptionRate')}</span>
             <input
@@ -219,6 +236,7 @@ function App() {
             sortKey={sortKey}
             minAdopt={minAdopt}
             lang={lang}
+            bronzeMode={bronzeMode}
           />
         </main>
       </div>
