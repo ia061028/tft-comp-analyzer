@@ -6,13 +6,13 @@ import type { CompUsage } from './multiset'
 
 /**
  * CDragon の trait effect style 値 → バッジ配色。
- * MetaTFT風のフラットで視認性の高い配色に変更。
+ * 一族の彩度に揃えたフラットで視認性の高い配色（Prismatic/Gold/Silver/Bronze）。
  */
 export function styleClasses(style: number): string {
-  if (style >= 6) return 'border-[#f085ba] bg-[#f085ba]/20 text-[#fbd7e9]' // Prismatic
-  if (style >= 5) return 'border-[#f2b968] bg-[#f2b968]/20 text-[#fbe1bb]' // Gold
-  if (style >= 3) return 'border-[#9da7b3] bg-[#9da7b3]/20 text-[#dde1e5]' // Silver
-  return 'border-[#c9755b] bg-[#c9755b]/20 text-[#e9c7bd]' // Bronze
+  if (style >= 6) return 'border-[#d98fc4]/50 bg-[#d98fc4]/15 text-[#f0cfe5]' // Prismatic
+  if (style >= 5) return 'border-[#e8b75c]/50 bg-[#e8b75c]/15 text-[#f4d79e]' // Gold
+  if (style >= 3) return 'border-[#9aa6b4]/50 bg-[#9aa6b4]/15 text-[#d6dce3]' // Silver
+  return 'border-[#c9755b]/50 bg-[#c9755b]/15 text-[#e3b6a6]' // Bronze
 }
 
 /** 発動数 count に対する活性ティア（最大の minUnits<=count）。未発動は null。 */
@@ -93,18 +93,19 @@ export function costBorder(cost: number): string {
 }
 
 /**
- * 平均順位 → ティア。MetaTFTに合わせたカラーパレット（左端の縦線などに使用）。
+ * 平均順位 → ティア。調和したカラーパレット。
+ * color = 左アクセント線・ヒーロー数値の色、classes = ティアバッジの bg/text。
  */
 export function tierOf(avgPlace: number): { label: string; color: string; classes: string } {
   if (avgPlace <= 3.5)
-    return { label: 'S', color: '#ff7e83', classes: 'bg-[#ff7e83] text-[#222222]' }
+    return { label: 'S', color: '#ff6b7a', classes: 'bg-[#ff6b7a] text-[#1a1112]' }
   if (avgPlace <= 4.0)
-    return { label: 'A', color: '#ffbf7f', classes: 'bg-[#ffbf7f] text-[#222222]' }
+    return { label: 'A', color: '#ff9d5c', classes: 'bg-[#ff9d5c] text-[#1a1410]' }
   if (avgPlace <= 4.5)
-    return { label: 'B', color: '#ffd572', classes: 'bg-[#ffd572] text-[#222222]' }
+    return { label: 'B', color: '#ecc64f', classes: 'bg-[#ecc64f] text-[#1a1710]' }
   if (avgPlace <= 5.2)
-    return { label: 'C', color: '#579e56', classes: 'bg-[#579e56] text-white' }
-  return { label: 'D', color: '#666666', classes: 'bg-[#666666] text-white' }
+    return { label: 'C', color: '#6fc06a', classes: 'bg-[#6fc06a] text-[#101a10]' }
+  return { label: 'D', color: '#707682', classes: 'bg-[#707682] text-[#0f1012]' }
 }
 
 /**

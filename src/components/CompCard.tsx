@@ -36,7 +36,9 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
 
   const avgPlace = usage.adopt > 0 ? usage.p / usage.adopt : NaN
   const hasPlace = Number.isFinite(avgPlace)
-  const tier = hasPlace ? tierOf(avgPlace) : { label: '?', color: '#666666', classes: 'bg-[#666666] text-white' }
+  const tier = hasPlace
+    ? tierOf(avgPlace)
+    : { label: '?', color: '#707682', classes: 'bg-line-strong text-muted' }
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
 
   // 発動特性 = 盤面ユニットの所持トレイト ＋ 選択紋章のうち活用された付与分（決定的算出）。
@@ -63,29 +65,33 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
     }
   }
 
-  // 指標のハイライト判定
-  const isGoodPlace = avgPlace <= 4.3
   const winRate = usage.adopt > 0 ? (usage.win / usage.adopt) * 100 : 0
   const top4Rate = usage.adopt > 0 ? (usage.top4 / usage.adopt) * 100 : 0
 
-  return (
-    <div className="my-2 flex flex-col rounded-[2px_5px_5px_2px] bg-gradient-to-b from-[#27282b] to-[#222326] shadow-md transition-transform hover:translate-y-[-1px]">
-      <div
-        className="flex min-h-[100px] flex-col sm:flex-row items-stretch"
-        style={{ borderLeft: `5px solid ${tier.color}` }}
-      >
-        {/* 左端：ティアバッジ */}
-        <div className={`${tier.classes} hidden sm:flex w-[27px] shrink-0 mx-3 my-auto items-center justify-center rounded-[3px] h-[89.5px] font-bold text-[13px] shadow-sm`}>
-          {tier.label}
-        </div>
+  // 副指標セル（現在のソート対象を金でハイライト）。
+  const statCell = (active: boolean, label: string, value: string) => (
+    <div
+      className={`flex min-w-[50px] flex-col items-center rounded-md px-2 py-1 transition-colors ${
+        active ? 'bg-gold/10' : ''
+      }`}
+    >
+      <span className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-faint">{label}</span>
+      <span className={`text-sm font-bold tabular-nums ${active ? 'text-gold' : 'text-ink'}`}>{value}</span>
+    </div>
+  )
 
+  return (
+    <div className="flex flex-col rounded-xl border border-line bg-surface transition-all duration-150 hover:-translate-y-px hover:border-line-strong hover:shadow-lg hover:shadow-black/30">
+      <div
+        className="flex min-h-[96px] flex-col items-stretch overflow-hidden rounded-xl sm:flex-row"
+        style={{ borderLeft: `3px solid ${tier.color}` }}
+      >
         {/* 中央：特性とチャンピオン */}
-        <div className="flex-1 flex flex-col justify-center py-3 px-3 sm:px-0 min-w-0 border-b border-[#333] sm:border-b-0 sm:border-r border-dashed">
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-2.5 px-3.5 py-3">
           {/* 特性バッジ */}
-          <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-            <span className={`${tier.classes} sm:hidden mr-1 px-1.5 py-0.5 rounded text-xs font-bold`}>{tier.label}</span>
+          <div className="flex flex-wrap items-center gap-1.5">
             {bronzeMode && (
-              <span className="inline-flex items-center h-[18.5px] px-1.5 text-[11px] font-bold rounded-[4px] border border-[#c9755b] bg-[#c9755b]/20 text-[#e9c7bd]">
+              <span className="inline-flex h-[19px] items-center rounded-md border border-bronze/50 bg-bronze/15 px-1.5 text-[11px] font-bold text-[#e3b6a6] tabular-nums">
                 {t(lang, 'bronzeBadge', { n: bronzeCount })}
               </span>
             )}
@@ -94,7 +100,7 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
               return (
                 <Tip key={traitIdx} label={trait ? pickName(lang, trait) : `#${traitIdx}`}>
                   <span
-                    className={`inline-flex items-center gap-1 h-[18.5px] px-1.5 text-[11px] font-semibold rounded-[4px] border ${styleClasses(
+                    className={`inline-flex h-[19px] items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold tabular-nums ${styleClasses(
                       style,
                     )}`}
                   >
@@ -143,7 +149,7 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
                       src={unit.icon}
                       alt={unitName}
                       loading="lazy"
-                      className={`h-[48px] w-[48px] shrink-0 rounded-[3px] border-2 object-cover ${costBorder(unit.cost)}`}
+                      className={`h-[48px] w-[48px] shrink-0 rounded-md border-2 object-cover ${costBorder(unit.cost)}`}
                     />
                   </Tip>
 
@@ -156,9 +162,9 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
                             <div className="flex flex-col items-center gap-1 px-1 py-0.5">
                               <span className="font-bold text-[11px]">{eq.label}</span>
                               <div className="flex items-center gap-1.5">
-                                <img src={eq.recipe[0]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
-                                <span className="text-slate-400 text-xs leading-none">+</span>
-                                <img src={eq.recipe[1]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
+                                <img src={eq.recipe[0]} alt="" className="h-[18px] w-[18px] rounded border border-base" />
+                                <span className="text-faint text-xs leading-none">+</span>
+                                <img src={eq.recipe[1]} alt="" className="h-[18px] w-[18px] rounded border border-base" />
                               </div>
                             </div>
                           ) : eq.label
@@ -167,7 +173,7 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
                             src={eq.icon}
                             alt=""
                             loading="lazy"
-                            className="h-[17px] w-[17px] shrink-0 rounded-[2px] border border-[#111] bg-[#1d1e20] object-cover"
+                            className="h-[17px] w-[17px] shrink-0 rounded border border-base bg-base object-cover"
                           />
                         </Tip>
                       ) : null)}
@@ -183,9 +189,9 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
                             <div className="flex flex-col items-center gap-1 px-1 py-0.5">
                               <span className="font-bold text-[11px]">{eq.label}</span>
                               <div className="flex items-center gap-1.5">
-                                <img src={eq.recipe[0]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
-                                <span className="text-slate-400 text-xs leading-none">+</span>
-                                <img src={eq.recipe[1]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
+                                <img src={eq.recipe[0]} alt="" className="h-[18px] w-[18px] rounded border border-base" />
+                                <span className="text-faint text-xs leading-none">+</span>
+                                <img src={eq.recipe[1]} alt="" className="h-[18px] w-[18px] rounded border border-base" />
                               </div>
                             </div>
                           ) : eq.label
@@ -194,7 +200,7 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
                             src={eq.icon}
                             alt=""
                             loading="lazy"
-                            className="h-[17px] w-[17px] shrink-0 rounded-[2px] border border-[#111] bg-[#1d1e20] object-cover"
+                            className="h-[17px] w-[17px] shrink-0 rounded border border-base bg-base object-cover"
                           />
                         </Tip>
                       ) : null)}
@@ -206,45 +212,48 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
           </div>
         </div>
 
-        {/* 右端：指標ブロック */}
-        <div className="flex shrink-0 items-center gap-x-6 sm:gap-x-8 px-4 py-3 sm:py-0 justify-between sm:justify-end">
-          <div className={`flex flex-col text-center sm:text-right ${sortKey === 'place' ? 'opacity-100' : 'opacity-80'}`}>
-            <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'avg')}</span>
-            <span className={`text-[16px] font-bold ${isGoodPlace ? 'text-[#bffe7f]' : 'text-[#ede9ca]'}`}>
-              {hasPlace ? avgPlace.toFixed(2) : '—'}
+        {/* 右端：指標ブロック（平均順位をヒーロー化） */}
+        <div className="flex shrink-0 items-center justify-between gap-4 border-t border-line px-4 py-3 sm:justify-end sm:gap-5 sm:border-l sm:border-t-0 sm:py-0">
+          {/* ヒーロー: 平均順位（ティア色） */}
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`${tier.classes} flex h-7 w-7 items-center justify-center rounded-md text-sm font-extrabold shadow-sm`}
+            >
+              {tier.label}
             </span>
+            <div className="flex flex-col">
+              <span className="mb-0.5 text-[10px] font-medium uppercase tracking-wide leading-none text-faint">
+                {t(lang, 'avg')}
+              </span>
+              <span
+                className="text-[26px] font-extrabold leading-none tabular-nums"
+                style={{ color: tier.color }}
+              >
+                {hasPlace ? avgPlace.toFixed(2) : '—'}
+              </span>
+            </div>
           </div>
 
-          <div className={`flex flex-col text-center sm:text-right ${sortKey === 'top4' ? 'opacity-100' : 'opacity-80'}`}>
-            <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'metricTop4')}</span>
-            <span className={`text-[14px] font-bold ${sortKey === 'top4' ? 'text-amber-300' : 'text-[#ede9ca]'}`}>{top4Rate.toFixed(1)}%</span>
-          </div>
-
-          <div className={`flex flex-col text-center sm:text-right ${sortKey === 'win' ? 'opacity-100' : 'opacity-80'}`}>
-            <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'metricWin')}</span>
-            <span className={`text-[14px] font-bold ${sortKey === 'win' ? 'text-amber-300' : 'text-[#ede9ca]'}`}>{winRate.toFixed(1)}%</span>
-          </div>
-
-          <div className={`flex flex-col text-center sm:text-right ${sortKey === 'adopt' ? 'opacity-100' : 'opacity-80'}`}>
-            <span className="text-[12px] text-[#aaaaaa] mb-1">{t(lang, 'metricRate')}</span>
-            <span className={`text-[14px] font-bold ${sortKey === 'adopt' ? 'text-amber-300' : 'text-[#ede9ca]'}`}>{usage.adopt}</span>
+          {/* 副指標 */}
+          <div className="flex items-center gap-0.5">
+            {statCell(sortKey === 'top4', t(lang, 'metricTop4'), `${top4Rate.toFixed(1)}%`)}
+            {statCell(sortKey === 'win', t(lang, 'metricWin'), `${winRate.toFixed(1)}%`)}
+            {statCell(sortKey === 'adopt', t(lang, 'metricRate'), `${usage.adopt}`)}
           </div>
 
           {/* コードコピーボタン */}
-          <div className="hidden lg:flex flex-col items-center justify-center ml-2">
-            <button
-              type="button"
-              onClick={copy}
-              className="flex h-[32px] w-[32px] items-center justify-center rounded bg-[#36383e] hover:bg-[#46484e] text-[#eeeeee] transition-colors"
-              title={t(lang, 'copyCodeTitle')}
-            >
-              {copied ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#bffe7f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              )}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={copy}
+            className="hidden h-8 w-8 items-center justify-center rounded-md border border-line bg-surface-2 text-muted transition-colors hover:border-line-strong hover:bg-line hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 sm:flex"
+            title={t(lang, 'copyCodeTitle')}
+          >
+            {copied ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-gold)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            )}
+          </button>
         </div>
       </div>
     </div>

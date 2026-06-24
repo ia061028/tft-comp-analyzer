@@ -1,19 +1,48 @@
 @import "tailwindcss";
 
+/*
+ * デザイントークン（Tailwind v4 の @theme）。
+ * これらは bg-surface / text-muted / border-line / text-gold などのユーティリティを生成する。
+ * 旧UIの slate / zinc / 生hex の3系統混在を、この1系統のニュートラル＋金アクセントへ統一する。
+ */
+@theme {
+  /* ニュートラル階層（深→浅） */
+  --color-base: #0d0e10; /* アプリ最深背景 */
+  --color-surface: #16181c; /* パネル / カード */
+  --color-surface-2: #1d2025; /* 入力 / ホバー面 / 一段持ち上げ */
+  --color-line: #2a2d33; /* 罫線 */
+  --color-line-strong: #3a3e45; /* 強い罫線 / ホバー罫 */
+
+  /* テキスト */
+  --color-ink: #e9ebee; /* 主テキスト */
+  --color-muted: #9aa0a8; /* 副テキスト */
+  --color-faint: #6b7078; /* 最も淡いテキスト / ラベル */
+
+  /* アクセント（金のみ） */
+  --color-gold: #e8b75c;
+  --color-gold-bright: #f4cd7e;
+
+  /* 生涯ブロンズ専用アクセント */
+  --color-bronze: #c9755b;
+
+  /* UI フォント（index.html で Inter を読み込み） */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
 html {
   color-scheme: dark;
 }
 
 body {
-  /* MetaTFT-like solid dark gray background */
-  background-color: #1d1e20;
-  @apply text-slate-200 antialiased;
+  background-color: var(--color-base);
+  @apply text-ink antialiased;
+  font-family: var(--font-sans);
 }
 
 /* ダークテーマに馴染む細めのスクロールバー（Firefox / WebKit 両対応）。 */
 * {
   scrollbar-width: thin;
-  scrollbar-color: theme(colors.slate.700) transparent;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -26,12 +55,12 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: theme(colors.slate.700);
+  background-color: var(--color-line-strong);
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: theme(colors.slate.500);
+  background-color: var(--color-faint);
 }

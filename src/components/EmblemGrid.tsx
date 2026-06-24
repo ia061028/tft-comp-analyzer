@@ -30,8 +30,8 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
 
         return (
           <div key={group}>
-            {/* Section header */}
-            <div className="mb-2 flex items-center gap-1.5 border-l-2 border-slate-600 pl-2 text-[13px] font-bold text-slate-300">
+            {/* セクション見出し */}
+            <div className="mb-2 flex items-center gap-1.5 border-l-2 border-gold/50 pl-2 text-xs font-bold uppercase tracking-wide text-muted">
               {group === 'spatula' && baseItemIcons?.spatula && (
                 <img src={baseItemIcons.spatula} alt="" className="h-4 w-4 object-contain" />
               )}
@@ -57,9 +57,9 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                   <div className="flex flex-col items-center gap-1 px-1 py-0.5">
                     <span className="font-bold text-[11px]">{label}</span>
                     <div className="flex items-center gap-1.5">
-                      <img src={emblem.recipe[0]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
-                      <span className="text-slate-400 text-xs leading-none">+</span>
-                      <img src={emblem.recipe[1]} alt="" className="h-[18px] w-[18px] rounded-[2px] border border-[#111]" />
+                      <img src={emblem.recipe[0]} alt="" className="h-[18px] w-[18px] rounded border border-base" />
+                      <span className="text-faint text-xs leading-none">+</span>
+                      <img src={emblem.recipe[1]} alt="" className="h-[18px] w-[18px] rounded border border-base" />
                     </div>
                   </div>
                 ) : label
@@ -73,20 +73,20 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                         e.preventDefault()
                         onRemove(i)
                       }}
-                      className={`group relative flex w-full items-center justify-center rounded-xl border p-1.5 transition-all duration-200 hover:scale-[1.08] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
+                      className={`group relative flex w-full items-center justify-center rounded-md border p-1.5 transition-all duration-150 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
                         selected
-                          ? 'border-amber-400/80 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.15)]'
-                          : 'border-slate-700/60 bg-slate-800/40 hover:border-slate-500 hover:bg-slate-700/60'
+                          ? 'border-gold/70 bg-gold/10 shadow-[0_0_16px_-4px_var(--color-gold)]'
+                          : 'border-line bg-surface-2 hover:border-line-strong hover:bg-line'
                       }`}
                     >
                       <img
                         src={emblem.icon}
                         alt={label}
                         loading="lazy"
-                        className="h-12 w-12 object-contain"
+                        className={`h-12 w-12 object-contain transition-opacity ${selected ? '' : 'opacity-85 group-hover:opacity-100'}`}
                       />
                       {selected && (
-                        <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border border-amber-200/50 bg-gradient-to-br from-amber-300 to-amber-500 px-1 text-xs font-black text-amber-950 shadow-md">
+                        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-xs font-black text-base shadow-md ring-2 ring-surface">
                           {count}
                         </span>
                       )}

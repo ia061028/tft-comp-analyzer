@@ -23,9 +23,9 @@ const MIN_SAMPLE = 3
 export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMode }: CompListProps) {
   if (sel.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-zinc-800 bg-zinc-900/30 px-4 py-16 text-center text-sm text-zinc-400">
+      <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-line bg-surface/40 px-4 py-16 text-center text-sm text-muted">
         <svg
-          className="h-10 w-10 text-zinc-600"
+          className="h-10 w-10 text-faint"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -58,7 +58,7 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMod
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-10 text-center text-sm text-zinc-400">
+      <div className="rounded-xl border border-line bg-surface/40 px-4 py-10 text-center text-sm text-muted">
         {t(lang, 'noCompsAdopt', { x: floor })}
       </div>
     )
@@ -96,7 +96,7 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMod
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="px-1 text-xs font-medium text-zinc-500">
+      <div className="px-1 text-xs font-medium text-faint">
         {t(lang, 'resultCount', { n: rows.length })}
       </div>
       {groups.map(([x, arr]) => (
@@ -104,16 +104,16 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMod
           {N >= 1 && (
             <div className="flex items-center gap-2 px-1">
               <span
-                className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${
+                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 tabular-nums ${
                   bronzeMode
-                    ? 'bg-[#c9755b]/20 text-[#e9c7bd] ring-[#c9755b]/40'
-                    : 'bg-amber-400/15 text-amber-200 ring-amber-400/30'
+                    ? 'bg-bronze/15 text-[#e3b6a6] ring-bronze/40'
+                    : 'bg-gold/12 text-gold ring-gold/30'
                 }`}
               >
                 {bronzeMode ? t(lang, 'bronzeGroup', { n: x }) : t(lang, 'utilization', { n: fmtX(x), k: N })}
               </span>
-              <span className="text-[11px] text-zinc-500">{t(lang, 'resultCount', { n: arr.length })}</span>
-              <div className="h-px flex-1 bg-zinc-800" />
+              <span className="text-[11px] text-faint tabular-nums">{t(lang, 'resultCount', { n: arr.length })}</span>
+              <div className="h-px flex-1 bg-line" />
             </div>
           )}
           {arr.map(({ comp, usage }) => (
