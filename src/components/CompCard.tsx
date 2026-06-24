@@ -114,8 +114,14 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang }: CompCar
                 .map((h) => h[0])
                 .filter((ei) => selectedEmblemSet.has(ei))
               
-              const normalItems = unitItemIdxs.map(ii => ({ icon: items?.[ii]?.icon, label: pickName(lang, items?.[ii]!), recipe: items?.[ii]?.recipe }))
-              const emblemItems = unitEmblemIdxs.map(ei => ({ icon: emblems[ei]?.icon, label: pickName(lang, emblems[ei]!), recipe: emblems[ei]?.recipe }))
+              const normalItems = unitItemIdxs.map(ii => {
+                const item = items?.[ii]
+                return { icon: item?.icon, label: item ? pickName(lang, item) : '', recipe: item?.recipe }
+              })
+              const emblemItems = unitEmblemIdxs.map(ei => {
+                const emblem = emblems[ei]
+                return { icon: emblem?.icon, label: emblem ? pickName(lang, emblem) : '', recipe: emblem?.recipe }
+              })
 
               return (
                 <div key={unitIdx} className="flex flex-col items-center w-[48px]">
