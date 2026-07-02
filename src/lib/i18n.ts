@@ -51,6 +51,7 @@ const ja = {
   emblemCatSpatula: 'へら',
   emblemCatPan: 'フライパン',
   emblemCatNone: '合成不可',
+  emblemOpHint: 'クリックで+1 / Shift+クリック・右クリックで-1',
 }
 
 /** 翻訳キー（ja を基準に型化。en はこの全キーを持つことを型で強制）。 */
@@ -100,15 +101,23 @@ const en: Record<UIKey, string> = {
   emblemCatSpatula: 'Spatula',
   emblemCatPan: 'Frying Pan',
   emblemCatNone: 'Non-craftable',
+  emblemOpHint: 'Click to add / Shift+click or right-click to remove',
 }
 
 const STRINGS: Record<Lang, Record<UIKey, string>> = { ja, en }
 
+/**
+ * 文字列内の `{key}` プレースホルダを vars で置換する。同一プレースホルダが複数回出現しても
+ * 全て置換する（String#replace は初出のみのため replaceAll 相当に実装）。vars 未指定はそのまま返す。
+ */
+export function interpolate(s: string, vars?: Record<string, string | number>): string {
+  if (!vars) return s
+  let out = s
+  for (const [k, v] of Object.entries(vars)) out = out.replaceAll(`{${k}}`, String(v))
+  return out
+}
+
 /** UI 文言を取得。`{key}` プレースホルダを vars で置換。未定義言語は ja にフォールバック。 */
 export function t(lang: Lang, key: UIKey, vars?: Record<string, string | number>): string {
-  let s = STRINGS[lang][key] ?? ja[key]
-  if (vars) {
-    for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v))
-  }
-  return s
+  return interpolate(STRINGS[lang][key] ?? ja[key], vars)
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { StatsFile } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
 import { loadStats } from './lib/data'
@@ -14,6 +14,8 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'ready'; stats: StatsFile }
 
+const LANG_STORAGE_KEY = 'tft-lang'
+
 function App() {
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
   const [reloadKey, setReloadKey] = useState(0)
@@ -21,7 +23,10 @@ function App() {
   const [selection, setSelection] = useState<number[]>([])
   const [sortKey, setSortKey] = useState<SortKey>('top4')
   const [minAdopt, setMinAdopt] = useState(5)
-  const [lang, setLang] = useState<Lang>('ja')
+  const [lang, setLang] = useState<Lang>(() => {
+    const saved = localStorage.getItem(LANG_STORAGE_KEY)
+    return saved === 'ja' || saved === 'en' ? saved : 'ja'
+  })
   const [size, setSize] = useState<SizeKey>('all')
   const [bronzeMode, setBronzeMode] = useState(false)
 
@@ -41,6 +46,28 @@ function App() {
       cancelled = true
     }
   }, [reloadKey])
+
+  // 表示言語を localStorage に同期し、<html lang> も更新する。
+  useEffect(() => {
+    localStorage.setItem(LANG_STORAGE_KEY, lang)
+    document.documentElement.lang = lang
+  }, [lang])
+
+  const statsOrNull = load.status === 'ready' ? load.stats : null
+
+  // 盤面ユニット数でフィルタ。stats/size が変わらない限り再計算しない。
+  const selectedComps = useMemo(() => {
+    if (!statsOrNull) return []
+    return size === 'all' ? statsOrNull.comps : statsOrNull.comps.filter((c) => c.units.length === Number(size))
+  }, [statsOrNull, size])
+
+  // selection は emblems 配列インデックスのマルチセット。counts[index] = 個数。
+  const counts = useMemo(() => {
+    if (!statsOrNull) return []
+    const c = statsOrNull.emblems.map(() => 0)
+    for (const idx of selection) c[idx] = (c[idx] ?? 0) + 1
+    return c
+  }, [statsOrNull, selection])
 
   if (load.status === 'loading') {
     return (
@@ -90,14 +117,6 @@ function App() {
   }
 
   const stats = load.stats
-
-  // 盤面ユニット数でフィルタ。
-  const selectedComps =
-    size === 'all' ? stats.comps : stats.comps.filter((c) => c.units.length === Number(size))
-
-  // selection は emblems 配列インデックスのマルチセット。counts[index] = 個数。
-  const counts = stats.emblems.map(() => 0)
-  for (const idx of selection) counts[idx] = (counts[idx] ?? 0) + 1
 
   const addEmblem = (index: number) => setSelection((s) => [...s, index])
   const removeEmblem = (index: number) =>
@@ -207,6 +226,7 @@ function App() {
               min={0}
               value={minAdopt}
               onChange={(e) => setMinAdopt(Math.max(0, Number(e.target.value)))}
+              aria-label={t(lang, 'adoptionRate')}
               className="w-16 rounded-md border border-line bg-surface-2 px-2 py-1 text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
             />
           </div>

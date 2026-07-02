@@ -1,17 +1,9 @@
 import { useState } from 'react'
 import type { CompStats, StatsFile } from '../../shared/types'
 import type { CompUsage } from '../lib/multiset'
-import {
-  activeTier,
-  activeTraitCounts,
-  bronzeTraitCount,
-  buildPlannerCode,
-  costBorder,
-  starColor,
-  styleClasses,
-  tierOf,
-} from '../lib/format'
+import { activeTier, buildPlannerCode, costBorder, starColor, styleClasses, tierOf } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
+import { RecipeLabel } from './RecipeLabel'
 import { Tip } from './Tip'
 
 export type SortKey = 'place' | 'top4' | 'win' | 'adopt'
@@ -20,6 +12,10 @@ interface CompCardProps {
   stats: StatsFile
   comp: CompStats
   usage: CompUsage
+  /** 発動特性数（CompList で算出済み。盤面所持 ＋ 活用紋章の付与分）。 */
+  traitCount: Map<number, number>
+  /** 生涯ブロンズ数（CompList で算出済み）。 */
+  bronze: number
   /** 選択中の紋章インデックス（重複除去済み）。 */
   selList: number[]
   sortKey: SortKey
@@ -29,7 +25,17 @@ interface CompCardProps {
 }
 
 /** 構成一覧の1カード。MetaTFTライクなUI */
-export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMode }: CompCardProps) {
+export function CompCard({
+  stats,
+  comp,
+  usage,
+  traitCount,
+  bronze,
+  selList,
+  sortKey,
+  lang,
+  bronzeMode,
+}: CompCardProps) {
   const { traits, units, emblems, items } = stats
   const [copied, setCopied] = useState(false)
   const selectedEmblemSet = new Set(selList)
@@ -41,9 +47,7 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
     : { label: '?', color: '#707682', classes: 'bg-line-strong text-muted' }
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
 
-  // 発動特性 = 盤面ユニットの所持トレイト ＋ 選択紋章のうち活用された付与分（決定的算出）。
-  const traitCount = activeTraitCounts(comp, usage, units, emblems)
-  const bronzeCount = bronzeMode ? bronzeTraitCount(traitCount, traits) : 0
+  const bronzeCount = bronzeMode ? bronze : 0
   // 活性トレイトのみ（発動数 >= 最小ブレークポイント）。[traitIdx, style, 発動段]
   const traitChips: [number, number, number][] = []
   for (const [ti, count] of traitCount) {
@@ -157,18 +161,7 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
                   {normalItems.length > 0 && (
                     <div className="flex justify-center -mt-[14px] z-10 w-[48px] px-0.5 gap-[1px]">
                       {normalItems.slice(0, 3).map((eq, idx) => eq.icon ? (
-                        <Tip key={`item-${idx}`} label={
-                          eq.recipe ? (
-                            <div className="flex flex-col items-center gap-1 px-1 py-0.5">
-                              <span className="font-bold text-[11px]">{eq.label}</span>
-                              <div className="flex items-center gap-1.5">
-                                <img src={eq.recipe[0]} alt="" className="h-[18px] w-[18px] rounded border border-base" />
-                                <span className="text-faint text-xs leading-none">+</span>
-                                <img src={eq.recipe[1]} alt="" className="h-[18px] w-[18px] rounded border border-base" />
-                              </div>
-                            </div>
-                          ) : eq.label
-                        }>
+                        <Tip key={`item-${idx}`} label={<RecipeLabel label={eq.label} recipe={eq.recipe} />}>
                           <img
                             src={eq.icon}
                             alt=""
@@ -184,18 +177,7 @@ export function CompCard({ stats, comp, usage, selList, sortKey, lang, bronzeMod
                   {emblemItems.length > 0 && (
                     <div className={`flex justify-center z-10 w-[48px] px-0.5 gap-[1px] ${normalItems.length > 0 ? 'mt-[2px]' : '-mt-[14px]'}`}>
                       {emblemItems.map((eq, idx) => eq.icon ? (
-                        <Tip key={`emblem-${idx}`} label={
-                          eq.recipe ? (
-                            <div className="flex flex-col items-center gap-1 px-1 py-0.5">
-                              <span className="font-bold text-[11px]">{eq.label}</span>
-                              <div className="flex items-center gap-1.5">
-                                <img src={eq.recipe[0]} alt="" className="h-[18px] w-[18px] rounded border border-base" />
-                                <span className="text-faint text-xs leading-none">+</span>
-                                <img src={eq.recipe[1]} alt="" className="h-[18px] w-[18px] rounded border border-base" />
-                              </div>
-                            </div>
-                          ) : eq.label
-                        }>
+                        <Tip key={`emblem-${idx}`} label={<RecipeLabel label={eq.label} recipe={eq.recipe} />}>
                           <img
                             src={eq.icon}
                             alt=""
