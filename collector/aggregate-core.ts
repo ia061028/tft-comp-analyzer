@@ -1,6 +1,5 @@
 // aggregate.ts の集計ロジック本体を純関数として分離したモジュール。
 // ここには fs / fetch / process / console への依存を持ち込まない（テスト可能に保つ）。
-// 出力バイト列を変えないため、各関数のロジックは aggregate.ts の元コードを忠実に踏襲する。
 
 import type { StaticData } from './cdragon.ts'
 import type {
@@ -36,15 +35,17 @@ export interface LoadedRecord {
 
 /**
  * count 以下の最大ブレークポイントを返す。
- * bps が未定義/空、または count 以下のブレークポイントが存在しない場合は count を返す。
+ * bps が未定義/空（ブレークポイント情報なし）の場合はフォールバックとして count を返す。
+ * bps が非空なのに count 以下のブレークポイントが存在しない（最小BP未満）場合は
+ * undefined を返す（発動実体が最小ブレークポイントに満たない＝活用として扱えない）。
  */
-export function activeBreakpoint(count: number, bps: number[] | undefined): number {
+export function activeBreakpoint(count: number, bps: number[] | undefined): number | undefined {
   if (!bps || bps.length === 0) return count
   let best: number | undefined
   for (const bp of bps) {
     if (bp <= count && (best === undefined || bp > best)) best = bp
   }
-  return best ?? count
+  return best
 }
 
 /** 最頻値（同数なら大きい方）。空なら undefined。 */
@@ -128,6 +129,10 @@ export interface ClassifyEmblemsResult {
   activeEmblemApis: Set<string>
   /** 静的データに解決できなかった紋章 apiName（診断用・重複含む）。 */
   unresolvedEmblems: string[]
+  /** rec.tc（発動トレイト→num_units）欠落かつ発動紋章あり＝シグネチャから除外された（診断用）。 */
+  tcMissing: boolean
+  /** 盤面実効数が最小ブレークポイント未満のため活用に数えなかった紋章インスタンス数（診断用）。 */
+  belowMinBreakpoint: number
 }
 
 /**
@@ -150,6 +155,7 @@ export function classifyEmblems(
   const halfApisArr: string[] = []
   const activeEmblemApis = new Set<string>()
   const unresolvedEmblems: string[] = []
+  let belowMinBreakpoint = 0
   for (const [eApi, inst] of emblemInstances) {
     const emb = staticData.emblems.get(eApi)
     if (!emb) {
@@ -176,11 +182,19 @@ export function classifyEmblems(
     if (effective <= 0) continue // 盤面に実体が無い（召喚のみ）→ 活用に数えない
 
     // 余り判定: 実効数がちょうどブレークポイントなら +1、超過なら +0.5。
+    // 実効数が最小ブレークポイント未満（bp=undefined）は活用に数えない
+    // （召喚のみ→数えない、と同じ思想。診断用にインスタンス数を記録）。
     const bp = activeBreakpoint(effective, staticData.traitBreakpoints.get(bestVariant))
+    if (bp === undefined) {
+      belowMinBreakpoint += inst
+      continue
+    }
     const bucket = effective > bp ? halfApisArr : oneApisArr
     for (let j = 0; j < inst; j++) bucket.push(eApi)
   }
-  return { oneApisArr, halfApisArr, activeEmblemApis, unresolvedEmblems }
+  // tc 欠落レコード: 発動紋章があるのに num_units 不明で活用判定できない（旧形式レコード）。
+  const tcMissing = rec.tc === undefined && activeEmblemApis.size > 0
+  return { oneApisArr, halfApisArr, activeEmblemApis, unresolvedEmblems, tcMissing, belowMinBreakpoint }
 }
 
 export interface AggregateDiag {
@@ -196,6 +210,10 @@ export interface AggregateDiag {
   unresolvedUnitNames: Set<string>
   /** 未解決紋章 apiName 集合（該当紋章のみ無視）。 */
   unresolvedEmblemNames: Set<string>
+  /** tc 欠落（発動紋章ありなのに num_units 不明でシグネチャから除外）レコード数。 */
+  tcMissingRecords: number
+  /** 盤面実効数が最小ブレークポイント未満のため活用に数えなかった紋章インスタンス数。 */
+  belowMinBreakpoint: number
 }
 
 /**
@@ -235,6 +253,8 @@ export function buildStats(
   const map = new Map<string, CompAcc>()
   let noBoard = 0
   let excludedUnresolvedTrait = 0
+  let tcMissingRecords = 0
+  let belowMinBreakpointTotal = 0
 
   for (const lr of target) {
     const rec = lr.rec
@@ -298,12 +318,11 @@ export function buildStats(
     }
 
     // 紋章活用スコア → シグネチャ。
-    const { oneApisArr, halfApisArr, activeEmblemApis, unresolvedEmblems } = classifyEmblems(
-      rec,
-      staticData,
-      summonTraitCount,
-    )
+    const { oneApisArr, halfApisArr, activeEmblemApis, unresolvedEmblems, tcMissing, belowMinBreakpoint } =
+      classifyEmblems(rec, staticData, summonTraitCount)
     for (const e of unresolvedEmblems) unresolvedEmblemNames.add(e)
+    if (tcMissing) tcMissingRecords++
+    belowMinBreakpointTotal += belowMinBreakpoint
 
     // 装備者（発動ゲート済み・インスタンス単位）。
     for (let k = 0; k < rec.e.length; k++) {
@@ -569,6 +588,8 @@ export function buildStats(
     unresolvedTraitNames,
     unresolvedUnitNames,
     unresolvedEmblemNames,
+    tcMissingRecords,
+    belowMinBreakpoint: belowMinBreakpointTotal,
   }
 
   return { out, diag }

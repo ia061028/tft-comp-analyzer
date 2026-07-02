@@ -143,6 +143,16 @@ async function main(): Promise<void> {
       `[未解決紋章] ${diag.unresolvedEmblemNames.size} 種（該当紋章のみ無視）: ${[...diag.unresolvedEmblemNames].sort().join(', ')}`,
     )
   }
+  if (diag.tcMissingRecords > 0) {
+    warnLines.push(
+      `[tc欠落] ${diag.tcMissingRecords} レコード（tc なしのため紋章シグネチャ集計から除外）`,
+    )
+  }
+  if (diag.belowMinBreakpoint > 0) {
+    warnLines.push(
+      `[最小BP未満] ${diag.belowMinBreakpoint} 紋章インスタンス（盤面実効数が最小ブレークポイント未満のため活用に数えない）`,
+    )
+  }
   if (warnLines.length === 0) {
     console.log('警告: なし')
   } else {

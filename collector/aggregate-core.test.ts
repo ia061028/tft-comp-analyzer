@@ -72,8 +72,8 @@ test('activeBreakpoint: BP超過 → 直下BP', () => {
   assert.equal(activeBreakpoint(5, [2, 4]), 4)
 })
 
-test('activeBreakpoint: 最小BP未満 → count（現仕様）', () => {
-  assert.equal(activeBreakpoint(1, [2, 4]), 1)
+test('activeBreakpoint: 最小BP未満 → undefined（活用として扱えない）', () => {
+  assert.equal(activeBreakpoint(1, [2, 4]), undefined)
 })
 
 test('activeBreakpoint: bps 空・undefined → count', () => {
@@ -146,10 +146,12 @@ const noSummon = new Map<string, number>()
 test('classifyEmblems: effective==bp → one', () => {
   const sd = makeStaticData()
   const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 2 }, e: ['TFT_Item_EmblemA'] })
-  const { oneApisArr, halfApisArr, activeEmblemApis } = classifyEmblems(r, sd, noSummon)
+  const { oneApisArr, halfApisArr, activeEmblemApis, tcMissing, belowMinBreakpoint } = classifyEmblems(r, sd, noSummon)
   assert.deepEqual(oneApisArr, ['TFT_Item_EmblemA'])
   assert.deepEqual(halfApisArr, [])
   assert.ok(activeEmblemApis.has('TFT_Item_EmblemA'))
+  assert.equal(tcMissing, false)
+  assert.equal(belowMinBreakpoint, 0)
 })
 
 test('classifyEmblems: effective>bp → half', () => {
@@ -164,19 +166,40 @@ test('classifyEmblems: 召喚補正で effective が 0 → 数えない（発動
   const sd = makeStaticData()
   const summon = new Map<string, number>([['TraitA', 2]])
   const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 2 }, e: ['TFT_Item_EmblemA'] })
-  const { oneApisArr, halfApisArr, activeEmblemApis } = classifyEmblems(r, sd, summon)
+  const { oneApisArr, halfApisArr, activeEmblemApis, belowMinBreakpoint } = classifyEmblems(r, sd, summon)
   assert.deepEqual(oneApisArr, [])
   assert.deepEqual(halfApisArr, [])
   assert.ok(activeEmblemApis.has('TFT_Item_EmblemA')) // 発動はしているので装備者ゲートは通す
+  assert.equal(belowMinBreakpoint, 0) // effective<=0 は最小BP未満とは別カウント
 })
 
-test('classifyEmblems: tc 欠落 → 数えない（現仕様）', () => {
+test('classifyEmblems: 召喚補正で effective が最小BP未満 → 数えない + belowMinBreakpoint 加算', () => {
+  const sd = makeStaticData()
+  // effective = tc(2) − 召喚寄与(1) = 1 < 最小BP(2) → one/half どちらにも積まない。
+  const summon = new Map<string, number>([['TraitA', 1]])
+  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 2 }, e: ['TFT_Item_EmblemA', 'TFT_Item_EmblemA'] })
+  const { oneApisArr, halfApisArr, activeEmblemApis, belowMinBreakpoint } = classifyEmblems(r, sd, summon)
+  assert.deepEqual(oneApisArr, [])
+  assert.deepEqual(halfApisArr, [])
+  assert.ok(activeEmblemApis.has('TFT_Item_EmblemA')) // 発動はしているので装備者ゲートは通す
+  assert.equal(belowMinBreakpoint, 2) // 紋章インスタンス単位（同一紋章2個）
+})
+
+test('classifyEmblems: tc 欠落 → 数えない + tcMissing=true（診断用）', () => {
   const sd = makeStaticData()
   const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemA'] }) // tc なし
-  const { oneApisArr, halfApisArr, activeEmblemApis } = classifyEmblems(r, sd, noSummon)
+  const { oneApisArr, halfApisArr, activeEmblemApis, tcMissing } = classifyEmblems(r, sd, noSummon)
   assert.deepEqual(oneApisArr, [])
   assert.deepEqual(halfApisArr, [])
   assert.ok(activeEmblemApis.has('TFT_Item_EmblemA'))
+  assert.equal(tcMissing, true)
+})
+
+test('classifyEmblems: tc 欠落でも発動紋章なしなら tcMissing=false', () => {
+  const sd = makeStaticData()
+  const r = rec({ m: 'M', t: { TraitB: 3 }, e: ['TFT_Item_EmblemA'] }) // tc なし・EmblemA 非発動
+  const { tcMissing } = classifyEmblems(r, sd, noSummon)
+  assert.equal(tcMissing, false)
 })
 
 test('classifyEmblems: 未発動紋章はスキップ（付与トレイト非発動）', () => {
@@ -283,4 +306,6 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
   assert.equal(diag.boardGroupCount, 2)
   assert.equal(diag.noBoard, 0)
   assert.equal(diag.excludedUnresolvedTrait, 0)
+  assert.equal(diag.tcMissingRecords, 0)
+  assert.equal(diag.belowMinBreakpoint, 0)
 })
