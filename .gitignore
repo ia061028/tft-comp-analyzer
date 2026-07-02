@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# コレクター状態: main では追跡しない。orphan ブランチ `data` が唯一の正本。
+# CI では actions/checkout が `data` ブランチを path: data/state に展開し、
+# ローカルでは npm run collect が data/state 配下へ追記する（いずれも main の履歴には残さない）。
+data/
+
 # API keys
 .env
 

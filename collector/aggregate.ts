@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { config } from './config.ts'
 import { pickTargetPatch, compareVersions } from './patches.ts'
 import { getStaticData, type StaticData } from './cdragon.ts'
-import type { ParticipantRecord } from '../shared/types.ts'
+import type { ParticipantRecord, WireStatsFile } from '../shared/types.ts'
 import { type LoadedRecord, dedupeRecords, buildStats } from './aggregate-core.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -106,6 +106,22 @@ async function main(): Promise<void> {
   console.log(
     `盤面グループ: ${diag.boardGroupCount}（盤面なし除外 ${diag.noBoard}, 未解決トレイト除外 ${diag.excludedUnresolvedTrait}）`,
   )
+
+  // 実質差分なしなら書き換えをスキップ（generatedAt だけ変わる無意味な main コミット/デプロイを防ぐ）。
+  // buildStats は Phase 1 で純関数化済みで、出力は generatedAt を除き入力レコードのみに決定的に依存する。
+  // よって generatedAt を空にした JSON が一致すれば「実質差分なし」と断定でき、既存ファイルを
+  // そのまま残すのは安全（ハッシュ順序ゆらぎ等の非決定性はない）。
+  if (existsSync(OUT_PATH)) {
+    try {
+      const prev = JSON.parse(readFileSync(OUT_PATH, 'utf8')) as WireStatsFile
+      if (JSON.stringify({ ...prev, generatedAt: '' }) === JSON.stringify({ ...out, generatedAt: '' })) {
+        console.log('stats.json: 実質差分なし（generatedAt のみ）。書き換えをスキップ。')
+        return
+      }
+    } catch {
+      // 既存ファイルが壊れている等でパース不能なら比較を諦め、通常どおり書き直す。
+    }
+  }
 
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })
   writeFileSync(OUT_PATH, JSON.stringify(out))

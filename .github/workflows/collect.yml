@@ -1,5 +1,14 @@
 name: collect
 
+# 設計の要点（既定パスは「キー失効 = 完全 no-op」）:
+#   開発キーはほぼ常時失効している前提。collect は認証プリフライトで 401/403 を検出すると
+#   ::warning:: を出し status=auth_expired を書いて exit 0（state 不変）。その場合は後段の
+#   aggregate / data ブランチ push / stats.json コミットを全てスキップし、コミット0・デプロイ0。
+#   収集が成功した時（status=ok）だけ:
+#     1) 集計し、data ブランチへ squash force-push（履歴は常に1コミット＝スナップショット）
+#     2) stats.json に実質差分がある時だけ main へコミット（generatedAt だけの変更ではデプロイしない）
+#   実エラー（ルート例外）は collect が exit 1 → ジョブ赤失敗で従来どおり失敗通知を維持する。
+
 on:
   schedule:
     # 6時間ごと（自分のコミットでは再発火しない: schedule + workflow_dispatch のみ）
@@ -12,13 +21,23 @@ concurrency:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   collect:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      # main を作業ツリーへ（stats.json のコミット先）。persist-credentials 既定 true で push 可能。
       - uses: actions/checkout@v4
+
+      # 収集状態は orphan ブランチ `data` が正本。path で data/state に独立チェックアウトする。
+      # main 側 .gitignore が data/ を無視するため、この入れ子は main の git 操作に一切干渉しない。
+      # 各 checkout は自分の作業ツリーに credentials を保持するので、後段の push --force が通る。
+      - uses: actions/checkout@v4
+        with:
+          ref: data
+          path: data/state
 
       - uses: actions/setup-node@v4
         with:
@@ -27,31 +46,73 @@ jobs:
 
       - run: npm ci
 
-      # collect は冒頭に認証プリフライトを行う。キー失効（401/403）の場合は
-      # ::warning:: を出して exit 0（収集スキップ・state 不変）→ ジョブは成功扱いとなり
-      # 失敗メールは飛ばない。実エラー（ルート例外等）は従来どおり exit 1 で赤失敗する。
+      # collect は冒頭に認証プリフライトを行う。
+      #   - キー失効(401/403): status=auth_expired を書いて exit 0（state 不変・no-op）
+      #   - 全ルート成功:       status=ok, new_records=<新規マッチ数> を書く
+      #   - 実エラー:           status を書かず exit 1（＝このステップが失敗しジョブ赤）
       - name: collect
+        id: collect
         run: npm run collect
         env:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
 
+      # キー失効: スティッキー issue（ラベル riot-key）。初回のみ作成、以後は body 編集（通知なし）。
+      # これにより「6時間ごとに失効通知が飛び続ける」ことを避けつつ、失効状態は可視化される。
+      - name: notify key expired (sticky issue)
+        if: steps.collect.outputs.status == 'auth_expired'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "### Riot APIキー失効（収集スキップ・no-op）" >> "$GITHUB_STEP_SUMMARY"
+          num=$(gh issue list --label riot-key --state open --json number --jq '.[0].number')
+          body="collect が $(date -u +%FT%TZ) に 401/403 を検出。\`gh secret set RIOT_API_KEY --body \"RGAPI-...\"\` で更新してください。キー更新後の次回実行で自動クローズされます。"
+          if [ -z "$num" ]; then
+            gh issue create --title "Riot APIキーが失効しています" --label riot-key --body "$body"
+          else
+            gh issue edit "$num" --body "$body"
+          fi
+
+      # 復旧: キー更新で収集が再開したら、開いている失効 issue を閉じる。
+      - name: close key issue on recovery
+        if: steps.collect.outputs.status == 'ok'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          num=$(gh issue list --label riot-key --state open --json number --jq '.[0].number')
+          if [ -n "$num" ]; then gh issue close "$num" -c "キー更新を確認。収集を再開しました。"; fi
+
       - name: aggregate
+        if: steps.collect.outputs.status == 'ok'
         run: npm run aggregate
 
-      - name: commit & push（rebaseリトライ付き）
+      # data ブランチへ squash force-push。orphan ブランチを作り直して常に1コミットに保つ。
+      # data/state は独立チェックアウト（浅い clone）だが、orphan の force-push には影響しない。
+      - name: push data branch (squash force-push)
+        if: steps.collect.outputs.status == 'ok'
+        working-directory: data/state
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/state public/data/stats.json
-          if git diff --cached --quiet; then
-            echo "変更なし。コミットをスキップ。"
+          git checkout --orphan snapshot
+          git add -A
+          git commit -m "chore(data): snapshot $(date -u +%FT%TZ) (+${{ steps.collect.outputs.new_records }} matches)"
+          git push --force origin snapshot:data
+
+      # stats.json は実質差分がある時だけ main にコミット（＝サイト再デプロイ）。
+      # aggregate 側で generatedAt のみの変更はスキップ済みなので、ここで差分があれば実変更。
+      - name: commit stats.json to main (only on substantive change)
+        if: steps.collect.outputs.status == 'ok'
+        run: |
+          if git diff --quiet -- public/data/stats.json; then
+            echo "stats.json 実質変更なし。コミット・デプロイをスキップ。"
             exit 0
           fi
-          git commit -m "chore: collect $(date -u +%FT%TZ)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/stats.json
+          git commit -m "chore: stats $(date -u +%FT%TZ)"
           for i in 1 2 3; do
-            if git push; then
-              exit 0
-            fi
+            git push && exit 0
             echo "push 失敗（$i 回目）。pull --rebase して再試行。"
             git pull --rebase
           done

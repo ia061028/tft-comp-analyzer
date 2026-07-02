@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "collect": "tsx collector/collect.ts",
     "aggregate": "tsx collector/aggregate.ts",
+    "data:pull": "tsx collector/data-pull.ts",
     "test": "tsx --test \"collector/*.test.ts\" \"src/**/*.test.ts\""
   },
   "dependencies": {

@@ -16,10 +16,21 @@ import {
   pruneRecords,
   type Meta,
 } from './state.ts'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, appendFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ParticipantRecord } from '../shared/types.ts'
+
+/**
+ * GitHub Actions のステップ出力（$GITHUB_OUTPUT）へ key=value を追記する。
+ * ローカル実行など GITHUB_OUTPUT 未設定時は完全に no-op（CI 専用の副作用を持ち込まない）。
+ * この出力を後段ジョブが読み、status に応じて issue 通知 / aggregate / push を分岐する。
+ */
+function ghOutput(kv: Record<string, string>): void {
+  const f = process.env.GITHUB_OUTPUT
+  if (!f) return
+  appendFileSync(f, Object.entries(kv).map(([k, v]) => `${k}=${v}`).join('\n') + '\n')
+}
 
 // trim はBOM（U+FEFF）や末尾改行も除去する。CI Secret 経由の混入への防御。
 const apiKey = process.env.RIOT_API_KEY?.trim()
@@ -384,6 +395,9 @@ async function main(): Promise<void> {
         console.log(
           `::warning::認証エラー: ${err.message}。キー失効と判断し収集をスキップ（state は不変・前回データを配信継続）。`,
         )
+        // 後段ジョブへ「キー失効 no-op」を伝える。これがスティッキー issue 起票の条件になり、
+        // aggregate / data ブランチ push / stats.json コミットは全てスキップされる（デプロイ0）。
+        ghOutput({ status: 'auth_expired' })
         process.exit(0)
       }
       throw err
@@ -462,9 +476,17 @@ async function main(): Promise<void> {
 
   console.log('\n収集完了。')
   if (anyRouteFailed) {
+    // 実エラー（ルート例外）は従来どおり exit 1 で赤失敗させ、失敗通知を維持する。
+    // ここでは status を書かない: 後段ステップは status=='ok' 条件で全てスキップされ、
+    // 加えて exit 1 でジョブが赤になる。想定内の no-op（auth_expired）とは明確に区別する。
     console.error('一部ルートが失敗しました（成功ルートの meta は保存済み）。exit 1。')
     process.exit(1)
   }
+
+  // 全ルート成功。後段（aggregate → data ブランチ squash push → stats.json コミット/デプロイ）を起動。
+  // new_records は「今回追記した新規マッチ数の合計」（＝各ルート result.newMatches の総和 totalNew）。
+  // 1マッチ=最大8参加者レコードだが、収集側で追跡している集計単位はマッチ数なのでこれを採用する。
+  ghOutput({ status: 'ok', new_records: String(totalNew) })
 }
 
 await main()

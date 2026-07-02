@@ -1,4 +1,6 @@
-# CI(Linux)とローカル(Windows)で追記される状態ファイルのEOL差分を防ぐため全てLFに統一
+# CI(Linux)とローカル(Windows)の双方で生成・コミットされるファイル（public/data/stats.json
+# など）のEOL差分を防ぐため全てLFに統一。収集状態(data/)は data ブランチ側の .gitattributes
+# が担当するため、ここには data/state 固有の記述は置かない。
 * text=auto eol=lf
 *.png binary
 *.svg text eol=lf
