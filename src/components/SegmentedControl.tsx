@@ -7,7 +7,7 @@ interface SegmentedControlProps<T extends string> {
   ariaLabel?: string
 }
 
-/** セグメント型の単一選択コントロール（レベル・並び替えで共用）。 */
+/** セグメント型の単一選択コントロール（ユニット数・並び替えで共用）。 */
 export function SegmentedControl<T extends string>({
   options,
   value,

@@ -8,7 +8,7 @@ import { CompList } from './components/CompList'
 import { SegmentedControl } from './components/SegmentedControl'
 import type { SortKey } from './components/CompCard'
 
-type LevelKey = 'all' | '7' | '8' | '9' | '10'
+type SizeKey = 'all' | '7' | '8' | '9' | '10'
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
@@ -22,7 +22,7 @@ function App() {
   const [sortKey, setSortKey] = useState<SortKey>('top4')
   const [minAdopt, setMinAdopt] = useState(5)
   const [lang, setLang] = useState<Lang>('ja')
-  const [level, setLevel] = useState<LevelKey>('all')
+  const [size, setSize] = useState<SizeKey>('all')
   const [bronzeMode, setBronzeMode] = useState(false)
 
   useEffect(() => {
@@ -91,9 +91,9 @@ function App() {
 
   const stats = load.stats
 
-  // レベル = 盤面ユニット数でフィルタ。
+  // 盤面ユニット数でフィルタ。
   const selectedComps =
-    level === 'all' ? stats.comps : stats.comps.filter((c) => c.units.length === Number(level))
+    size === 'all' ? stats.comps : stats.comps.filter((c) => c.units.length === Number(size))
 
   // selection は emblems 配列インデックスのマルチセット。counts[index] = 個数。
   const counts = stats.emblems.map(() => 0)
@@ -152,17 +152,17 @@ function App() {
       <div className="sticky top-0 z-10 border-b border-line bg-base/85 px-5 py-2.5 backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5">
           <div className="flex items-center gap-2.5 text-sm">
-            <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t(lang, 'level')}</span>
-            <SegmentedControl<LevelKey>
-              ariaLabel={t(lang, 'level')}
-              value={level}
-              onChange={setLevel}
+            <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t(lang, 'boardSize')}</span>
+            <SegmentedControl<SizeKey>
+              ariaLabel={t(lang, 'boardSize')}
+              value={size}
+              onChange={setSize}
               options={[
                 { key: 'all', label: t(lang, 'all') },
-                { key: '7', label: 'Lv7' },
-                { key: '8', label: 'Lv8' },
-                { key: '9', label: 'Lv9' },
-                { key: '10', label: 'Lv10' },
+                { key: '7', label: '7' },
+                { key: '8', label: '8' },
+                { key: '9', label: '9' },
+                { key: '10', label: '10' },
               ]}
             />
           </div>

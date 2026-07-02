@@ -6,7 +6,7 @@ import { CompCard, type SortKey } from './CompCard'
 
 interface CompListProps {
   stats: StatsFile
-  /** 表示対象の構成（App でレベル＝盤面ユニット数フィルタ済み）。 */
+  /** 表示対象の構成（App で盤面ユニット数フィルタ済み）。 */
   comps: CompStats[]
   sel: number[]
   sortKey: SortKey
