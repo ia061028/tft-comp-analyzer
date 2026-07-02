@@ -37,7 +37,7 @@ function decodeStats(w: WireStatsFile): StatsFile {
 }
 
 /** data/stats.json を実行時fetchしてパース・復元する。非OKレスポンスはthrow。
- * BASE_URL 基準にすることで GitHub Pages の project サブパス配信に対応。 */
+ * BASE_URL 基準（Cloudflare Pages ルート配信）。 */
 export async function loadStats(): Promise<StatsFile> {
   const res = await fetch(`${import.meta.env.BASE_URL}data/stats.json`)
   if (!res.ok) {

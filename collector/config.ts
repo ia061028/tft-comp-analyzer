@@ -35,10 +35,6 @@ export const config = {
   enableDiamond: false,
   /** Diamond帯からプラットフォーム×ディビジョンごとに抽選する人数の上限 */
   diamondSamplePerDivision: 50,
-  /** 構成クラスタキーに含めるトレイトの最小style（3=ゴールド以上） */
-  clusterMinStyle: 3,
-  /** クラスタキーに含める上位トレイト数（スタイル降順で上位N件のみをキー化） */
-  clusterMaxKeyTraits: 2,
   /** 新パッチがこの試合数を超えたら集計対象を切替・旧パッチをprune */
   patchSwitchThreshold: 200,
   /** 実行時間バジェット（分）。残り5分で取得を打ち切り集計とflushを実施 */
