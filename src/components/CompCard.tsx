@@ -72,11 +72,6 @@ export function CompCard({
   const winRate = row.n > 0 ? (row.win / row.n) * 100 : 0
   const top4Rate = row.n > 0 ? (row.top4 / row.n) * 100 : 0
 
-  // 他紋章併用: この行の試合のうち、手持ち（選択紋章）を超える紋章も活用していた割合。
-  // 「選択紋章だけでこの成績が出る」という誤読を防ぐための注意書き。
-  const extraPct = row.n > 0 ? (row.extraN / row.n) * 100 : 0
-  const extraTop = [...row.extra.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)
-
   // 副指標セル（現在のソート対象を金でハイライト）。
   const statCell = (active: boolean, label: string, value: string) => (
     <div
@@ -112,41 +107,6 @@ export function CompCard({
               >
                 {t(lang, 'utilization', { n: row.match, k: total })}
               </span>
-            )}
-            {row.extraN > 0 && (
-              <Tip
-                label={
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-faint">{t(lang, 'extraEmblemsTitle')}</span>
-                    {extraTop.map(([ei, count]) => {
-                      const emblem = emblems[ei]
-                      if (!emblem) return null
-                      return (
-                        <span key={ei} className="flex items-center gap-1.5">
-                          <img src={emblem.icon} alt="" className="h-4 w-4 object-contain" />
-                          <span>{pickName(lang, emblem)}</span>
-                          <span className="text-faint tabular-nums">
-                            {((count / row.n) * 100).toFixed(0)}%
-                          </span>
-                        </span>
-                      )
-                    })}
-                  </div>
-                }
-              >
-                {/* 併用率は大半のカードで 0 より大きい（実データで 87%）。常時同じ強さで出すと
-                    信号にならないため、成績の半分以上が手持ち外の紋章に支えられている場合だけ
-                    警告色にし、それ未満は控えめに出す。 */}
-                <span
-                  className={`inline-flex h-[19px] items-center rounded-md border px-1.5 text-[11px] font-semibold tabular-nums ${
-                    extraPct >= 50
-                      ? 'border-bronze/50 bg-bronze/15 text-[#e3b6a6]'
-                      : 'border-transparent text-faint'
-                  }`}
-                >
-                  {t(lang, 'extraEmblems', { p: extraPct.toFixed(0) })}
-                </span>
-              </Tip>
             )}
             {traitChips.map(([traitIdx, style, count]) => {
               const trait = traits[traitIdx]

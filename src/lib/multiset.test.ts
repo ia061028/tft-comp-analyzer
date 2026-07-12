@@ -18,90 +18,60 @@ const sig = (e: number[], n: number, top4: number, win: number, p: number): Embl
 })
 
 // 紋章3だけの行 / 紋章3と7の行 / 紋章7だけの行。
-const c = comp([
-  sig([3], 10, 6, 2, 40),
-  sig([3, 7], 4, 3, 1, 14),
-  sig([7], 8, 4, 1, 32),
-])
+const c = comp([sig([3], 10, 6, 2, 40), sig([3, 7], 4, 3, 1, 14), sig([7], 8, 4, 1, 32)])
 
-test('compRows: 紋章の使われ方ごとに行が分かれ、各行の指標はその行のレコードのみ', () => {
-  // sel=[3]: 3 を活用している行 = 行1(n10) と 行2(n4)。どちらも「3を1枚使う」なので同じ行に畳まれる。
+test('compRows: 手持ちで再現できるレコードだけを行にする', () => {
+  // sel=[3]: 紋章7 も使っている行は「3しか持っていない自分には作れない」ので除外。
   const rows = compRows(c, [3])
   assert.equal(rows.length, 1)
-  const [r] = rows
-  assert.deepEqual(r.used, [3])
-  assert.equal(r.match, 1)
-  assert.equal(r.n, 14) // 10 + 4
-  assert.equal(r.top4, 9) // 6 + 3
-  assert.equal(r.win, 3) // 2 + 1
-  assert.equal(r.p, 54) // 40 + 14
+  assert.deepEqual(rows[0].used, [3])
+  assert.equal(rows[0].match, 1)
+  assert.equal(rows[0].n, 10) // 行1のみ。行2(3と7) は落ちる
+  assert.equal(rows[0].top4, 6)
+  assert.equal(rows[0].win, 2)
+  assert.equal(rows[0].p, 40)
 })
 
-test('compRows: 一致数は整数のみ（余りの 0.5 は存在しない）', () => {
+test('compRows: シグネチャがそのまま行になる（集約は不要）', () => {
   const rows = compRows(c, [3, 7])
   assert.deepEqual(
-    rows.map((r) => [r.match, r.n]),
+    rows.map((r) => [r.used, r.n]),
     [
-      [2, 4], // 行2: 3と7の両方
-      [1, 10], // 行1: 3のみ
-      [1, 8], // 行3: 7のみ
+      [[3, 7], 4], // 2枚とも活用
+      [[3], 10], // 3のみ
+      [[7], 8], // 7のみ
     ],
   )
-  assert.ok(rows.every((r) => Number.isInteger(r.match)))
-})
-
-test('compRows: 一致数が同じでも紋章の内訳が違えば別行', () => {
-  const rows = compRows(c, [3, 7]).filter((r) => r.match === 1)
-  assert.equal(rows.length, 2)
-  assert.deepEqual(rows.map((r) => r.used).sort(), [[3], [7]])
 })
 
 test('compRows: 返り値は一致数の降順', () => {
   const rows = compRows(c, [3, 7])
-  for (let i = 1; i < rows.length; i++) assert.ok(rows[i - 1].match >= rows[i].match)
+  assert.deepEqual(
+    rows.map((r) => r.match),
+    [2, 1, 1],
+  )
 })
 
-test('compRows: 同一紋章×2 は多重集合として数え、2枚活用と1枚活用で行が分かれる', () => {
+test('compRows: 選択枚数を超えて同一紋章を使う構成は除外（作れないため）', () => {
   const c2 = comp([sig([3, 3], 6, 3, 1, 20), sig([3], 10, 5, 2, 40)])
-  const rows = compRows(c2, [3, 3])
+  // 1枚しか持っていない → 2枚使う行は作れない。
   assert.deepEqual(
-    rows.map((r) => [r.match, r.n]),
+    compRows(c2, [3]).map((r) => [r.used, r.n]),
+    [[[3], 10]],
+  )
+  // 2枚持っていれば両方作れる。
+  assert.deepEqual(
+    compRows(c2, [3, 3]).map((r) => [r.used, r.n]),
     [
-      [2, 6], // 2枚とも活用
-      [1, 10], // 1枚だけ活用
+      [[3, 3], 6],
+      [[3], 10],
     ],
   )
 })
 
-test('compRows: 選択が1枚なら構成が2枚使っていても一致数は1（手持ち超過は extra 側）', () => {
-  const c2 = comp([sig([3, 3], 6, 3, 1, 20)])
-  const rows = compRows(c2, [3])
-  assert.equal(rows.length, 1)
-  assert.equal(rows[0].match, 1)
-  assert.equal(rows[0].extraN, 6)
-  assert.deepEqual([...rows[0].extra], [[3, 6]]) // 2枚目は手持ち外
-})
-
-test('compRows: 選択外の紋章を活用したレコードは extra に計上', () => {
-  const rows = compRows(c, [3])
-  const r = rows[0] // 行1(n10, 3のみ) + 行2(n4, 3と7)
-  assert.equal(r.extraN, 4) // 行2 のみ 7 を併用
-  assert.deepEqual([...r.extra], [[7, 4]])
-})
-
-test('compRows: strict は手持ち超過を含むレコードを母数から除外', () => {
-  const rows = compRows(c, [3], true)
-  assert.equal(rows.length, 1)
-  assert.equal(rows[0].n, 10) // 行2(7を併用) が落ちる
-  assert.equal(rows[0].extraN, 0)
-})
-
-test('compRows: strict で該当レコードが全滅すれば空配列', () => {
+test('compRows: 該当レコードが無ければ空配列', () => {
   const c2 = comp([sig([3, 7], 6, 3, 1, 20)]) // 常に7も併用する構成
-  assert.deepEqual(compRows(c2, [3], true), [])
-})
-
-test('compRows: どの行にも現れない紋章のみの選択は空', () => {
+  assert.deepEqual(compRows(c2, [3]), [])
   assert.deepEqual(compRows(c, [42]), [])
 })
 

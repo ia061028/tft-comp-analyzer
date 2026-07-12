@@ -23,8 +23,6 @@ interface CompListProps {
   lang: Lang
   /** 生涯ブロンズモード: ブロンズ特性数の多い順に並べる。 */
   bronzeMode: boolean
-  /** 選択紋章のみモード: 手持ちを超える紋章を活用した試合を母数から除外。 */
-  strict: boolean
 }
 
 /** 統計の信頼性のための最小サンプル（該当レコードがこの未満は除外）。 */
@@ -39,27 +37,18 @@ type Row = {
   bronze: number
 }
 
-export function CompList({
-  stats,
-  comps,
-  sel,
-  sortKey,
-  minAdopt,
-  lang,
-  bronzeMode,
-  strict,
-}: CompListProps) {
+export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMode }: CompListProps) {
   const { units, emblems, traits } = stats
 
   const floor = Math.max(MIN_SAMPLE, minAdopt)
 
-  // 1構成は「選択紋章の使われ方」ごとに複数行へ分解される（2枚使う行と1枚だけ使う行は別カード）。
+  // 1構成は「紋章の積み方」ごとに複数行へ分解される（2枚使う行と1枚だけ使う行は別カード）。
   // compRows / activeTraitCounts / bronzeTraitCount は構成数×選択紋章に比例して重いため、
-  // comps・sel・floor・strict・stats の該当サブフィールドが変わらない限り再計算しない。
+  // comps・sel・floor・stats の該当サブフィールドが変わらない限り再計算しない。
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = []
     for (const comp of comps) {
-      for (const row of compRows(comp, sel, strict)) {
+      for (const row of compRows(comp, sel)) {
         if (row.n < floor) continue
         const traitCount = activeTraitCounts(comp, row.used, units, emblems)
         const bronze = bronzeTraitCount(traitCount, traits)
@@ -67,7 +56,7 @@ export function CompList({
       }
     }
     return out
-  }, [comps, sel, floor, strict, units, emblems, traits])
+  }, [comps, sel, floor, units, emblems, traits])
 
   // 並び順: 第1キーは「一致数 降順」（生涯ブロンズ時はブロンズ特性数 降順）、第2キーが指標。
   // 率は縮約値で比較する（生の率だと採用5件の 80% が採用500件の 62% より上に来る）。

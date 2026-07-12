@@ -30,7 +30,6 @@ function App() {
   })
   const [size, setSize] = useState<SizeKey>('all')
   const [bronzeMode, setBronzeMode] = useState(false)
-  const [strict, setStrict] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -233,24 +232,6 @@ function App() {
             {t(lang, 'bronzeMode')}
           </button>
 
-          <button
-            type="button"
-            aria-pressed={strict}
-            onClick={() => setStrict((s) => !s)}
-            title={t(lang, 'strictModeTitle')}
-            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
-              strict
-                ? 'border-gold bg-gold text-base shadow-sm'
-                : 'border-line bg-surface-2 text-muted hover:border-gold/60 hover:text-ink'
-            }`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${strict ? 'bg-base' : 'bg-gold'}`}
-              aria-hidden
-            />
-            {t(lang, 'strictMode')}
-          </button>
-
           <div className="ml-auto flex items-center gap-2.5 text-sm">
             <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t(lang, 'adoptionRate')}</span>
             <input
@@ -309,7 +290,6 @@ function App() {
             minAdopt={minAdopt}
             lang={lang}
             bronzeMode={bronzeMode}
-            strict={strict}
           />
         </main>
       </div>

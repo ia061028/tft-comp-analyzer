@@ -1,16 +1,16 @@
 import type { CompStats } from '../../shared/types'
 
 /**
- * 構成一覧の1行。
+ * 構成一覧の1行 ＝ 1つの盤面 × 1つの紋章構成（レコードのシグネチャそのもの）。
  *
- * 1つの構成（＝盤面ユニット集合）は「選択紋章のうち実際に使われた組み合わせ」ごとに
- * 複数の行へ分解される。こうすると、行に表示する一致数と、Top4率・平均順位の母数が
- * 必ず同じレコード集合を指す（片方が最良値、片方が全体のプール、という食い違いが起きない）。
+ * 表示するのは「選択紋章だけで再現できるレコード」に限る。手持ち外の紋章を使っていた
+ * レコードは、そもそもあなたには作れない盤面なので母数から外す。
+ * これにより、カードに出る紋章・特性・成績がすべて同じレコード集合を指す。
  */
 export interface CompRow {
-  /** この行で実際に使われた「あなたの紋章」の多重集合（昇順）。行内の全レコードで一定。 */
+  /** この行で活用された紋章の多重集合（昇順）。選択紋章の部分多重集合であることが保証される。 */
   used: number[]
-  /** 一致数 = used.length。整数のみ（紋章の余りは区別しない）。 */
+  /** 一致数 = used.length。選択紋章のうち何枚を活かせているか。 */
   match: number
   /** 該当レコード数。 */
   n: number
@@ -18,81 +18,46 @@ export interface CompRow {
   win: number
   /** 順位合計（平均順位 = p / n）。 */
   p: number
-  /** 手持ち外の紋章 idx → それを活用していたレコード数。 */
-  extra: Map<number, number>
-  /** 手持ち外の紋章を活用していたレコード数の合計。 */
-  extraN: number
 }
 
-/** 多重集合の交差 a ∩ b（a・b は昇順ソート済み）。 */
-function intersect(a: number[], b: number[]): number[] {
-  const out: number[] = []
-  let i = 0
+/** 多重集合の包含判定: a のすべての要素が b に足りているか（a・b は昇順ソート済み）。 */
+function isSubset(a: number[], b: number[]): boolean {
   let j = 0
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      out.push(a[i])
-      i++
-      j++
-    } else if (a[i] < b[j]) i++
-    else j++
+  for (const x of a) {
+    while (j < b.length && b[j] < x) j++
+    if (j >= b.length || b[j] !== x) return false
+    j++
   }
-  return out
-}
-
-/** 多重集合の差 a − b（a・b は昇順ソート済み）。b に無い/足りない分だけ残る。 */
-function difference(a: number[], b: number[]): number[] {
-  const out: number[] = []
-  let i = 0
-  let j = 0
-  while (i < a.length) {
-    if (j >= b.length || a[i] < b[j]) out.push(a[i++])
-    else if (a[i] === b[j]) {
-      i++
-      j++
-    } else j++
-  }
-  return out
+  return true
 }
 
 /**
- * 構成 comp を、選択紋章 sel（多重集合）の「使われ方」ごとの行に分解する。
+ * 構成 comp のうち、選択紋章 sel（多重集合）だけで再現できるレコード群を行として返す。
  *
- * - マッチ: そのレコードが選択紋章を1つ以上活用している（交差が非空）
- * - 一致数: 交差の要素数。同一紋章の複数選択も多重集合として正しく数える
- * - 手持ち外: レコードが活用した紋章 − 選択（選択外の紋章、および選択枚数を超える同一紋章）
- * - strict: 手持ち外を含むレコードを母数から除外する（自分の紋章だけで達成した試合に限定）
+ * 各シグネチャ（＝その試合で活用された紋章の多重集合）が sel の部分多重集合なら採用。
+ * 選択外の紋章を使っていた試合、および選択枚数を超えて同一紋章を使っていた試合は除外する
+ * （あなたの手持ちでは作れないため。実データではそれらの試合は平均順位が 0.35 位ぶん良く、
+ * 混ぜると成績が水増しされる）。
  *
- * 返り値は一致数の降順。該当行が無ければ空配列。
+ * シグネチャがそのまま行になるので、行の集約は不要。返り値は一致数の降順。
  */
-export function compRows(comp: CompStats, sel: number[], strict = false): CompRow[] {
+export function compRows(comp: CompStats, sel: number[]): CompRow[] {
   if (sel.length === 0) return []
-  const want = sel.slice().sort((a, b) => a - b)
+  const have = sel.slice().sort((a, b) => a - b)
 
-  const rows = new Map<string, CompRow>()
+  const rows: CompRow[] = []
   for (const sig of comp.sigs) {
-    const used = intersect(sig.e, want)
-    if (used.length === 0) continue // 選択紋章をどれも活用していない
-    const extra = difference(sig.e, want)
-    if (strict && extra.length > 0) continue
-
-    const key = used.join(',')
-    let row = rows.get(key)
-    if (!row) {
-      row = { used, match: used.length, n: 0, top4: 0, win: 0, p: 0, extra: new Map(), extraN: 0 }
-      rows.set(key, row)
-    }
-    row.n += sig.n
-    row.top4 += sig.top4
-    row.win += sig.win
-    row.p += sig.p
-    if (extra.length > 0) {
-      row.extraN += sig.n
-      // 同一紋章が複数余っていても「その紋章を併用したレコード数」は1回だけ数える。
-      for (const e of new Set(extra)) row.extra.set(e, (row.extra.get(e) ?? 0) + sig.n)
-    }
+    if (!isSubset(sig.e, have)) continue
+    rows.push({
+      used: sig.e,
+      match: sig.e.length,
+      n: sig.n,
+      top4: sig.top4,
+      win: sig.win,
+      p: sig.p,
+    })
   }
-  return [...rows.values()].sort((a, b) => b.match - a.match)
+  return rows.sort((a, b) => b.match - a.match)
 }
 
 /**
