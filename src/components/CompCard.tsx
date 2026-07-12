@@ -16,8 +16,6 @@ interface CompCardProps {
   traitCount: Map<number, number>
   /** 生涯ブロンズ数（CompList で算出済み）。 */
   bronze: number
-  /** 選択中の紋章インデックス（重複除去済み）。 */
-  selList: number[]
   sortKey: SortKey
   lang: Lang
   /** 生涯ブロンズモード時、ブロンズ特性数バッジを表示。 */
@@ -31,14 +29,14 @@ export function CompCard({
   usage,
   traitCount,
   bronze,
-  selList,
   sortKey,
   lang,
   bronzeMode,
 }: CompCardProps) {
   const { traits, units, emblems, items } = stats
   const [copied, setCopied] = useState(false)
-  const selectedEmblemSet = new Set(selList)
+  /** この行で実際に活用されている選択紋章か（活用スコア > 0）。 */
+  const isUsed = (ei: number) => (usage.best.get(ei) ?? 0) > 0
 
   const avgPlace = usage.adopt > 0 ? usage.p / usage.adopt : NaN
   const hasPlace = Number.isFinite(avgPlace)
@@ -129,7 +127,7 @@ export function CompCard({
               const unitEmblemIdxs = comp.holders
                 .filter((h) => h[1] === unitIdx)
                 .map((h) => h[0])
-                .filter((ei) => selectedEmblemSet.has(ei))
+                .filter(isUsed)
               
               const normalItems = unitItemIdxs.map(ii => {
                 const item = items?.[ii]

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { CompStats, StatsFile } from '../../shared/types'
-import { compUsage, type CompUsage } from '../lib/multiset'
+import { compUsages, type CompUsage } from '../lib/multiset'
 import { activeTraitCounts, bronzeTraitCount } from '../lib/format'
 import { t, type Lang } from '../lib/i18n'
 import { CompCard, type SortKey } from './CompCard'
@@ -33,21 +33,20 @@ type Row = {
 export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMode }: CompListProps) {
   const { units, emblems, traits } = stats
 
-  // 選択紋章（重複除去済み）。CompCard ごとに再生成しないよう1回だけ計算。
-  const selList = useMemo(() => [...new Set(sel)], [sel])
-
   const floor = Math.max(MIN_SAMPLE, minAdopt)
 
-  // compUsage / activeTraitCounts / bronzeTraitCount は構成数×選択紋章に比例して重いため、
+  // 1構成は「紋章の活用の仕方」ごとに複数行へ分解される（活用2/2 の行と活用1/2 の行は別カード）。
+  // compUsages / activeTraitCounts / bronzeTraitCount は構成数×選択紋章に比例して重いため、
   // comps・sel・floor・stats の該当サブフィールドが変わらない限り再計算しない。
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = []
     for (const comp of comps) {
-      const usage = compUsage(comp, sel)
-      if (usage === null || usage.adopt < floor) continue
-      const traitCount = activeTraitCounts(comp, usage, units, emblems)
-      const bronze = bronzeTraitCount(traitCount, traits)
-      out.push({ comp, usage, traitCount, bronze })
+      for (const usage of compUsages(comp, sel)) {
+        if (usage.adopt < floor) continue
+        const traitCount = activeTraitCounts(comp, usage, units, emblems)
+        const bronze = bronzeTraitCount(traitCount, traits)
+        out.push({ comp, usage, traitCount, bronze })
+      }
     }
     return out
   }, [comps, sel, floor, units, emblems, traits])
@@ -112,7 +111,7 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMod
 
   // X の表示（整数はそのまま、0.5 刻みは小数1桁）。
   const fmtX = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1))
-  const N = rows[0].usage.n
+  const N = sel.length
 
   return (
     <div className="flex flex-col gap-4">
@@ -121,30 +120,29 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMod
       </div>
       {groups.map(([x, arr]) => (
         <div key={x} className="flex flex-col gap-2">
-          {N >= 1 && (
-            <div className="flex items-center gap-2 px-1">
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 tabular-nums ${
-                  bronzeMode
-                    ? 'bg-bronze/15 text-[#e3b6a6] ring-bronze/40'
-                    : 'bg-gold/12 text-gold ring-gold/30'
-                }`}
-              >
-                {bronzeMode ? t(lang, 'bronzeGroup', { n: x }) : t(lang, 'utilization', { n: fmtX(x), k: N })}
-              </span>
-              <span className="text-[11px] text-faint tabular-nums">{t(lang, 'resultCount', { n: arr.length })}</span>
-              <div className="h-px flex-1 bg-line" />
-            </div>
-          )}
+          <div className="flex items-center gap-2 px-1">
+            <span
+              title={bronzeMode ? t(lang, 'bronzeModeTitle') : t(lang, 'utilizationTitle')}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 tabular-nums ${
+                bronzeMode
+                  ? 'bg-bronze/15 text-[#e3b6a6] ring-bronze/40'
+                  : 'bg-gold/12 text-gold ring-gold/30'
+              }`}
+            >
+              {bronzeMode ? t(lang, 'bronzeGroup', { n: x }) : t(lang, 'utilization', { n: fmtX(x), k: N })}
+            </span>
+            <span className="text-[11px] text-faint tabular-nums">{t(lang, 'resultCount', { n: arr.length })}</span>
+            <div className="h-px flex-1 bg-line" />
+          </div>
+          {/* 同一盤面でも活用の仕方（usage.key）が違えば別カード。キーに両方を含める。 */}
           {arr.map(({ comp, usage, traitCount, bronze }) => (
             <CompCard
-              key={comp.units.join(',')}
+              key={`${comp.units.join(',')}|${usage.key}`}
               stats={stats}
               comp={comp}
               usage={usage}
               traitCount={traitCount}
               bronze={bronze}
-              selList={selList}
               sortKey={sortKey}
               lang={lang}
               bronzeMode={bronzeMode}
