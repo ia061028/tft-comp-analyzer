@@ -31,26 +31,35 @@ const c = comp([
   sig([7], [3], 4, 3, 1, 14), // Meeple +1 ＋ Brawler +0.5
 ])
 
-test('compUsage: 単一紋章+1の行のみ該当し集計', () => {
-  // sel=[3]: one に3を含む行 = 行1(n10) のみ。行2(+0.5のみ)・行3(3はhalf)は該当しない。
+test('compUsage: 発動していれば +1 でも +0.5 でも該当行として集計', () => {
+  // sel=[3]: 3 が発動している行 = 行1(one,n10)・行2(half,n5)・行3(half,n4) の全て。
   const u = compUsage(c, [3])!
-  assert.equal(u.adopt, 10)
-  assert.equal(u.top4, 6)
-  assert.equal(u.win, 2)
-  assert.equal(u.x, 1) // Brawler は +1 が存在 → 1
+  assert.equal(u.adopt, 19) // 10 + 5 + 4
+  assert.equal(u.top4, 11) // 6 + 2 + 3
+  assert.equal(u.win, 3) // 2 + 0 + 1
+  assert.equal(u.p, 79) // 40 + 25 + 14
+  assert.equal(u.x, 1) // Brawler は +1 の行が存在 → best=1
   assert.equal(u.n, 1)
 })
 
-test('compUsage: +0.5のみ（一度も+1にならない紋章）単独選択は除外=null', () => {
-  // half にしか現れない紋章 99 を選択 → 該当行なし
+test('compUsage: +0.5のみ（一度も+1にならない紋章）でも該当し X=0.5', () => {
+  // half にしか現れない紋章 99 を選択。発動はしている（余りあり）ので対象。
   const only = comp([sig([], [99], 8, 3, 0, 40)])
-  assert.equal(compUsage(only, [99]), null)
+  const u = compUsage(only, [99])!
+  assert.equal(u.adopt, 8)
+  assert.equal(u.top4, 3)
+  assert.equal(u.x, 0.5)
+  assert.equal(u.n, 1)
 })
 
-test('compUsage: 複数選択は「いずれか+1」の行を抽出、Xは紋章ごと最良値の合計', () => {
-  // sel=[7,3]: 該当行 = one に7か3を含む = 行1(3+1) と 行3(7+1, 3 half)。行2は該当せず。
+test('compUsage: どの行にも現れない紋章のみの選択は null', () => {
+  assert.equal(compUsage(c, [42]), null)
+})
+
+test('compUsage: 複数選択は「いずれかが発動」の行を抽出、Xは紋章ごと最良値の合計', () => {
+  // sel=[7,3]: 3 が全行で発動、7 は行3。→ 該当行は3行すべて。
   const u = compUsage(c, [7, 3])!
-  assert.equal(u.adopt, 14) // 10 + 4
+  assert.equal(u.adopt, 19) // 10 + 5 + 4
   // best: 3 は行1で+1→1、7 は行3で+1→1 → X=2
   assert.equal(u.x, 2)
   assert.equal(u.n, 2)

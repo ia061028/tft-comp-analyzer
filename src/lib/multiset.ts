@@ -1,7 +1,7 @@
 import type { CompStats } from '../../shared/types'
 
 export interface CompUsage {
-  /** 該当レコード数（選択紋章のいずれかが +1 のレコード）。 */
+  /** 該当レコード数（選択紋章のいずれかが発動しているレコード＝ +1 または +0.5）。 */
   adopt: number
   top4: number
   win: number
@@ -25,7 +25,9 @@ function countOcc(arr: number[], e: number): number {
 
 /**
  * 構成 comp に対する、選択紋章 sel（マルチセット）の活用状況。
- * - 「選択紋章のいずれかが +1」のシグネチャ行のみを該当として集計。
+ * - 「選択紋章のいずれかが発動している」シグネチャ行を該当として集計。one(+1) だけでなく
+ *   half(+0.5＝発動しているが発動数がブレークポイント超過で余りあり) も該当とする
+ *   （仕様: その紋章を使ったシナジーが1つでも発動していれば対象）。
  * - 各紋章 e の score = 該当 sig ごとに min(個数, one内のe数) + 0.5*min(残り, half内のe数) の最大値。
  * - X = Σ score、N = sel.length（同一紋章の複数選択を加算）。
  * - 該当行が1つも無ければ null。
@@ -45,8 +47,9 @@ export function compUsage(comp: CompStats, sel: number[]): CompUsage | null {
   for (const e of distinct) best.set(e, 0)
 
   let any = false
+  const hits = (arr: number[]) => arr.some((e) => distinctSet.has(e))
   for (const sig of comp.sigs) {
-    if (!sig.one.some((e) => distinctSet.has(e))) continue
+    if (!hits(sig.one) && !hits(sig.half)) continue
     any = true
     adopt += sig.n
     top4 += sig.top4
