@@ -47,7 +47,6 @@ const ja = {
   utilizationTitle: '選択した紋章のうち、この構成が活用している数',
   bronzeMode: '生涯ブロンズ',
   bronzeModeTitle: 'ブロンズ特性（固有特性を除く、最小ティアで発動中の特性）が多い順に構成を表示',
-  bronzeGroup: 'ブロンズ {n}',
   bronzeBadge: 'ブロンズ {n}',
   strictMode: '選択紋章のみ',
   strictModeTitle:
@@ -104,7 +103,6 @@ const en: Record<UIKey, string> = {
   utilizationTitle: 'How many of the selected emblems this comp uses',
   bronzeMode: 'Lifelong Bronze',
   bronzeModeTitle: 'Rank comps by number of bronze traits (non-unique traits active at their lowest tier)',
-  bronzeGroup: 'Bronze {n}',
   bronzeBadge: 'Bronze {n}',
   strictMode: 'Selected only',
   strictModeTitle:

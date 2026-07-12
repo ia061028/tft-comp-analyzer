@@ -1,14 +1,7 @@
 import type { StatsFile, WireStatsFile, WireComp, CompStats, EmblemSig } from '../../shared/types'
 
 function decodeComp(c: WireComp): CompStats {
-  const sigs: EmblemSig[] = c.g.map(([one, half, n, top4, win, p]) => ({
-    one,
-    half,
-    n,
-    top4,
-    win,
-    p,
-  }))
+  const sigs: EmblemSig[] = c.g.map(([e, n, top4, win, p]) => ({ e, n, top4, win, p }))
   return {
     units: c.u,
     n: c.n,

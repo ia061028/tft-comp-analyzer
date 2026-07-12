@@ -10,7 +10,10 @@ export interface ParticipantRecord {
   p: number
   /** 発動トレイト（tier_current>=1）→ style（1=ブロンズ,2=シルバー,3=ゴールド,4=プリズム） */
   t: Record<string, number>
-  /** 発動トレイト → ユニット数(num_units)。例: ブローラー2なら2（旧レコードは欠落） */
+  /**
+   * 発動トレイト → ユニット数(num_units)。例: ブローラー2なら2（旧レコードは欠落）。
+   * 現在の集計では未使用（紋章の活用判定は発動の有無のみで行う）。将来の効率分析のため収集は継続する。
+   */
   tc?: Record<string, number>
   /** 装備された紋章アイテムの apiName（重複保持・発動フィルタは集計時に適用） */
   e: string[]
@@ -76,15 +79,16 @@ export interface ItemInfo {
 }
 
 /**
- * 紋章活用シグネチャ: 1つ以上の紋章を「発動」させたレコード群を、
- * 発動効率でグループ化したもの。
- * - one: そのレコードで +1（装備・発動・発動数に余りなし＝ちょうどブレークポイント）の emblem idx 集合。
- * - half: +0.5（装備・発動・発動数に余りあり）の emblem idx 集合。
- * - n/top4/win: 該当レコード数・Top4数・1位数。
+ * 紋章活用シグネチャ: 「活用された紋章の多重集合」が同一のレコード群。
+ *
+ * 活用の定義は二値: 装備している AND 付与トレイトが発動している（tier_current >= 1）。
+ * 発動数がブレークポイントちょうどか超過か（＝紋章が余っているか）は区別しない。
+ * 要件が「その紋章を使ったシナジーが1つでも発動していれば対象」であり、
+ * 余りの区別は要求されていないため。
  */
 export interface EmblemSig {
-  one: number[]
-  half: number[]
+  /** 活用された紋章 idx の多重集合（昇順。同一紋章2個なら同じ idx が2つ入る）。 */
+  e: number[]
   n: number
   top4: number
   win: number
@@ -122,13 +126,13 @@ export interface WireComp {
   i?: [number, number, number][]
   /** holders（空なら省略） */
   h?: [number, number, number][]
-  /** sigs: [one[], half[], n, top4, win, p] */
-  g: [number[], number[], number, number, number, number][]
+  /** sigs: [活用紋章idx[], n, top4, win, p] */
+  g: [number[], number, number, number, number][]
 }
 
 /** stats.json 全体のオンディスク圧縮形式。 */
 export interface WireStatsFile {
-  schemaVersion: 3
+  schemaVersion: 4
   generatedAt: string
   patch: string
   tftPatch: string

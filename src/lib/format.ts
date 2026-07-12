@@ -2,7 +2,6 @@
 // CompList/CompCard から共有する。
 
 import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/types'
-import type { CompUsage } from './multiset'
 
 /**
  * CDragon の trait effect style 値 → バッジ配色。
@@ -28,10 +27,11 @@ export function activeTier(
 /**
  * 構成＋活用紋章の発動特性数（盤面ユニットの所持特性 ＋ 活用紋章の付与分）。
  * trait idx → 発動数。CompCard の特性チップ表示と CompList のブロンズ集計で共有する。
+ * used は CompRow.used（この行で実際に使われた紋章の多重集合）。
  */
 export function activeTraitCounts(
   comp: CompStats,
-  usage: CompUsage,
+  used: number[],
   units: UnitInfo[],
   emblems: EmblemInfo[],
 ): Map<number, number> {
@@ -39,12 +39,11 @@ export function activeTraitCounts(
   for (const ui of comp.units) {
     for (const ti of units[ui]?.traits ?? []) counts.set(ti, (counts.get(ti) ?? 0) + 1)
   }
-  for (const ei of usage.req.keys()) {
-    const add = Math.ceil(usage.best.get(ei) ?? 0) // 活用された個数
-    if (add <= 0) continue
+  // 紋章1枚 = その付与特性 +1（同一紋章2枚なら used に2つ入るので自然に +2 になる）。
+  for (const ei of used) {
     const ti = emblems[ei]?.trait
     if (ti == null) continue
-    counts.set(ti, (counts.get(ti) ?? 0) + add)
+    counts.set(ti, (counts.get(ti) ?? 0) + 1)
   }
   return counts
 }

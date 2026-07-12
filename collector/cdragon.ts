@@ -100,8 +100,6 @@ export interface StaticData {
   setNumber: number
   /** apiName → 表示名(en/ja)・アイコンURL・発動ティア([minUnits, style] 昇順) */
   traits: Map<string, { name: string; nameJa: string; icon: string; tiers: [number, number][] }>
-  /** トレイト apiName → 発動ブレークポイント数リスト（昇順）。シナジー数の活性ブレークポイント算出用。 */
-  traitBreakpoints: Map<string, number[]>
   /** champions apiName → 表示名(en/ja)・コスト・アイコンURL・プランナーcode・所持トレイト(apiName) */
   units: Map<string, { name: string; nameJa: string; cost: number; icon: string; code: number; traits: string[] }>
   /**
@@ -204,7 +202,6 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
 
   // traits
   const traits = new Map<string, { name: string; nameJa: string; icon: string; tiers: [number, number][] }>()
-  const traitBreakpoints = new Map<string, number[]>()
   const traitNameToApi = new Map<string, string>()
   for (const t of chosen.traits ?? []) {
     if (!t.apiName) continue
@@ -224,7 +221,6 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
       icon: iconUrl(t.icon),
       tiers,
     })
-    traitBreakpoints.set(t.apiName, tiers.map((x) => x[0]))
   }
 
   // カバレッジ警告
@@ -336,5 +332,5 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
     fryingPan: iconUrl(fryingPanItem?.icon),
   }
 
-  return { setNumber, traits, traitBreakpoints, units, emblems, items, baseItemIcons, warnings }
+  return { setNumber, traits, units, emblems, items, baseItemIcons, warnings }
 }

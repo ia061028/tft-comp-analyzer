@@ -1,7 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/types'
-import type { CompUsage } from './multiset'
 import {
   activeTraitCounts,
   bronzeTraitCount,
@@ -60,30 +59,29 @@ const emblems: EmblemInfo[] = [
 ]
 const comp: CompStats = { units: [0, 1], n: 1, unitStars: [], unitItems: [], holders: [], sigs: [] }
 
-const usage = (req: Record<number, number>, best: Record<number, number>): CompUsage => ({
-  adopt: 1, top4: 0, win: 0, p: 4, x: 0, n: Object.values(req).reduce((a, b) => a + b, 0),
-  req: counts(req), best: counts(best), key: '', extraAdopt: 0, extra: new Map(),
-})
-
 test('activeTraitCounts: 盤面の所持特性を集計', () => {
-  const c = activeTraitCounts(comp, usage({}, {}), units, emblems)
+  const c = activeTraitCounts(comp, [], units, emblems)
   assert.equal(c.get(0), 2) // u0,u1 が Brawler
 })
 
-test('activeTraitCounts: 活用紋章(best>=1)の付与を加算、ceil で端数も繰り上げ', () => {
-  // 紋章 e1(→SpaceGroove) を活用(best 1) ＋ e0(→Brawler) を 0.5 だけ活用 → ceil で +1
-  const c = activeTraitCounts(comp, usage({ 0: 1, 1: 1 }, { 0: 0.5, 1: 1 }), units, emblems)
-  assert.equal(c.get(0), 3) // Brawler 2(盤面) + 1(紋章 ceil(0.5))
-  assert.equal(c.get(2), 1) // SpaceGroove 1(紋章)
+test('activeTraitCounts: 活用紋章の付与を加算（紋章1枚 = +1）', () => {
+  const c = activeTraitCounts(comp, [0, 1], units, emblems) // e0(→Brawler), e1(→SpaceGroove)
+  assert.equal(c.get(0), 3) // Brawler 2(盤面) + 1(紋章e0)
+  assert.equal(c.get(2), 1) // SpaceGroove 1(紋章e1)
 })
 
-test('activeTraitCounts: best=0 の紋章は加算しない', () => {
-  const c = activeTraitCounts(comp, usage({ 1: 1 }, { 1: 0 }), units, emblems)
+test('activeTraitCounts: 同一紋章2枚なら +2', () => {
+  const c = activeTraitCounts(comp, [0, 0], units, emblems)
+  assert.equal(c.get(0), 4) // Brawler 2(盤面) + 2(紋章e0 ×2)
+})
+
+test('activeTraitCounts: 活用紋章なしなら付与も無し', () => {
+  const c = activeTraitCounts(comp, [], units, emblems)
   assert.equal(c.get(2), undefined)
 })
 
 test('activeTraitCounts → bronzeTraitCount: 紋章付与でブロンズが増える', () => {
-  const c = activeTraitCounts(comp, usage({ 1: 1 }, { 1: 1 }), units, emblems)
+  const c = activeTraitCounts(comp, [1], units, emblems)
   // Brawler 2(盤面=ブロンズ) ＋ SpaceGroove 1(紋章=ブロンズ) = 2
   assert.equal(bronzeTraitCount(c, traits), 2)
 })

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CompStats, StatsFile } from '../../shared/types'
-import type { CompUsage } from '../lib/multiset'
+import type { CompRow } from '../lib/multiset'
 import { activeTier, buildPlannerCode, costBorder, starColor, styleClasses, tierOf } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { RecipeLabel } from './RecipeLabel'
@@ -11,7 +11,9 @@ export type SortKey = 'place' | 'top4' | 'win' | 'adopt'
 interface CompCardProps {
   stats: StatsFile
   comp: CompStats
-  usage: CompUsage
+  row: CompRow
+  /** 選択紋章の総数（一致数バッジの分母）。 */
+  total: number
   /** 発動特性数（CompList で算出済み。盤面所持 ＋ 活用紋章の付与分）。 */
   traitCount: Map<number, number>
   /** 生涯ブロンズ数（CompList で算出済み）。 */
@@ -26,7 +28,8 @@ interface CompCardProps {
 export function CompCard({
   stats,
   comp,
-  usage,
+  row,
+  total,
   traitCount,
   bronze,
   sortKey,
@@ -35,10 +38,9 @@ export function CompCard({
 }: CompCardProps) {
   const { traits, units, emblems, items } = stats
   const [copied, setCopied] = useState(false)
-  /** この行で実際に活用されている選択紋章か（活用スコア > 0）。 */
-  const isUsed = (ei: number) => (usage.best.get(ei) ?? 0) > 0
+  const usedSet = new Set(row.used)
 
-  const avgPlace = usage.adopt > 0 ? usage.p / usage.adopt : NaN
+  const avgPlace = row.n > 0 ? row.p / row.n : NaN
   const hasPlace = Number.isFinite(avgPlace)
   const tier = hasPlace
     ? tierOf(avgPlace)
@@ -67,13 +69,13 @@ export function CompCard({
     }
   }
 
-  const winRate = usage.adopt > 0 ? (usage.win / usage.adopt) * 100 : 0
-  const top4Rate = usage.adopt > 0 ? (usage.top4 / usage.adopt) * 100 : 0
+  const winRate = row.n > 0 ? (row.win / row.n) * 100 : 0
+  const top4Rate = row.n > 0 ? (row.top4 / row.n) * 100 : 0
 
   // 他紋章併用: この行の試合のうち、手持ち（選択紋章）を超える紋章も活用していた割合。
   // 「選択紋章だけでこの成績が出る」という誤読を防ぐための注意書き。
-  const extraPct = usage.adopt > 0 ? (usage.extraAdopt / usage.adopt) * 100 : 0
-  const extraTop = [...usage.extra.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)
+  const extraPct = row.n > 0 ? (row.extraN / row.n) * 100 : 0
+  const extraTop = [...row.extra.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)
 
   // 副指標セル（現在のソート対象を金でハイライト）。
   const statCell = (active: boolean, label: string, value: string) => (
@@ -102,7 +104,16 @@ export function CompCard({
                 {t(lang, 'bronzeBadge', { n: bronzeCount })}
               </span>
             )}
-            {usage.extraAdopt > 0 && (
+            {/* 一致数は複数選択時のみ意味を持つ（単体選択なら常に 1/1）。 */}
+            {total > 1 && (
+              <span
+                title={t(lang, 'utilizationTitle')}
+                className="inline-flex h-[19px] items-center rounded-md border border-gold/40 bg-gold/12 px-1.5 text-[11px] font-bold text-gold tabular-nums"
+              >
+                {t(lang, 'utilization', { n: row.match, k: total })}
+              </span>
+            )}
+            {row.extraN > 0 && (
               <Tip
                 label={
                   <div className="flex flex-col gap-1">
@@ -115,7 +126,7 @@ export function CompCard({
                           <img src={emblem.icon} alt="" className="h-4 w-4 object-contain" />
                           <span>{pickName(lang, emblem)}</span>
                           <span className="text-faint tabular-nums">
-                            {((count / usage.adopt) * 100).toFixed(0)}%
+                            {((count / row.n) * 100).toFixed(0)}%
                           </span>
                         </span>
                       )
@@ -167,7 +178,7 @@ export function CompCard({
               const unitEmblemIdxs = comp.holders
                 .filter((h) => h[1] === unitIdx)
                 .map((h) => h[0])
-                .filter(isUsed)
+                .filter((ei) => usedSet.has(ei))
               
               const normalItems = unitItemIdxs.map(ii => {
                 const item = items?.[ii]
@@ -258,7 +269,7 @@ export function CompCard({
           <div className="flex items-center gap-0.5">
             {statCell(sortKey === 'top4', t(lang, 'metricTop4'), `${top4Rate.toFixed(1)}%`)}
             {statCell(sortKey === 'win', t(lang, 'metricWin'), `${winRate.toFixed(1)}%`)}
-            {statCell(sortKey === 'adopt', t(lang, 'metricRate'), `${usage.adopt}`)}
+            {statCell(sortKey === 'adopt', t(lang, 'metricRate'), `${row.n}`)}
           </div>
 
           {/* コードコピーボタン */}

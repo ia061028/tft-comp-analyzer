@@ -1,123 +1,98 @@
 import type { CompStats } from '../../shared/types'
 
-export interface CompUsage {
-  /** この行（＝この活用の仕方）の該当レコード数。 */
-  adopt: number
+/**
+ * 構成一覧の1行。
+ *
+ * 1つの構成（＝盤面ユニット集合）は「選択紋章のうち実際に使われた組み合わせ」ごとに
+ * 複数の行へ分解される。こうすると、行に表示する一致数と、Top4率・平均順位の母数が
+ * 必ず同じレコード集合を指す（片方が最良値、片方が全体のプール、という食い違いが起きない）。
+ */
+export interface CompRow {
+  /** この行で実際に使われた「あなたの紋章」の多重集合（昇順）。行内の全レコードで一定。 */
+  used: number[]
+  /** 一致数 = used.length。整数のみ（紋章の余りは区別しない）。 */
+  match: number
+  /** 該当レコード数。 */
+  n: number
   top4: number
   win: number
-  /** 順位合計（平均順位 = p / adopt）。 */
+  /** 順位合計（平均順位 = p / n）。 */
   p: number
-  /** 活用スコア X = Σ best。行内の全レコードで一定。 */
-  x: number
-  /** N = 選択紋章の総数（同一紋章の複数選択は加算）。 */
-  n: number
-  /** 紋章 → この行での活用スコア（0 .. その紋章の選択個数）。行内で一定。 */
-  best: Map<number, number>
-  /** 紋章 → 選択個数。 */
-  req: Map<number, number>
-  /** 行の識別キー（紋章スコアのベクトル）。同一構成の別行を区別する。 */
-  key: string
-  /**
-   * この行のレコードのうち、選択紋章だけでは説明できない紋章（＝手持ち超過分）も
-   * 活用していたレコード数。選択外の紋章、および「選択枚数を超える同一紋章」を含む。
-   */
-  extraAdopt: number
-  /** 超過分の紋章 idx → それを活用していたレコード数（extraAdopt の内訳・降順表示用）。 */
+  /** 手持ち外の紋章 idx → それを活用していたレコード数。 */
   extra: Map<number, number>
+  /** 手持ち外の紋章を活用していたレコード数の合計。 */
+  extraN: number
 }
 
-export interface CompUsagesOptions {
-  /**
-   * 厳密モード: 選択紋章だけで達成したレコードに限定する（超過分の紋章を活用していた
-   * レコードを除外）。「自分の手持ちだけでこの成績が出せるのか」を見るためのフィルタ。
-   */
-  strict?: boolean
+/** 多重集合の交差 a ∩ b（a・b は昇順ソート済み）。 */
+function intersect(a: number[], b: number[]): number[] {
+  const out: number[] = []
+  let i = 0
+  let j = 0
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      out.push(a[i])
+      i++
+      j++
+    } else if (a[i] < b[j]) i++
+    else j++
+  }
+  return out
 }
 
-function countOcc(arr: number[], e: number): number {
-  let c = 0
-  for (const x of arr) if (x === e) c++
-  return c
+/** 多重集合の差 a − b（a・b は昇順ソート済み）。b に無い/足りない分だけ残る。 */
+function difference(a: number[], b: number[]): number[] {
+  const out: number[] = []
+  let i = 0
+  let j = 0
+  while (i < a.length) {
+    if (j >= b.length || a[i] < b[j]) out.push(a[i++])
+    else if (a[i] === b[j]) {
+      i++
+      j++
+    } else j++
+  }
+  return out
 }
 
 /**
- * 構成 comp を、選択紋章 sel（マルチセット）の「活用の仕方」ごとの行に分解する。
+ * 構成 comp を、選択紋章 sel（多重集合）の「使われ方」ごとの行に分解する。
  *
- * レコード群（sig）1つずつについて、選択紋章 e の活用スコアを
- *   score(e) = min(選択個数, one内のe数) + 0.5 * min(残り, half内のe数)
- * で求める（one=+1: 発動数がちょうどブレークポイント、half=+0.5: 発動しているが余りあり）。
- * 同じスコアベクトルを持つ sig をまとめて1行にし、その行の X = Σ score とする。
+ * - マッチ: そのレコードが選択紋章を1つ以上活用している（交差が非空）
+ * - 一致数: 交差の要素数。同一紋章の複数選択も多重集合として正しく数える
+ * - 手持ち外: レコードが活用した紋章 − 選択（選択外の紋章、および選択枚数を超える同一紋章）
+ * - strict: 手持ち外を含むレコードを母数から除外する（自分の紋章だけで達成した試合に限定）
  *
- * 行に分けるのが要点。X を「紋章ごとに別々の sig から最良値を拾った合計」にすると、
- * A を使った試合群と B を使った試合群が別物でも X=2 になり、実在しない盤面を指す。
- * さらに X（最良値）と指標（該当 sig 全体のプール）で母数が食い違う。
- * 行に分ければ、バッジの X とその行の Top4率・平均順位の母数が必ず一致する。
- *
- * 選択紋章が1つも発動していない sig は対象外。該当行が無ければ空配列。返り値は X の降順。
+ * 返り値は一致数の降順。該当行が無ければ空配列。
  */
-export function compUsages(
-  comp: CompStats,
-  sel: number[],
-  opts: CompUsagesOptions = {},
-): CompUsage[] {
+export function compRows(comp: CompStats, sel: number[], strict = false): CompRow[] {
   if (sel.length === 0) return []
-  const req = new Map<number, number>()
-  for (const e of sel) req.set(e, (req.get(e) ?? 0) + 1)
-  const distinct = [...req.keys()].sort((a, b) => a - b)
+  const want = sel.slice().sort((a, b) => a - b)
 
-  const rows = new Map<string, CompUsage>()
+  const rows = new Map<string, CompRow>()
   for (const sig of comp.sigs) {
-    const best = new Map<number, number>()
-    let x = 0
-    for (const e of distinct) {
-      const m = req.get(e)!
-      const filledOne = Math.min(m, countOcc(sig.one, e))
-      const filledHalf = Math.min(m - filledOne, countOcc(sig.half, e))
-      const score = filledOne + 0.5 * filledHalf
-      best.set(e, score)
-      x += score
-    }
-    if (x === 0) continue // 選択紋章がどれも発動していない sig
+    const used = intersect(sig.e, want)
+    if (used.length === 0) continue // 選択紋章をどれも活用していない
+    const extra = difference(sig.e, want)
+    if (strict && extra.length > 0) continue
 
-    // 手持ち超過分の紋章（選択外の紋章、および選択枚数を超える同一紋章）。
-    // このレコードの成績は「あなたが持っていない紋章」にも支えられている、という情報。
-    const surplus = new Set<number>()
-    for (const e of new Set([...sig.one, ...sig.half])) {
-      const used = countOcc(sig.one, e) + countOcc(sig.half, e)
-      if (used > (req.get(e) ?? 0)) surplus.add(e)
-    }
-    if (opts.strict && surplus.size > 0) continue
-
-    // 合計 X が同じでも紋章の内訳が違えば別の構成（別の紋章を積んだ盤面）なので、
-    // スコアのベクトルを行キーにする。
-    const key = distinct.map((e) => `${e}:${best.get(e)}`).join(',')
+    const key = used.join(',')
     let row = rows.get(key)
     if (!row) {
-      row = {
-        adopt: 0,
-        top4: 0,
-        win: 0,
-        p: 0,
-        x,
-        n: sel.length,
-        best,
-        req,
-        key,
-        extraAdopt: 0,
-        extra: new Map(),
-      }
+      row = { used, match: used.length, n: 0, top4: 0, win: 0, p: 0, extra: new Map(), extraN: 0 }
       rows.set(key, row)
     }
-    row.adopt += sig.n
+    row.n += sig.n
     row.top4 += sig.top4
     row.win += sig.win
     row.p += sig.p
-    if (surplus.size > 0) {
-      row.extraAdopt += sig.n
-      for (const e of surplus) row.extra.set(e, (row.extra.get(e) ?? 0) + sig.n)
+    if (extra.length > 0) {
+      row.extraN += sig.n
+      // 同一紋章が複数余っていても「その紋章を併用したレコード数」は1回だけ数える。
+      for (const e of new Set(extra)) row.extra.set(e, (row.extra.get(e) ?? 0) + sig.n)
     }
   }
-  return [...rows.values()].sort((a, b) => b.x - a.x)
+  return [...rows.values()].sort((a, b) => b.match - a.match)
 }
 
 /**
@@ -128,10 +103,17 @@ export function maxEmblemMultiplicity(comps: CompStats[], emblemCount: number): 
   const max = new Array<number>(emblemCount).fill(0)
   for (const comp of comps) {
     for (const sig of comp.sigs) {
-      const used = new Map<number, number>()
-      for (const e of sig.one) used.set(e, (used.get(e) ?? 0) + 1)
-      for (const e of sig.half) used.set(e, (used.get(e) ?? 0) + 1)
-      for (const [e, c] of used) if (e < emblemCount && c > max[e]) max[e] = c
+      // sig.e は昇順なので、同じ値の連続長がその紋章の枚数。
+      let i = 0
+      while (i < sig.e.length) {
+        const e = sig.e[i]
+        let c = 0
+        while (i < sig.e.length && sig.e[i] === e) {
+          c++
+          i++
+        }
+        if (e < emblemCount && c > max[e]) max[e] = c
+      }
     }
   }
   return max

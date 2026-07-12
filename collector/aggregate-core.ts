@@ -33,21 +33,6 @@ export interface LoadedRecord {
   route: string
 }
 
-/**
- * count 以下の最大ブレークポイントを返す。
- * bps が未定義/空（ブレークポイント情報なし）の場合はフォールバックとして count を返す。
- * bps が非空なのに count 以下のブレークポイントが存在しない（最小BP未満）場合は
- * undefined を返す（発動実体が最小ブレークポイントに満たない＝活用として扱えない）。
- */
-export function activeBreakpoint(count: number, bps: number[] | undefined): number | undefined {
-  if (!bps || bps.length === 0) return count
-  let best: number | undefined
-  for (const bp of bps) {
-    if (bp <= count && (best === undefined || bp > best)) best = bp
-  }
-  return best
-}
-
 /** 最頻値（同数なら大きい方）。空なら undefined。 */
 export function modeMaxNumber(values: number[]): number | undefined {
   const counts = new Map<number, number>()
@@ -87,114 +72,58 @@ export interface SplitBoardResult {
   boardApis: string[]
   /** 盤面ユニット集合（表示用収集のメンバシップ判定に使用）。 */
   boardSet: Set<string>
-  /** 盤面から除外したユニット（召喚等）の特性寄与。num_units の盤面実効数補正に使う。 */
-  summonTraitCount: Map<string, number>
   /** 静的データに解決できなかったユニット apiName（診断用・重複含む）。 */
   unresolvedUnits: string[]
 }
 
-/**
- * 盤面ユニット集合を構築する（召喚・非ショップ除外、コスト1-5、重複除去）。
- * 盤面から除外したユニット（召喚等）の特性寄与は summonTraitCount に記録する
- * （召喚も Riot の num_units に含まれるため、盤面実効数補正に必要）。
- */
+/** 盤面ユニット集合を構築する（召喚・非ショップ除外、コスト1-5、重複除去）。 */
 export function splitBoardUnits(rec: ParticipantRecord, staticData: StaticData): SplitBoardResult {
   const boardSet = new Set<string>()
-  const summonTraitCount = new Map<string, number>()
   const unresolvedUnits: string[] = []
   for (const uApi of rec.u) {
-    if (!staticData.units.has(uApi)) {
+    const uInfo = staticData.units.get(uApi)
+    if (!uInfo) {
       unresolvedUnits.push(uApi)
       continue
     }
-    const uInfo = staticData.units.get(uApi)!
-    if (uInfo.cost < 1 || uInfo.cost > 5 || NON_BOARD_UNIT_RE.test(uApi)) {
-      for (const tApi of uInfo.traits) {
-        summonTraitCount.set(tApi, (summonTraitCount.get(tApi) ?? 0) + 1)
-      }
-      continue
-    }
+    if (uInfo.cost < 1 || uInfo.cost > 5 || NON_BOARD_UNIT_RE.test(uApi)) continue
     boardSet.add(uApi)
   }
-  const boardApis = [...boardSet].sort()
-  return { boardApis, boardSet, summonTraitCount, unresolvedUnits }
+  return { boardApis: [...boardSet].sort(), boardSet, unresolvedUnits }
 }
 
 export interface ClassifyEmblemsResult {
-  /** +1 紋章（ちょうどブレークポイント）の apiName（未ソート・個数分積む）。 */
-  oneApisArr: string[]
-  /** +0.5 紋章（ブレークポイント超過）の apiName（未ソート・個数分積む）。 */
-  halfApisArr: string[]
-  /** 発動している（付与トレイトが tier>=1）紋章 apiName 集合。装備者収集のゲートに使う。 */
+  /** 活用された紋章の apiName（rec.e の並び順＝多重度を保持）。 */
+  active: string[]
+  /** 同上の集合。装備者収集のゲートに使う。 */
   activeEmblemApis: Set<string>
   /** 静的データに解決できなかった紋章 apiName（診断用・重複含む）。 */
   unresolvedEmblems: string[]
-  /** rec.tc（発動トレイト→num_units）欠落かつ発動紋章あり＝シグネチャから除外された（診断用）。 */
-  tcMissing: boolean
-  /** 盤面実効数が最小ブレークポイント未満のため活用に数えなかった紋章インスタンス数（診断用）。 */
-  belowMinBreakpoint: number
 }
 
 /**
- * 紋章活用スコアを算出し one/half バケットへ振り分ける。
- * 同一紋章を複数装備した場合は同数だけ配列に積む（multiplicity 保持）。
- * summonTraitCount は splitBoardUnits の返り値を渡す（盤面実効特性数の補正に使用）。
+ * 装備紋章のうち「活用された」ものを抽出する。
+ *
+ * 活用の定義は二値: 装備している AND 付与トレイト（変種含むいずれか）が発動している(tier>=1)。
+ * 発動数がブレークポイントちょうどか超過か（＝余っているか）は区別しない。要件が
+ * 「その紋章を使ったシナジーが1つでも発動していれば対象」であり、余りの区別は要求されていないため。
+ * 同一紋章を複数装備した場合は rec.e の並びをそのまま辿ることで多重度が保たれる。
  */
 export function classifyEmblems(
   rec: ParticipantRecord,
   staticData: StaticData,
-  summonTraitCount: Map<string, number>,
 ): ClassifyEmblemsResult {
-  // 発動トレイト集合（紋章の発動判定に使用）。
-  const recTraitKeys = new Set(Object.keys(rec.t))
-
-  const emblemInstances = new Map<string, number>()
-  for (const eApi of rec.e) emblemInstances.set(eApi, (emblemInstances.get(eApi) ?? 0) + 1)
-
-  const oneApisArr: string[] = []
-  const halfApisArr: string[] = []
-  const activeEmblemApis = new Set<string>()
+  const active: string[] = []
   const unresolvedEmblems: string[] = []
-  let belowMinBreakpoint = 0
-  for (const [eApi, inst] of emblemInstances) {
+  for (const eApi of rec.e) {
     const emb = staticData.emblems.get(eApi)
     if (!emb) {
       unresolvedEmblems.push(eApi)
       continue
     }
-    // 付与特性（変種含む）のうち発動中(tier>=1)のもの。最大 num_units の変種を採用。
-    let bestVariant: string | undefined
-    let bestRaw = -1
-    for (const a of emb.traitApis) {
-      if (recTraitKeys.has(a)) {
-        const nu = rec.tc?.[a] ?? 0
-        if (nu > bestRaw) {
-          bestRaw = nu
-          bestVariant = a
-        }
-      }
-    }
-    if (!bestVariant) continue // 発動していない紋章は活用に数えない
-    activeEmblemApis.add(eApi)
-
-    // 盤面実効特性数 = Riot num_units − 召喚ユニットの当該特性寄与。
-    const effective = Math.max(0, (rec.tc?.[bestVariant] ?? 0) - (summonTraitCount.get(bestVariant) ?? 0))
-    if (effective <= 0) continue // 盤面に実体が無い（召喚のみ）→ 活用に数えない
-
-    // 余り判定: 実効数がちょうどブレークポイントなら +1、超過なら +0.5。
-    // 実効数が最小ブレークポイント未満（bp=undefined）は活用に数えない
-    // （召喚のみ→数えない、と同じ思想。診断用にインスタンス数を記録）。
-    const bp = activeBreakpoint(effective, staticData.traitBreakpoints.get(bestVariant))
-    if (bp === undefined) {
-      belowMinBreakpoint += inst
-      continue
-    }
-    const bucket = effective > bp ? halfApisArr : oneApisArr
-    for (let j = 0; j < inst; j++) bucket.push(eApi)
+    if (emb.traitApis.some((a) => a in rec.t)) active.push(eApi)
   }
-  // tc 欠落レコード: 発動紋章があるのに num_units 不明で活用判定できない（旧形式レコード）。
-  const tcMissing = rec.tc === undefined && activeEmblemApis.size > 0
-  return { oneApisArr, halfApisArr, activeEmblemApis, unresolvedEmblems, tcMissing, belowMinBreakpoint }
+  return { active, activeEmblemApis: new Set(active), unresolvedEmblems }
 }
 
 export interface AggregateDiag {
@@ -210,10 +139,6 @@ export interface AggregateDiag {
   unresolvedUnitNames: Set<string>
   /** 未解決紋章 apiName 集合（該当紋章のみ無視）。 */
   unresolvedEmblemNames: Set<string>
-  /** tc 欠落（発動紋章ありなのに num_units 不明でシグネチャから除外）レコード数。 */
-  tcMissingRecords: number
-  /** 盤面実効数が最小ブレークポイント未満のため活用に数えなかった紋章インスタンス数。 */
-  belowMinBreakpoint: number
 }
 
 /**
@@ -232,8 +157,7 @@ export function buildStats(
 
   // 盤面ユニット集合でグルーピング ＋ 紋章活用シグネチャ集計。
   interface SigAcc {
-    one: string[] // +1 紋章 apiName（ソート済み）
-    half: string[] // +0.5 紋章 apiName（ソート済み）
+    e: string[] // 活用紋章 apiName の多重集合（ソート済み）
     n: number
     top4: number
     win: number
@@ -253,8 +177,6 @@ export function buildStats(
   const map = new Map<string, CompAcc>()
   let noBoard = 0
   let excludedUnresolvedTrait = 0
-  let tcMissingRecords = 0
-  let belowMinBreakpointTotal = 0
 
   for (const lr of target) {
     const rec = lr.rec
@@ -272,7 +194,7 @@ export function buildStats(
       continue
     }
 
-    const { boardApis, boardSet, summonTraitCount, unresolvedUnits } = splitBoardUnits(rec, staticData)
+    const { boardApis, boardSet, unresolvedUnits } = splitBoardUnits(rec, staticData)
     for (const u of unresolvedUnits) unresolvedUnitNames.add(u)
     if (boardSet.size === 0) {
       noBoard++
@@ -317,12 +239,9 @@ export function buildStats(
       }
     }
 
-    // 紋章活用スコア → シグネチャ。
-    const { oneApisArr, halfApisArr, activeEmblemApis, unresolvedEmblems, tcMissing, belowMinBreakpoint } =
-      classifyEmblems(rec, staticData, summonTraitCount)
+    // 活用紋章（装備 AND 付与トレイト発動）。
+    const { active, activeEmblemApis, unresolvedEmblems } = classifyEmblems(rec, staticData)
     for (const e of unresolvedEmblems) unresolvedEmblemNames.add(e)
-    if (tcMissing) tcMissingRecords++
-    belowMinBreakpointTotal += belowMinBreakpoint
 
     // 装備者（発動ゲート済み・インスタンス単位）。
     for (let k = 0; k < rec.e.length; k++) {
@@ -339,14 +258,13 @@ export function buildStats(
       }
     }
 
-    if (oneApisArr.length === 0 && halfApisArr.length === 0) continue // 発動紋章なし → シグネチャ対象外
+    if (active.length === 0) continue // 活用紋章なし → シグネチャ対象外
 
-    const oneApis = oneApisArr.sort()
-    const halfApis = halfApisArr.sort()
-    const sigKey = JSON.stringify([oneApis, halfApis])
+    const emblemApis = active.slice().sort()
+    const sigKey = emblemApis.join('|')
     let sig = acc.sigs.get(sigKey)
     if (!sig) {
-      sig = { one: oneApis, half: halfApis, n: 0, top4: 0, win: 0, p: 0 }
+      sig = { e: emblemApis, n: 0, top4: 0, win: 0, p: 0 }
       acc.sigs.set(sigKey, sig)
     }
     sig.n++
@@ -432,10 +350,7 @@ export function buildStats(
 
     // シグネチャ（紋章 idx は後でインターン）。
     const sigs = [...acc.sigs.values()]
-    for (const s of sigs) {
-      for (const e of s.one) usedEmblemApis.add(e)
-      for (const e of s.half) usedEmblemApis.add(e)
-    }
+    for (const s of sigs) for (const e of s.e) usedEmblemApis.add(e)
 
     preComps.push({
       unitApis: acc.unitApis,
@@ -535,16 +450,15 @@ export function buildStats(
       ])
       .sort((a, b) => a[0] - b[0])
 
-    const g: [number[], number[], number, number, number, number][] = pc.sigs
-      .map((s): [number[], number[], number, number, number, number] => [
-        s.one.map((e) => emblemIndex.get(e)!).sort((x, y) => x - y),
-        s.half.map((e) => emblemIndex.get(e)!).sort((x, y) => x - y),
+    const g: [number[], number, number, number, number][] = pc.sigs
+      .map((s): [number[], number, number, number, number] => [
+        s.e.map((e) => emblemIndex.get(e)!).sort((x, y) => x - y),
         s.n,
         s.top4,
         s.win,
         s.p,
       ])
-      .sort((a, b) => b[2] - a[2])
+      .sort((a, b) => b[1] - a[1])
 
     const wire: WireComp = { u: unitIdxs, n: pc.n, g }
     if (unitStars.some((s) => s > 0)) wire.k = unitStars
@@ -563,7 +477,7 @@ export function buildStats(
   }
 
   const out: WireStatsFile = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     generatedAt: opts.generatedAt,
     patch: opts.targetPatch,
     tftPatch: opts.tftPatch,
@@ -588,8 +502,6 @@ export function buildStats(
     unresolvedTraitNames,
     unresolvedUnitNames,
     unresolvedEmblemNames,
-    tcMissingRecords,
-    belowMinBreakpoint: belowMinBreakpointTotal,
   }
 
   return { out, diag }

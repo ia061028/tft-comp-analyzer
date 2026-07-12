@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import type { StaticData } from './cdragon.ts'
 import type { ParticipantRecord } from '../shared/types.ts'
 import {
-  activeBreakpoint,
   modeMaxNumber,
   dedupeRecords,
   splitBoardUnits,
@@ -13,17 +12,13 @@ import {
 } from './aggregate-core.ts'
 
 // ---- 手作りの最小 StaticData フィクスチャ ----
-// トレイト2種 bp=[2,4] / 通常ユニット4種+召喚ユニット1種 / 紋章2種 / アイテム2種。
+// トレイト2種 / 通常ユニット4種+召喚ユニット1種 / 紋章2種 / アイテム2種。
 function makeStaticData(): StaticData {
   return {
     setNumber: 17,
     traits: new Map([
       ['TraitA', { name: 'Alpha', nameJa: 'アルファ', icon: 'traitA.png', tiers: [[2, 1], [4, 3]] as [number, number][] }],
       ['TraitB', { name: 'Bravo', nameJa: 'ブラボー', icon: 'traitB.png', tiers: [[2, 1], [4, 3]] as [number, number][] }],
-    ]),
-    traitBreakpoints: new Map([
-      ['TraitA', [2, 4]],
-      ['TraitB', [2, 4]],
     ]),
     units: new Map([
       ['TFT_UnitA', { name: 'UnitA', nameJa: 'ユニットA', cost: 1, icon: 'unitA.png', code: 1, traits: ['TraitA'] }],
@@ -35,7 +30,7 @@ function makeStaticData(): StaticData {
     ]),
     emblems: new Map([
       ['TFT_Item_EmblemA', { name: 'EmblemA', nameJa: '紋章A', traitApi: 'TraitA', traitApis: ['TraitA'], icon: 'embA.png', base: 'spatula', recipe: ['spat.png', 'baseA.png'] as [string, string] }],
-      // 変種を持つ紋章（発動判定で num_units 最大の付与トレイトを採用）。
+      // 変種を持つ紋章（付与トレイトのいずれかが発動していれば活用）。
       ['TFT_Item_EmblemB', { name: 'EmblemB', nameJa: '紋章B', traitApi: 'TraitB', traitApis: ['TraitB', 'TraitA'], icon: 'embB.png', base: 'spatula', recipe: ['spat.png', 'baseB.png'] as [string, string] }],
     ]),
     items: new Map([
@@ -60,31 +55,6 @@ function rec(p: Partial<ParticipantRecord> & Pick<ParticipantRecord, 'm'>): Part
     ...p,
   }
 }
-
-// ---- activeBreakpoint ----
-test('activeBreakpoint: ちょうどBP → そのBP', () => {
-  assert.equal(activeBreakpoint(2, [2, 4]), 2)
-  assert.equal(activeBreakpoint(4, [2, 4]), 4)
-})
-
-test('activeBreakpoint: BP超過 → 直下BP', () => {
-  assert.equal(activeBreakpoint(3, [2, 4]), 2)
-  assert.equal(activeBreakpoint(5, [2, 4]), 4)
-})
-
-test('activeBreakpoint: 最小BP未満 → undefined（活用として扱えない）', () => {
-  assert.equal(activeBreakpoint(1, [2, 4]), undefined)
-})
-
-test('activeBreakpoint: bps 空・undefined → count', () => {
-  assert.equal(activeBreakpoint(3, []), 3)
-  assert.equal(activeBreakpoint(3, undefined), 3)
-})
-
-test('activeBreakpoint: 未ソート bps でも正しい', () => {
-  assert.equal(activeBreakpoint(5, [4, 2]), 4)
-  assert.equal(activeBreakpoint(3, [4, 2]), 2)
-})
 
 // ---- modeMaxNumber ----
 test('modeMaxNumber: 最頻値', () => {
@@ -114,13 +84,12 @@ test('dedupeRecords: 同一 (m,p) は先勝ち', () => {
 })
 
 // ---- splitBoardUnits ----
-test('splitBoardUnits: 召喚除外 + summonTraitCount 記録', () => {
+test('splitBoardUnits: 召喚は盤面から除外', () => {
   const sd = makeStaticData()
   const r = rec({ m: 'M', u: ['TFT_UnitA', 'TFT_UnitB', 'TFT_UnitE_Summon'] })
-  const { boardApis, boardSet, summonTraitCount, unresolvedUnits } = splitBoardUnits(r, sd)
+  const { boardApis, boardSet, unresolvedUnits } = splitBoardUnits(r, sd)
   assert.deepEqual(boardApis, ['TFT_UnitA', 'TFT_UnitB'])
   assert.ok(!boardSet.has('TFT_UnitE_Summon'))
-  assert.equal(summonTraitCount.get('TraitA'), 1) // 召喚Eの TraitA 寄与
   assert.equal(unresolvedUnits.length, 0)
 })
 
@@ -140,92 +109,53 @@ test('splitBoardUnits: 盤面空（召喚のみ）', () => {
   assert.equal(boardSet.size, 0)
 })
 
-// ---- classifyEmblems ----
-const noSummon = new Map<string, number>()
-
-test('classifyEmblems: effective==bp → one', () => {
+// ---- classifyEmblems（活用 = 装備 AND 付与トレイト発動 の二値） ----
+test('classifyEmblems: 付与トレイトが発動していれば活用', () => {
   const sd = makeStaticData()
-  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 2 }, e: ['TFT_Item_EmblemA'] })
-  const { oneApisArr, halfApisArr, activeEmblemApis, tcMissing, belowMinBreakpoint } = classifyEmblems(r, sd, noSummon)
-  assert.deepEqual(oneApisArr, ['TFT_Item_EmblemA'])
-  assert.deepEqual(halfApisArr, [])
+  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemA'] })
+  const { active, activeEmblemApis, unresolvedEmblems } = classifyEmblems(r, sd)
+  assert.deepEqual(active, ['TFT_Item_EmblemA'])
   assert.ok(activeEmblemApis.has('TFT_Item_EmblemA'))
-  assert.equal(tcMissing, false)
-  assert.equal(belowMinBreakpoint, 0)
+  assert.deepEqual(unresolvedEmblems, [])
 })
 
-test('classifyEmblems: effective>bp → half', () => {
+test('classifyEmblems: 発動数(tc)には依存しない（余っていても活用）', () => {
   const sd = makeStaticData()
+  // 旧実装では tc=3 > bp=2 で「+0.5（余りあり）」だったケース。今は単に活用。
   const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 3 }, e: ['TFT_Item_EmblemA'] })
-  const { oneApisArr, halfApisArr } = classifyEmblems(r, sd, noSummon)
-  assert.deepEqual(oneApisArr, [])
-  assert.deepEqual(halfApisArr, ['TFT_Item_EmblemA'])
-})
-
-test('classifyEmblems: 召喚補正で effective が 0 → 数えない（発動扱いは維持）', () => {
-  const sd = makeStaticData()
-  const summon = new Map<string, number>([['TraitA', 2]])
-  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 2 }, e: ['TFT_Item_EmblemA'] })
-  const { oneApisArr, halfApisArr, activeEmblemApis, belowMinBreakpoint } = classifyEmblems(r, sd, summon)
-  assert.deepEqual(oneApisArr, [])
-  assert.deepEqual(halfApisArr, [])
-  assert.ok(activeEmblemApis.has('TFT_Item_EmblemA')) // 発動はしているので装備者ゲートは通す
-  assert.equal(belowMinBreakpoint, 0) // effective<=0 は最小BP未満とは別カウント
-})
-
-test('classifyEmblems: 召喚補正で effective が最小BP未満 → 数えない + belowMinBreakpoint 加算', () => {
-  const sd = makeStaticData()
-  // effective = tc(2) − 召喚寄与(1) = 1 < 最小BP(2) → one/half どちらにも積まない。
-  const summon = new Map<string, number>([['TraitA', 1]])
-  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 2 }, e: ['TFT_Item_EmblemA', 'TFT_Item_EmblemA'] })
-  const { oneApisArr, halfApisArr, activeEmblemApis, belowMinBreakpoint } = classifyEmblems(r, sd, summon)
-  assert.deepEqual(oneApisArr, [])
-  assert.deepEqual(halfApisArr, [])
-  assert.ok(activeEmblemApis.has('TFT_Item_EmblemA')) // 発動はしているので装備者ゲートは通す
-  assert.equal(belowMinBreakpoint, 2) // 紋章インスタンス単位（同一紋章2個）
-})
-
-test('classifyEmblems: tc 欠落 → 数えない + tcMissing=true（診断用）', () => {
-  const sd = makeStaticData()
-  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemA'] }) // tc なし
-  const { oneApisArr, halfApisArr, activeEmblemApis, tcMissing } = classifyEmblems(r, sd, noSummon)
-  assert.deepEqual(oneApisArr, [])
-  assert.deepEqual(halfApisArr, [])
-  assert.ok(activeEmblemApis.has('TFT_Item_EmblemA'))
-  assert.equal(tcMissing, true)
-})
-
-test('classifyEmblems: tc 欠落でも発動紋章なしなら tcMissing=false', () => {
-  const sd = makeStaticData()
-  const r = rec({ m: 'M', t: { TraitB: 3 }, e: ['TFT_Item_EmblemA'] }) // tc なし・EmblemA 非発動
-  const { tcMissing } = classifyEmblems(r, sd, noSummon)
-  assert.equal(tcMissing, false)
+  assert.deepEqual(classifyEmblems(r, sd).active, ['TFT_Item_EmblemA'])
+  // tc 自体が無くても判定できる（旧実装ではシグネチャから除外されていた）。
+  const noTc = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemA'] })
+  assert.deepEqual(classifyEmblems(noTc, sd).active, ['TFT_Item_EmblemA'])
 })
 
 test('classifyEmblems: 未発動紋章はスキップ（付与トレイト非発動）', () => {
   const sd = makeStaticData()
-  const r = rec({ m: 'M', t: { TraitB: 3 }, tc: { TraitB: 2 }, e: ['TFT_Item_EmblemA'] }) // TraitA 非発動
-  const { oneApisArr, halfApisArr, activeEmblemApis } = classifyEmblems(r, sd, noSummon)
-  assert.deepEqual(oneApisArr, [])
-  assert.deepEqual(halfApisArr, [])
+  const r = rec({ m: 'M', t: { TraitB: 3 }, e: ['TFT_Item_EmblemA'] }) // TraitA 非発動
+  const { active, activeEmblemApis } = classifyEmblems(r, sd)
+  assert.deepEqual(active, [])
   assert.ok(!activeEmblemApis.has('TFT_Item_EmblemA'))
 })
 
-test('classifyEmblems: 同一紋章2個 → 2回積む', () => {
+test('classifyEmblems: 同一紋章2個 → 多重度を保って2回積む', () => {
   const sd = makeStaticData()
-  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 2 }, e: ['TFT_Item_EmblemA', 'TFT_Item_EmblemA'] })
-  const { oneApisArr } = classifyEmblems(r, sd, noSummon)
-  assert.deepEqual(oneApisArr, ['TFT_Item_EmblemA', 'TFT_Item_EmblemA'])
+  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemA', 'TFT_Item_EmblemA'] })
+  assert.deepEqual(classifyEmblems(r, sd).active, ['TFT_Item_EmblemA', 'TFT_Item_EmblemA'])
 })
 
-test('classifyEmblems: 変種トレイトは num_units 最大を採用', () => {
+test('classifyEmblems: 変種トレイトはいずれかが発動していれば活用', () => {
   const sd = makeStaticData()
-  // EmblemB は traitApis=[TraitB, TraitA]。TraitA(3) > TraitB(2) なので TraitA を採用し
-  // effective=3, bp=2 → half。誤って TraitB(2) を採ると effective=2, bp=2 → one になり区別できる。
-  const r = rec({ m: 'M', t: { TraitA: 3, TraitB: 1 }, tc: { TraitA: 3, TraitB: 2 }, e: ['TFT_Item_EmblemB'] })
-  const { oneApisArr, halfApisArr } = classifyEmblems(r, sd, noSummon)
-  assert.deepEqual(oneApisArr, [])
-  assert.deepEqual(halfApisArr, ['TFT_Item_EmblemB'])
+  // EmblemB は traitApis=[TraitB, TraitA]。TraitB は非発動だが TraitA が発動 → 活用。
+  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemB'] })
+  assert.deepEqual(classifyEmblems(r, sd).active, ['TFT_Item_EmblemB'])
+})
+
+test('classifyEmblems: 未解決紋章は記録して無視', () => {
+  const sd = makeStaticData()
+  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_Unknown', 'TFT_Item_EmblemA'] })
+  const { active, unresolvedEmblems } = classifyEmblems(r, sd)
+  assert.deepEqual(active, ['TFT_Item_EmblemA'])
+  assert.deepEqual(unresolvedEmblems, ['TFT_Item_Unknown'])
 })
 
 // ---- buildStats（ミニゴールデン） ----
@@ -276,7 +206,7 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
   })
 
   assert.deepStrictEqual(out, {
-    schemaVersion: 3,
+    schemaVersion: 4,
     generatedAt: 'FIXED_TS',
     patch: '16.12',
     tftPatch: '17.5',
@@ -297,7 +227,7 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
       { api: 'TFT_Item_ItemX', name: 'ItemX', nameJa: 'アイテムX', icon: 'itemX.png', recipe: ['c1.png', 'c2.png'] },
     ],
     comps: [
-      { u: [0, 1], n: 4, g: [[[0], [], 3, 2, 1, 13]], k: [2, 3], i: [[1, 0, 4]], h: [[0, 1, 3]] },
+      { u: [0, 1], n: 4, g: [[[0], 3, 2, 1, 13]], k: [2, 3], i: [[1, 0, 4]], h: [[0, 1, 3]] },
     ],
     baseItemIcons: { spatula: 'spat.png', fryingPan: 'pan.png' },
   })
@@ -306,6 +236,4 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
   assert.equal(diag.boardGroupCount, 2)
   assert.equal(diag.noBoard, 0)
   assert.equal(diag.excludedUnresolvedTrait, 0)
-  assert.equal(diag.tcMissingRecords, 0)
-  assert.equal(diag.belowMinBreakpoint, 0)
 })
