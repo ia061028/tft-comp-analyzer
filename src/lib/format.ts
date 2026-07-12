@@ -64,6 +64,26 @@ export function bronzeTraitCount(counts: Map<number, number>, traits: TraitInfo[
   return c
 }
 
+/**
+ * 並び順のための縮約（ベイズ平滑化）。
+ *
+ * TFT は8人対戦なので理論ベースレートが確定している（Top4=50%、1位=12.5%、平均順位=4.5）。
+ * 事前分布を推定する必要がなく、そのまま事前平均として使える。
+ * これにより「採用5件で Top4率 80%」が「採用500件で 62%」より上に来るのを防ぐ。
+ * n → ∞ で生の率に収束するので、サンプルが十分な構成の順位は歪まない。
+ *
+ * 注意: 縮約値は**並び順の決定にのみ**使う。カードに表示する数字は生の率のまま
+ * （数字を偽らない）。表示値と並び順が一致しない件は並び替えラベルの title で説明する。
+ */
+export const PRIOR_WEIGHT = 10 // 事前分布の重み ＝「仮想的な10試合」ぶんの重み
+export const PRIOR_PLACE = 4.5
+export const PRIOR_TOP4 = 0.5
+export const PRIOR_WIN = 0.125
+
+export function shrunk(successes: number, n: number, prior: number, weight = PRIOR_WEIGHT): number {
+  return (successes + weight * prior) / (n + weight)
+}
+
 /** スターレベル → ★の配色（3=金,2=銀,1=銅） */
 export function starColor(star: number): string {
   switch (star) {

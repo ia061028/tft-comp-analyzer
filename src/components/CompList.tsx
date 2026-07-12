@@ -1,7 +1,14 @@
 import { useMemo } from 'react'
 import type { CompStats, StatsFile } from '../../shared/types'
 import { compUsages, type CompUsage } from '../lib/multiset'
-import { activeTraitCounts, bronzeTraitCount } from '../lib/format'
+import {
+  activeTraitCounts,
+  bronzeTraitCount,
+  shrunk,
+  PRIOR_PLACE,
+  PRIOR_TOP4,
+  PRIOR_WIN,
+} from '../lib/format'
 import { t, type Lang } from '../lib/i18n'
 import { CompCard, type SortKey } from './CompCard'
 
@@ -64,17 +71,21 @@ export function CompList({
 
   // グループ化・ソートは rows が変わらなければ再計算不要（sortKey/bronzeMode 変更時のみ）。
   const groups = useMemo(() => {
+    // 率は縮約値で比較する（生の率だと採用5件の 80% が採用500件の 62% より上に来る）。
+    // 表示する数字は生の率のまま。詳細は format.ts の shrunk を参照。
     const cmp = (a: CompUsage, b: CompUsage): number => {
       switch (sortKey) {
         case 'place':
-          return a.p / a.adopt - b.p / b.adopt // 平均順位 昇順
+          return (
+            shrunk(a.p, a.adopt, PRIOR_PLACE) - shrunk(b.p, b.adopt, PRIOR_PLACE) // 平均順位 昇順
+          )
         case 'win':
-          return b.win / b.adopt - a.win / a.adopt
+          return shrunk(b.win, b.adopt, PRIOR_WIN) - shrunk(a.win, a.adopt, PRIOR_WIN)
         case 'adopt':
-          return b.adopt - a.adopt
+          return b.adopt - a.adopt // 採用数そのものは縮約しない
         case 'top4':
         default:
-          return b.top4 / b.adopt - a.top4 / a.adopt
+          return shrunk(b.top4, b.adopt, PRIOR_TOP4) - shrunk(a.top4, a.adopt, PRIOR_TOP4)
       }
     }
 

@@ -188,7 +188,12 @@ function App() {
           </div>
 
           <div className="flex items-center gap-2.5 text-sm">
-            <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t(lang, 'sort')}</span>
+            <span
+              className="cursor-help text-xs font-semibold uppercase tracking-wide text-faint"
+              title={t(lang, 'sortHint')}
+            >
+              {t(lang, 'sort')}
+            </span>
             <SegmentedControl<SortKey>
               ariaLabel={t(lang, 'sort')}
               value={sortKey}
