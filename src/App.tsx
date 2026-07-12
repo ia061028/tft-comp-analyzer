@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { StatsFile } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
 import { loadStats } from './lib/data'
+import { maxEmblemMultiplicity } from './lib/multiset'
 import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
 import { CompList } from './components/CompList'
@@ -61,6 +62,13 @@ function App() {
     if (!statsOrNull) return []
     return size === 'all' ? statsOrNull.comps : statsOrNull.comps.filter((c) => c.units.length === Number(size))
   }, [statsOrNull, size])
+
+  // 紋章ごとの「データ上1レコードで同時活用された最大枚数」。選択枚数がこれを超えたら
+  // SelectionBar で警告する（構成全体が対象。ユニット数フィルタの影響を受けない）。
+  const maxMult = useMemo(
+    () => (statsOrNull ? maxEmblemMultiplicity(statsOrNull.comps, statsOrNull.emblems.length) : []),
+    [statsOrNull],
+  )
 
   // selection は emblems 配列インデックスのマルチセット。counts[index] = 個数。
   const counts = useMemo(() => {
@@ -291,6 +299,7 @@ function App() {
             lang={lang}
             onClear={clear}
             onRemove={removeEmblem}
+            maxMult={maxMult}
           />
           <CompList
             stats={stats}
