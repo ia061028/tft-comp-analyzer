@@ -55,7 +55,7 @@ const comp: CompStats = { units: [0, 1], n: 1, unitStars: [], unitItems: [], hol
 
 const usage = (req: Record<number, number>, best: Record<number, number>): CompUsage => ({
   adopt: 1, top4: 0, win: 0, p: 4, x: 0, n: Object.values(req).reduce((a, b) => a + b, 0),
-  req: counts(req), best: counts(best), key: '',
+  req: counts(req), best: counts(best), key: '', extraAdopt: 0, extra: new Map(),
 })
 
 test('activeTraitCounts: 盤面の所持特性を集計', () => {

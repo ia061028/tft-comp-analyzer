@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { CompStats, EmblemSig } from '../../shared/types'
-import { compUsages } from './multiset'
+import { compUsages, maxEmblemMultiplicity } from './multiset'
 
 /** sigs だけ持つ最小の CompStats を作る（compUsages は sigs のみ参照）。 */
 function comp(sigs: EmblemSig[]): CompStats {
@@ -117,4 +117,58 @@ test('compUsages: 同一紋章×2 だが1体しか+1にならない構成は X=1
 
 test('compUsages: 選択なしは空', () => {
   assert.deepEqual(compUsages(c, []), [])
+})
+
+// --- 他紋章併用（手持ち超過分）と厳密モード ---
+
+test('compUsages: 選択外の紋章を活用していたレコードは extra として計上', () => {
+  // sel=[3]: 行3 は Meeple(7) も活用している＝手持ち(3のみ)を超える。
+  const rows = compUsages(c, [3])
+  const half = rows.find((r) => r.x === 0.5)! // 行2(n5) + 行3(n4)
+  assert.equal(half.adopt, 9)
+  assert.equal(half.extraAdopt, 4) // 行3 のみ
+  assert.deepEqual([...half.extra], [[7, 4]])
+
+  const full = rows.find((r) => r.x === 1)! // 行1 は 3 だけ
+  assert.equal(full.extraAdopt, 0)
+  assert.equal(full.extra.size, 0)
+})
+
+test('compUsages: 選択枚数を超える同一紋章も「手持ち超過」として extra に計上', () => {
+  // 1枚しか選んでいないのに、構成は2枚使っている。
+  const c2 = comp([sig([3, 3], [], 6, 3, 1, 20)])
+  const rows = compUsages(c2, [3])
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].x, 1) // 手持ち1枚分しか活用に数えない
+  assert.equal(rows[0].adopt, 6)
+  assert.equal(rows[0].extraAdopt, 6)
+  assert.deepEqual([...rows[0].extra], [[3, 6]])
+})
+
+test('compUsages: strict は手持ち超過を含むレコードを母数から除外', () => {
+  const rows = compUsages(c, [3], { strict: true })
+  const half = rows.find((r) => r.x === 0.5)!
+  assert.equal(half.adopt, 5) // 行3(Meeple併用, n4) が落ちて 行2(n5) のみ
+  assert.equal(half.extraAdopt, 0)
+
+  const full = rows.find((r) => r.x === 1)!
+  assert.equal(full.adopt, 10) // 行1 は超過なしなので不変
+})
+
+test('compUsages: strict で該当レコードが全滅すれば空配列', () => {
+  const c2 = comp([sig([3, 3], [], 6, 3, 1, 20)]) // 常に2枚使う構成
+  assert.deepEqual(compUsages(c2, [3], { strict: true }), [])
+})
+
+// --- 選択可能枚数の目安 ---
+
+test('maxEmblemMultiplicity: 1レコード内で同時活用された最大枚数（one/half 合算）', () => {
+  const comps = [
+    comp([sig([3, 3], [], 6, 3, 1, 20), sig([3], [7], 10, 5, 2, 40)]),
+    comp([sig([3], [3], 4, 2, 0, 16)]), // one と half に跨って合計2枚
+  ]
+  const max = maxEmblemMultiplicity(comps, 8)
+  assert.equal(max[3], 2)
+  assert.equal(max[7], 1)
+  assert.equal(max[0], 0) // 一度も活用されていない紋章
 })

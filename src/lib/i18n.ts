@@ -48,6 +48,11 @@ const ja = {
   bronzeModeTitle: 'ブロンズ特性（固有特性を除く、最小ティアで発動中の特性）が多い順に構成を表示',
   bronzeGroup: 'ブロンズ {n}',
   bronzeBadge: 'ブロンズ {n}',
+  strictMode: '選択紋章のみ',
+  strictModeTitle:
+    '選択した紋章だけで達成した試合に限定（他の紋章を併用した試合、および同一紋章を選択枚数より多く使った試合を除外）',
+  extraEmblems: '他紋章 {p}%',
+  extraEmblemsTitle: 'この行の試合のうち、選択していない紋章も活用していた割合',
   emblemCatSpatula: 'へら',
   emblemCatPan: 'フライパン',
   emblemCatNone: '合成不可',
@@ -98,6 +103,11 @@ const en: Record<UIKey, string> = {
   bronzeModeTitle: 'Rank comps by number of bronze traits (non-unique traits active at their lowest tier)',
   bronzeGroup: 'Bronze {n}',
   bronzeBadge: 'Bronze {n}',
+  strictMode: 'Selected only',
+  strictModeTitle:
+    'Limit to games achieved with the selected emblems alone (exclude games that also used other emblems, or more copies of an emblem than selected)',
+  extraEmblems: 'Other {p}%',
+  extraEmblemsTitle: 'Share of this row’s games that also used emblems you did not select',
   emblemCatSpatula: 'Spatula',
   emblemCatPan: 'Frying Pan',
   emblemCatNone: 'Non-craftable',
