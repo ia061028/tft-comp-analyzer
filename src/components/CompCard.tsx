@@ -29,6 +29,8 @@ interface CompCardProps {
   sortKey: SortKey
   lang: Lang
   bronzeMode?: boolean
+  /** 「活用紋章 n/k」を出すか。「すべて使う」ON のときは全行 k/k になるので出さない。 */
+  showUtilization: boolean
 }
 
 /**
@@ -53,6 +55,7 @@ export function CompCard({
   sortKey,
   lang,
   bronzeMode,
+  showUtilization,
 }: CompCardProps) {
   const { traits, units, emblems, items } = stats
   const [copied, setCopied] = useState(false)
@@ -173,7 +176,7 @@ export function CompCard({
               </Tip>
             ) : null,
           )}
-          {total > 1 && (
+          {showUtilization && (
             <div className="flex flex-col">
               <span className="text-[11px] leading-tight text-faint">{t(lang, 'utilizationLabel')}</span>
               <span

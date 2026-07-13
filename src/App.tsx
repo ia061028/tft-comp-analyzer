@@ -30,6 +30,9 @@ function App() {
   })
   const [size, setSize] = useState<SizeKey>('all')
   const [bronzeMode, setBronzeMode] = useState(false)
+  // 既定は OFF。「紋章A と B、どっちの方が良い盤面が組めるか」を見比べるのが最頻タスクなので、
+  // 片方だけを使う構成も既定で見せる。全部使い切る構成だけを見たいときに絞り込む。
+  const [fullUseOnly, setFullUseOnly] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -214,6 +217,27 @@ function App() {
             />
           </div>
 
+          {/* 「すべて使う」は紋章が2枚以上ないと恒真になるので、そのときだけ出す。 */}
+          {selection.length > 1 && (
+            <button
+              type="button"
+              aria-pressed={fullUseOnly}
+              onClick={() => setFullUseOnly((v) => !v)}
+              title={t(lang, 'fullUseOnlyTitle')}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                fullUseOnly
+                  ? 'border-gold bg-gold text-base shadow-sm'
+                  : 'border-line bg-surface-2 text-muted hover:border-gold/60 hover:text-ink'
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${fullUseOnly ? 'bg-base' : 'bg-gold'}`}
+                aria-hidden
+              />
+              {t(lang, 'fullUseOnly', { n: selection.length })}
+            </button>
+          )}
+
           <button
             type="button"
             aria-pressed={bronzeMode}
@@ -290,6 +314,8 @@ function App() {
             minAdopt={minAdopt}
             lang={lang}
             bronzeMode={bronzeMode}
+            fullUseOnly={fullUseOnly}
+            onDisableFullUse={() => setFullUseOnly(false)}
           />
         </main>
       </div>

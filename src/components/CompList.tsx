@@ -23,6 +23,10 @@ interface CompListProps {
   lang: Lang
   /** 生涯ブロンズモード: ブロンズ特性数の多い順に並べる。 */
   bronzeMode: boolean
+  /** 選択紋章を1枚残らず使う構成だけに絞る。OFF なら一部だけ使う構成も出す（＝見比べ用）。 */
+  fullUseOnly: boolean
+  /** 「すべて使う」を解除する導線（0件時の回復操作）。 */
+  onDisableFullUse: () => void
 }
 
 /** 統計の信頼性のための最小サンプル（該当レコードがこの未満は除外）。 */
@@ -37,7 +41,17 @@ type Row = {
   bronze: number
 }
 
-export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMode }: CompListProps) {
+export function CompList({
+  stats,
+  comps,
+  sel,
+  sortKey,
+  minAdopt,
+  lang,
+  bronzeMode,
+  fullUseOnly,
+  onDisableFullUse,
+}: CompListProps) {
   const { units, emblems, traits } = stats
 
   const floor = Math.max(MIN_SAMPLE, minAdopt)
@@ -50,15 +64,22 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMod
     for (const comp of comps) {
       for (const row of compRows(comp, sel)) {
         if (row.n < floor) continue
+        // 「すべて使う」ON なら、選択枚数を1枚残らず活かしている行だけ。
+        if (fullUseOnly && row.match < sel.length) continue
         const traitCount = activeTraitCounts(comp, row.used, units, emblems)
         const bronze = bronzeTraitCount(traitCount, traits)
         out.push({ comp, row, traitCount, bronze })
       }
     }
     return out
-  }, [comps, sel, floor, units, emblems, traits])
+  }, [comps, sel, floor, fullUseOnly, units, emblems, traits])
 
-  // 並び順: 第1キーは「一致数 降順」（生涯ブロンズ時はブロンズ特性数 降順）、第2キーが指標。
+  // 並び順は「選んだ指標」だけで決まる（生涯ブロンズ時のみブロンズ特性数が第1キー）。
+  //
+  // 以前は活用紋章数を第1キーにしていたが、それだと「Top4率」を選んでも活用数で層が分かれ、
+  // 画面上は Top4率 の降順に見えない。ランキングの軸が信用できないと「どれが一番良いか」を
+  // 判断できないので、絞り込み（＝すべて使うか）と順位付け（＝どの指標か）を分離した。
+  //
   // 率は縮約値で比較する（生の率だと採用5件の 80% が採用500件の 62% より上に来る）。
   // 表示する数字は生の率のまま。詳細は format.ts の shrunk を参照。
   const sorted = useMemo(() => {
@@ -77,11 +98,7 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMod
     }
     return rows
       .slice()
-      .sort(
-        (a, b) =>
-          (bronzeMode ? b.bronze - a.bronze : b.row.match - a.row.match) ||
-          metric(a.row) - metric(b.row),
-      )
+      .sort((a, b) => (bronzeMode ? b.bronze - a.bronze : 0) || metric(a.row) - metric(b.row))
   }, [rows, sortKey, bronzeMode])
 
   if (sel.length === 0) {
@@ -106,9 +123,20 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMod
   }
 
   if (sorted.length === 0) {
+    // 0件の原因は2つしかない。取り違えると回復操作を間違えるので、原因ごとに導線を出し分ける。
+    const byFullUse = fullUseOnly && sel.length > 1
     return (
-      <div className="rounded-xl border border-line bg-surface/40 px-4 py-10 text-center text-sm text-muted">
-        {t(lang, 'noCompsAdopt', { x: floor })}
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-line bg-surface/40 px-4 py-10 text-center text-sm text-muted">
+        {byFullUse ? t(lang, 'noCompsFullUse', { n: sel.length }) : t(lang, 'noCompsAdopt', { x: floor })}
+        {byFullUse && (
+          <button
+            type="button"
+            onClick={onDisableFullUse}
+            className="rounded-md border border-line-strong bg-surface-2 px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-faint hover:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+          >
+            {t(lang, 'noCompsFullUseAction')}
+          </button>
+        )}
       </div>
     )
   }
@@ -132,6 +160,7 @@ export function CompList({ stats, comps, sel, sortKey, minAdopt, lang, bronzeMod
             sortKey={sortKey}
             lang={lang}
             bronzeMode={bronzeMode}
+            showUtilization={sel.length > 1 && !fullUseOnly}
           />
         ))}
       </div>
