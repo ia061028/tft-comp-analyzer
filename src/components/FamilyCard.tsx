@@ -26,12 +26,9 @@ export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
   const { traits, units, emblems, items } = stats
   const { backbone, holders, traitCount, used, groups } = family
 
-  // 既定は最良の派生を含むグループだけ開く（groups は体数の降順、derivs は指標の順）。
-  const bestUnits = groups.reduce(
-    (best, g) => (g.derivs[0].rank < best.derivs[0].rank ? g : best),
-    groups[0],
-  ).units
-  const [open, setOpen] = useState<Set<number>>(new Set([bestUnits]))
+  // 既定は全グループを閉じる。プレイ中は自分のレベル（＝置ける体数）が決まっているので、
+  // 開いた1つだけを見れば足りる。最初から開いていると、関係ない体数まで読まされる。
+  const [open, setOpen] = useState<Set<number>>(new Set())
   const toggle = (u: number) =>
     setOpen((s) => {
       const next = new Set(s)
