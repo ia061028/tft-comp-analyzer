@@ -59,20 +59,28 @@ export function CompList({
   // 1構成は「紋章の積み方」ごとに複数行へ分解される（2枚使う行と1枚だけ使う行は別カード）。
   // compRows / activeTraitCounts / bronzeTraitCount は構成数×選択紋章に比例して重いため、
   // comps・sel・floor・stats の該当サブフィールドが変わらない限り再計算しない。
-  const rows = useMemo<Row[]>(() => {
+  // 採用数下限までを適用した行。「すべて使う」の絞り込みはまだ掛けない —
+  // 0件になったときに原因（採用数下限 なのか すべて使う なのか）を切り分けるために必要。
+  const rowsBeforeFullUse = useMemo<Row[]>(() => {
     const out: Row[] = []
     for (const comp of comps) {
       for (const row of compRows(comp, sel)) {
         if (row.n < floor) continue
-        // 「すべて使う」ON なら、選択枚数を1枚残らず活かしている行だけ。
-        if (fullUseOnly && row.match < sel.length) continue
         const traitCount = activeTraitCounts(comp, row.used, units, emblems)
         const bronze = bronzeTraitCount(traitCount, traits)
         out.push({ comp, row, traitCount, bronze })
       }
     }
     return out
-  }, [comps, sel, floor, fullUseOnly, units, emblems, traits])
+  }, [comps, sel, floor, units, emblems, traits])
+
+  const rows = useMemo<Row[]>(
+    () =>
+      fullUseOnly
+        ? rowsBeforeFullUse.filter(({ row }) => row.match >= sel.length)
+        : rowsBeforeFullUse,
+    [rowsBeforeFullUse, fullUseOnly, sel.length],
+  )
 
   // 並び順は「選んだ指標」だけで決まる（生涯ブロンズ時のみブロンズ特性数が第1キー）。
   //
@@ -124,10 +132,13 @@ export function CompList({
 
   if (sorted.length === 0) {
     // 0件の原因は2つしかない。取り違えると回復操作を間違えるので、原因ごとに導線を出し分ける。
-    const byFullUse = fullUseOnly && sel.length > 1
+    // 「すべて使う」を外せば行が戻ってくる場合だけが「すべて使う」起因。そうでなければ採用数下限。
+    const byFullUse = fullUseOnly && rowsBeforeFullUse.length > 0
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-line bg-surface/40 px-4 py-10 text-center text-sm text-muted">
-        {byFullUse ? t(lang, 'noCompsFullUse', { n: sel.length }) : t(lang, 'noCompsAdopt', { x: floor })}
+        {byFullUse
+          ? t(lang, 'noCompsFullUse', { n: sel.length, x: floor })
+          : t(lang, 'noCompsAdopt', { x: floor })}
         {byFullUse && (
           <button
             type="button"
