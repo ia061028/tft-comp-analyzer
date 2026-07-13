@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { StatsFile } from '../../shared/types'
 import type { Deriv } from '../lib/backbone'
 import {
+  activeTier,
   buildPlannerCode,
   costBorder,
   holderMap,
@@ -54,6 +55,25 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
 
   const holders = holderMap(comp, row.used)
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
+
+  // この盤面の全発動特性。[traitIdx, style, 発動段, この派生で伸びたか]
+  // 伸びた特性を先頭に、その後は発動ティアの高い順。
+  const gainedSet = new Set(synergy.map(([ti]) => ti))
+  const chips: [number, number, number, boolean][] = []
+  for (const [ti, count] of deriv.traitCount) {
+    const tr = traits[ti]
+    if (!tr) continue
+    const at = activeTier(count, tr.tiers)
+    if (!at) continue
+    chips.push([ti, at.style, at.min, gainedSet.has(ti)])
+  }
+  chips.sort(
+    (a, b) =>
+      Number(b[3]) - Number(a[3]) ||
+      b[1] - a[1] ||
+      (traits[a[0]].name < traits[b[0]].name ? -1 : 1),
+  )
+  const anyGained = chips.some((c) => c[3])
 
   const copy = async () => {
     try {
@@ -216,21 +236,37 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
           )
         })}
 
-        {/* この駒を足すと伸びる特性 ＝ この派生を選ぶ理由 */}
-        {synergy.length > 0 && (
+        {/*
+         * この盤面で発動している特性を**すべて**出す（コアだけの行も空にならない）。
+         * そのうえで、この駒を足したことで伸びた特性は明るく・太く出す ＝ この派生を選ぶ理由。
+         * 金は紋章の色なので使わない（役割が混ざる）。強調は明度と太さでやる。
+         */}
+        {chips.length > 0 && (
           <div className="ml-1 flex flex-wrap items-center gap-1">
-            {synergy.map(([traitIdx, style, count]) => {
+            {chips.map(([traitIdx, style, count, gained]) => {
               const trait = traits[traitIdx]
+              const name = trait ? pickName(lang, trait) : `#${traitIdx}`
+              // 伸びた特性が1つも無い行（＝コアのまま）は全部を等しく出す。落とす相手がいないのに
+              // 全チップを淡くすると、ただ読みにくいだけになる。
+              const dim = anyGained && !gained
               return (
-                <Tip
-                  key={traitIdx}
-                  label={`${trait ? pickName(lang, trait) : `#${traitIdx}`} ${count} — ${t(lang, 'synergyGain')}`}
-                >
+                <Tip key={traitIdx} label={gained ? `${name} ${count} — ${t(lang, 'synergyGain')}` : `${name} ${count}`}>
                   <span
-                    className={`inline-flex h-[20px] items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold tabular-nums ${styleClasses(style)}`}
+                    className={`inline-flex items-center gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${styleClasses(
+                      style,
+                    )} ${
+                      gained
+                        ? 'h-[22px] font-bold ring-1 ring-ink/25'
+                        : `h-[19px] font-semibold ${dim ? 'opacity-55' : ''}`
+                    }`}
                   >
                     {trait?.icon && (
-                      <img src={trait.icon} alt="" loading="lazy" className="h-3.5 w-3.5 object-contain" />
+                      <img
+                        src={trait.icon}
+                        alt=""
+                        loading="lazy"
+                        className={gained ? 'h-4 w-4 object-contain' : 'h-3.5 w-3.5 object-contain'}
+                      />
                     )}
                     {count}
                   </span>
