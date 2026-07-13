@@ -5,6 +5,7 @@ import {
   activeTier,
   buildPlannerCode,
   costBorder,
+  holderMap,
   starColor,
   styleClasses,
   tierOf,
@@ -60,20 +61,8 @@ export function CompCard({
   const { traits, units, emblems, items } = stats
   const [copied, setCopied] = useState(false)
 
-  // 装備者の割り当て。
-  //
-  // comp.holders は「紋章 ei を持っていた unit の候補」を出現頻度順に**紋章あたり最大3件**持つ。
-  // そのまま全部を装備者として描くと、1枚しか使っていない紋章が3体に光ってしまう。
-  // 紋章ごとに row.used の枚数ぶんだけ先頭から取り、unit → 装備している紋章 に反転する。
-  const holderEmblems = new Map<number, number[]>() // unitIdx → emblemIdx[]
-  const needed = new Map<number, number>() // emblemIdx → その紋章を何枚使うか
-  for (const ei of row.used) needed.set(ei, (needed.get(ei) ?? 0) + 1)
-  for (const [ei, ui] of comp.holders.map((h) => [h[0], h[1]] as const)) {
-    const left = needed.get(ei) ?? 0
-    if (left <= 0) continue
-    needed.set(ei, left - 1)
-    holderEmblems.set(ui, [...(holderEmblems.get(ui) ?? []), ei])
-  }
+  // 装備者の割り当て（unitIdx → 載せている紋章）。詳細は format.ts の holderMap。
+  const holderEmblems = holderMap(comp, row.used)
 
   const avgPlace = row.n > 0 ? row.p / row.n : NaN
   const hasPlace = Number.isFinite(avgPlace)

@@ -49,6 +49,27 @@ export function activeTraitCounts(
 }
 
 /**
+ * 装備者の割り当て: unitIdx → そのユニットが載せている紋章 emblemIdx[]。
+ *
+ * comp.holders は「紋章 ei を持っていた unit の候補」を出現頻度順に**紋章あたり最大3件**持つ。
+ * そのまま全部を装備者として描くと、1枚しか使っていない紋章が3体に光ってしまう。
+ * 紋章ごとに used の枚数ぶんだけ先頭から取り、unit → 紋章 に反転する。
+ */
+export function holderMap(comp: CompStats, used: number[]): Map<number, number[]> {
+  const byUnit = new Map<number, number[]>()
+  const needed = new Map<number, number>() // emblemIdx → その紋章を何枚使うか
+  for (const ei of used) needed.set(ei, (needed.get(ei) ?? 0) + 1)
+  for (const h of comp.holders) {
+    const [ei, ui] = h
+    const left = needed.get(ei) ?? 0
+    if (left <= 0) continue
+    needed.set(ei, left - 1)
+    byUnit.set(ui, [...(byUnit.get(ui) ?? []), ei])
+  }
+  return byUnit
+}
+
+/**
  * 生涯ブロンズ用: 固有特性（単一ティア）を除き、最小（先頭）ティアで発動中の特性数。
  * 例 Brawler [[2,1],[4,3],[6,5]] は発動数2-3でブロンズ計上、4以上は非計上。
  */
@@ -118,6 +139,52 @@ export function costBorder(cost: number): string {
     default:
       return 'border-[#696969]'
   }
+}
+
+/**
+ * 同ユニット数コホートの平均順位（盤面ユニット数 → 平均順位）。
+ *
+ * 平均順位は構成の強さではなく**盤面ユニット数**をほぼ測っている（実データで 7体=5.60 …
+ * 10体=1.95）。10体を並べられた＝終盤まで生き残った＝すでに勝っていた、というだけで因果が逆。
+ * そのため絶対値でティアを切ると 10体構成が全部 S になり、色が情報を運ばなくなる。
+ *
+ * これを「同じ体数の中での相対」に直す基準として使う。**画面には一切出さない**（色の根拠のみ）。
+ * CI でデータが更新されるたびに実際の値が動くので、定数で埋め込まず stats から算出する。
+ */
+export function cohortPlace(comps: CompStats[]): Map<number, number> {
+  const sum = new Map<number, { n: number; p: number }>()
+  for (const c of comps) {
+    const k = c.units.length
+    const a = sum.get(k) ?? { n: 0, p: 0 }
+    for (const sig of c.sigs) {
+      a.n += sig.n
+      a.p += sig.p
+    }
+    sum.set(k, a)
+  }
+  const out = new Map<number, number>()
+  for (const [k, a] of sum) if (a.n > 0) out.set(k, a.p / a.n)
+  return out
+}
+
+/**
+ * 同体数コホートからの差でティアを切る（派生行の平均順位の色にだけ使う）。
+ * 順位は小さいほど良いので、edge が負＝同じ体数の中では良い。
+ * コホートが不明な体数（データが薄い）は絶対値のティアにフォールバックする。
+ */
+export function tierOfEdge(
+  avgPlace: number,
+  unitCount: number,
+  cohort: Map<number, number>,
+): { label: string; color: string; classes: string } {
+  const base = cohort.get(unitCount)
+  if (base == null) return tierOf(avgPlace)
+  const edge = avgPlace - base
+  if (edge <= -1.5) return { label: 'S', color: '#ff6b7a', classes: 'bg-[#ff6b7a] text-[#1a1112]' }
+  if (edge <= -0.7) return { label: 'A', color: '#ff9d5c', classes: 'bg-[#ff9d5c] text-[#1a1410]' }
+  if (edge <= -0.3) return { label: 'B', color: '#ecc64f', classes: 'bg-[#ecc64f] text-[#1a1710]' }
+  if (edge <= 0.3) return { label: 'C', color: '#6fc06a', classes: 'bg-[#6fc06a] text-[#101a10]' }
+  return { label: 'D', color: '#707682', classes: 'bg-[#707682] text-[#0f1012]' }
 }
 
 /**

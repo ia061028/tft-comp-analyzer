@@ -4,13 +4,16 @@ import { compRows, type CompRow } from '../lib/multiset'
 import {
   activeTraitCounts,
   bronzeTraitCount,
+  cohortPlace,
   shrunk,
   PRIOR_PLACE,
   PRIOR_TOP4,
   PRIOR_WIN,
 } from '../lib/format'
+import { buildTree } from '../lib/backbone'
 import { t, type Lang } from '../lib/i18n'
 import { CompCard, type SortKey } from './CompCard'
+import { FamilyCard } from './FamilyCard'
 
 interface CompListProps {
   stats: StatsFile
@@ -109,6 +112,13 @@ export function CompList({
       .sort((a, b) => (bronzeMode ? b.bronze - a.bronze : 0) || metric(a.row) - metric(b.row))
   }, [rows, sortKey, bronzeMode])
 
+  // 上位を「背骨 ＋ 派生」の系統に畳む。背骨が取れない行は flat に落ちて従来カードで描かれる。
+  const tree = useMemo(() => buildTree(sorted), [sorted])
+
+  // 平均順位の**色**の根拠にだけ使う（数値も見出しも画面には出さない）。
+  // 絶対値でティアを切ると 10体グループが全部 S になり、色が情報を運ばなくなるため。
+  const cohort = useMemo(() => cohortPlace(stats.comps), [stats.comps])
+
   if (sel.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-line bg-surface/40 px-4 py-16 text-center text-sm text-muted">
@@ -157,24 +167,48 @@ export function CompList({
       <div className="px-1 text-xs font-medium text-faint">
         {t(lang, 'resultCount', { n: sorted.length })}
       </div>
-      <div className="flex flex-col gap-2">
-        {/* 同一盤面でも紋章の使われ方（row.used）が違えば別カード。キーに両方を含める。 */}
-        {sorted.map(({ comp, row, traitCount, bronze }) => (
-          <CompCard
-            key={`${comp.units.join(',')}|${row.used.join(',')}`}
-            stats={stats}
-            comp={comp}
-            row={row}
-            total={sel.length}
-            traitCount={traitCount}
-            bronze={bronze}
-            sortKey={sortKey}
-            lang={lang}
-            bronzeMode={bronzeMode}
-            showUtilization={sel.length > 1 && !fullUseOnly}
-          />
-        ))}
-      </div>
+
+      {/* 系統（背骨＋派生）。上位のほぼ同一な構成がここに畳まれる。 */}
+      {tree.families.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {tree.families.map((family) => (
+            <FamilyCard
+              key={family.backbone.join(',')}
+              stats={stats}
+              family={family}
+              cohort={cohort}
+              lang={lang}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 背骨が取れなかった行と、上位N件から外れた行。従来のフルカードで描く。 */}
+      {tree.flat.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {tree.families.length > 0 && (
+            <div className="px-1 text-xs font-medium text-faint">
+              {t(lang, 'otherComps', { n: tree.flat.length })}
+            </div>
+          )}
+          {/* 同一盤面でも紋章の使われ方（row.used）が違えば別カード。キーに両方を含める。 */}
+          {tree.flat.map(({ comp, row, traitCount, bronze }) => (
+            <CompCard
+              key={`${comp.units.join(',')}|${row.used.join(',')}`}
+              stats={stats}
+              comp={comp}
+              row={row}
+              total={sel.length}
+              traitCount={traitCount}
+              bronze={bronze}
+              sortKey={sortKey}
+              lang={lang}
+              bronzeMode={bronzeMode}
+              showUtilization={sel.length > 1 && !fullUseOnly}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
