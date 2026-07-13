@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { StatsFile } from '../../shared/types'
-import type { Family } from '../lib/backbone'
+import type { Family, Span } from '../lib/backbone'
 import { activeTier, costBorder, starColor, styleClasses } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { DerivRow } from './DerivRow'
@@ -25,6 +25,8 @@ interface FamilyCardProps {
 export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
   const { traits, units, emblems, items } = stats
   const { backbone, holders, traitCount, used, groups } = family
+  // コアユニットのスター・アイテムは系統の最良行のものを代表値として使う。
+  const bestComp = groups.flatMap((g) => g.derivs).reduce((a, b) => (a.rank <= b.rank ? a : b)).comp
 
   // 既定は全グループを閉じる。プレイ中は自分のレベル（＝置ける体数）が決まっているので、
   // 開いた1つだけを見れば足りる。最初から開いていると、関係ない体数まで読まされる。
@@ -56,10 +58,12 @@ export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
       (traits[a[0]].name < traits[b[0]].name ? -1 : 1),
   )
 
+  // overflow-hidden は使わない。角丸のためにクリップすると、ユニット上のツールチップが
+  // カードの縁で切られて読めなくなる（背骨パネルの1行目が特に潰れる）。角丸は子側で処理する。
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-surface">
-      {/* ───── 背骨パネル: この系統に共通するユニット・装備者・アイテム・特性を1回だけ ───── */}
-      <div className="border-b-2 border-line bg-gradient-to-b from-gold/[0.06] to-black/20 px-4 py-3">
+    <div className="rounded-xl border border-line bg-surface">
+      {/* ───── コアパネル: この系統に共通するユニット・装備者・アイテム・特性を1回だけ ───── */}
+      <div className="rounded-t-xl border-b-2 border-line bg-gradient-to-b from-gold/[0.06] to-black/20 px-4 py-3">
         <div className="mb-2.5 flex flex-wrap items-center gap-2">
           <span className="text-xs font-extrabold tracking-wide text-gold">
             {t(lang, 'backbone', { n: backbone.length })}
@@ -90,11 +94,9 @@ export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
             const unit = units[unitIdx]
             if (!unit) return null
             const unitName = pickName(lang, unit)
-            // スター・アイテムは系統の最良行のものを使う（背骨は共通ユニットなので代表値でよい）。
-            const best = family.groups[0].derivs[0].comp
-            const pos = best.units.indexOf(unitIdx)
-            const star = pos >= 0 ? (best.unitStars?.[pos] ?? 0) : 0
-            const unitItems = best.unitItems
+            const pos = bestComp.units.indexOf(unitIdx)
+            const star = pos >= 0 ? (bestComp.unitStars?.[pos] ?? 0) : 0
+            const unitItems = bestComp.unitItems
               .filter((ui) => ui[0] === unitIdx)
               .map((ui) => items?.[ui[1]])
               .filter(Boolean)
@@ -184,15 +186,19 @@ export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
       </div>
 
       {/* ───── 体数グループ（アコーディオン）。グループ間に線を引かない ───── */}
-      {groups.map((g) => {
+      {groups.map((g, i) => {
         const isOpen = open.has(g.units)
+        const last = i === groups.length - 1
         return (
           <div key={g.units}>
             <button
               type="button"
               onClick={() => toggle(g.units)}
               aria-expanded={isOpen}
-              className="flex w-full items-center gap-2.5 border-t border-line bg-black/20 px-4 py-2.5 text-left transition-colors hover:bg-black/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold/50"
+              title={t(lang, 'compareWithin')}
+              className={`flex w-full items-center gap-x-3 gap-y-1 border-t border-line bg-black/20 px-4 py-2.5 text-left transition-colors hover:bg-black/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold/50 ${
+                last && !isOpen ? 'rounded-b-xl' : ''
+              }`}
             >
               <svg
                 className={`h-3 w-3 shrink-0 text-faint transition-transform duration-150 ${
@@ -204,11 +210,22 @@ export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
               >
                 <path d="M4 2l5 4-5 4z" />
               </svg>
-              <span className="text-[15px] font-extrabold text-ink">
+              <span className="w-[52px] shrink-0 text-[15px] font-extrabold text-ink">
                 {t(lang, 'unitsGroup', { n: g.units })}
               </span>
-              <span className="text-[11px] text-faint">{t(lang, 'compareWithin')}</span>
-              <span className="ml-auto text-[11px] text-faint tabular-nums">
+
+              {/*
+               * このグループの成績の幅。**同じ体数の中だけ**で集計しているので、数字が歪まない。
+               * 系統全体で集計すると 7体〜10体が混ざり、平均順位の幅（例 1.83〜6.74）が
+               * 構成の差ではなく生存バイアスそのものになる。
+               */}
+              <span className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] text-faint tabular-nums">
+                {span(t(lang, 'avgPlace'), g.place, (x) => x.toFixed(2))}
+                {span(t(lang, 'metricTop4'), g.top4, pct)}
+                {span(t(lang, 'metricWin'), g.win, pct)}
+              </span>
+
+              <span className="ml-auto shrink-0 text-[11px] text-faint tabular-nums">
                 {t(lang, 'derivCount', { n: g.derivs.length })}
               </span>
             </button>
@@ -219,6 +236,7 @@ export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
                   stats={stats}
                   deriv={d}
                   cohort={cohort}
+                  showEmblems={family.mixedEmblems}
                   lang={lang}
                 />
               ))}
@@ -227,4 +245,21 @@ export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
       })}
     </div>
   )
+
+  /** 「Top4率 88.9〜100.0 中央 96.4」。中央値を強調し、幅は淡く添える。 */
+  function span(label: string, s: Span, fmt: (x: number) => string) {
+    return (
+      <span key={label} className="inline-flex items-baseline gap-1">
+        <span className="text-faint">{label}</span>
+        <b className="text-[13px] font-bold text-ink">{fmt(s.median)}</b>
+        {s.min !== s.max && (
+          <span className="text-faint/70">
+            {t(lang, 'statRange', { min: fmt(s.min), max: fmt(s.max) })}
+          </span>
+        )}
+      </span>
+    )
+  }
 }
+
+const pct = (x: number) => `${x.toFixed(1)}%`

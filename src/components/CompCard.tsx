@@ -153,17 +153,18 @@ export function CompCard({
         <div className="flex items-center gap-6">
           {stat(sortKey === 'top4', t(lang, 'metricTop4'), `${top4Rate.toFixed(1)}%`)}
           {stat(sortKey === 'win', t(lang, 'metricWin'), `${winRate.toFixed(1)}%`)}
-          {stat(
-            sortKey === 'adopt',
-            t(lang, 'metricSample'),
-            `${row.n}`,
-            lowSample ? (
-              <Tip label={t(lang, 'lowSampleTitle', { n: LOW_SAMPLE })}>
-                <span className="cursor-help text-[11px] font-bold text-bronze">
-                  {t(lang, 'lowSample')}
+          {/* 採用数が少ないことは色だけで示す（銅色＝この率は信じるな）。文字は足さない。 */}
+          {lowSample ? (
+            <Tip label={t(lang, 'lowSampleTitle', { n: LOW_SAMPLE })}>
+              <div className="flex cursor-help flex-col">
+                <span className="text-[11px] leading-tight text-faint">{t(lang, 'metricSample')}</span>
+                <span className="text-[17px] font-bold leading-tight text-bronze tabular-nums">
+                  {row.n}
                 </span>
-              </Tip>
-            ) : null,
+              </div>
+            </Tip>
+          ) : (
+            stat(sortKey === 'adopt', t(lang, 'metricSample'), `${row.n}`)
           )}
           {showUtilization && (
             <div className="flex flex-col">
@@ -255,11 +256,6 @@ export function CompCard({
                   ))}
                 </div>
 
-                {isHolder && (
-                  <span className="text-[9px] font-extrabold leading-none tracking-wide text-gold">
-                    {t(lang, 'holderTag')}
-                  </span>
-                )}
               </div>
             )
           })}

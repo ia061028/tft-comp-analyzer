@@ -1,7 +1,15 @@
 import { useState } from 'react'
 import type { StatsFile } from '../../shared/types'
 import type { Deriv } from '../lib/backbone'
-import { buildPlannerCode, costBorder, holderMap, starColor, tierOfEdge, LOW_SAMPLE } from '../lib/format'
+import {
+  buildPlannerCode,
+  costBorder,
+  holderMap,
+  starColor,
+  styleClasses,
+  tierOfEdge,
+  LOW_SAMPLE,
+} from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { RecipeLabel } from './RecipeLabel'
 import { Tip } from './Tip'
@@ -11,6 +19,11 @@ interface DerivRowProps {
   deriv: Deriv
   /** 同ユニット数コホートの平均順位。平均順位の**色**の根拠にだけ使う（数値は出さない）。 */
   cohort: Map<number, number>
+  /**
+   * 系統内で使う紋章が派生ごとに違う場合は true。この行が使う紋章を明示する。
+   * 差分（追加・欠落）が同じでも紋章の使い方が違えば別の構成なので、出さないと見分けがつかない。
+   */
+  showEmblems: boolean
   lang: Lang
 }
 
@@ -23,9 +36,9 @@ interface DerivRowProps {
  * 平均順位の色は**同じ体数のコホートからの差**で切る（`tierOfEdge`）。絶対値だと 10体グループが
  * 全部 S（同じ赤）になり、色が情報を運ばなくなるため。差の数値は画面に出さない。
  */
-export function DerivRow({ stats, deriv, cohort, lang }: DerivRowProps) {
-  const { units, emblems, items } = stats
-  const { comp, row, adds, removes } = deriv
+export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowProps) {
+  const { traits, units, emblems, items } = stats
+  const { comp, row, adds, removes, synergy } = deriv
   const [copied, setCopied] = useState(false)
 
   const unitCount = comp.units.length
@@ -130,29 +143,102 @@ export function DerivRow({ stats, deriv, cohort, lang }: DerivRowProps) {
           <span className="text-[11px] text-faint">{t(lang, 'derivBackboneOnly')}</span>
         )}
 
-        {/* 欠落: 背骨にあるのにこの盤面には居ないユニット */}
+        {/*
+         * この行が実際に活用している紋章。同じ盤面・同じ差分でも「1枚だけ使う」と「2枚とも使う」は
+         * 別の構成なので、系統内で使い方が割れているときは出さないと2行が同一に見える。
+         */}
+        {showEmblems && (
+          <span className="ml-1 inline-flex items-center gap-1">
+            {row.used.map((ei, i) => {
+              const e = emblems[ei]
+              if (!e) return null
+              return (
+                <Tip key={i} label={<RecipeLabel label={pickName(lang, e)} recipe={e.recipe} />}>
+                  <img
+                    src={e.icon}
+                    alt=""
+                    loading="lazy"
+                    className="h-[20px] w-[20px] shrink-0 rounded bg-base object-contain ring-1 ring-gold"
+                  />
+                </Tip>
+              )
+            })}
+          </span>
+        )}
+
+        {/* コアから抜くユニット。「足す」と取り違えないよう、記号・色・打ち消し線の3重で示す。 */}
+        {removes.length > 0 && (
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-bronze/15 text-sm font-extrabold leading-none text-bronze ring-1 ring-bronze/50"
+            aria-hidden
+          >
+            −
+          </span>
+        )}
         {removes.map((unitIdx) => {
           const unit = units[unitIdx]
           if (!unit) return null
           const unitName = pickName(lang, unit)
           return (
-            <div key={`r${unitIdx}`} className="flex w-[46px] flex-col items-center gap-0.5 opacity-60">
-              <div className="h-3 text-[10px] leading-none text-faint">−</div>
+            <div key={`r${unitIdx}`} className="flex w-[46px] flex-col items-center gap-0.5">
+              <div className="h-3" />
               <Tip label={`${unitName} — ${t(lang, 'missing')}`}>
-                <img
-                  src={unit.icon}
-                  alt=""
-                  loading="lazy"
-                  className="h-[42px] w-[42px] shrink-0 rounded-lg border-2 border-dashed border-faint object-cover grayscale"
-                />
+                <span className="relative block h-[42px] w-[42px] shrink-0">
+                  <img
+                    src={unit.icon}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full rounded-lg border-2 border-dashed border-bronze/70 object-cover opacity-30 grayscale"
+                  />
+                  {/* 打ち消しの斜線。アイコンが薄いだけだと「弱いユニット」に見えてしまう。 */}
+                  <svg
+                    className="pointer-events-none absolute inset-0 h-full w-full text-bronze"
+                    viewBox="0 0 42 42"
+                    aria-hidden
+                  >
+                    <line
+                      x1="7"
+                      y1="35"
+                      x2="35"
+                      y2="7"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
               </Tip>
               <div className="h-[15px]" />
-              <span className="max-w-[46px] truncate text-[9px] leading-none text-faint line-through">
+              <span className="max-w-[46px] truncate text-[9px] leading-none text-bronze line-through">
                 {unitName}
               </span>
             </div>
           )
         })}
+
+        {/* この駒を足すと伸びる特性 ＝ この派生を選ぶ理由 */}
+        {synergy.length > 0 && (
+          <div className="ml-1 flex flex-wrap items-center gap-1">
+            {synergy.map(([traitIdx, style, count]) => {
+              const trait = traits[traitIdx]
+              return (
+                <Tip
+                  key={traitIdx}
+                  label={`${trait ? pickName(lang, trait) : `#${traitIdx}`} ${count} — ${t(lang, 'synergyGain')}`}
+                >
+                  <span
+                    className={`inline-flex h-[20px] items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold tabular-nums ${styleClasses(style)}`}
+                  >
+                    {trait?.icon && (
+                      <img src={trait.icon} alt="" loading="lazy" className="h-3.5 w-3.5 object-contain" />
+                    )}
+                    {count}
+                  </span>
+                </Tip>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* 平均順位（色 = 同体数コホートからの差） */}
@@ -172,13 +258,12 @@ export function DerivRow({ stats, deriv, cohort, lang }: DerivRowProps) {
         <div className="text-faint">
           {t(lang, 'metricWin')} <b className="text-ink tabular-nums">{winRate.toFixed(1)}%</b>
         </div>
+        {/* 採用数が少ないことは色だけで示す（銅色＝この率は信じるな）。文字は足さない。 */}
         <div className="text-faint">
           {t(lang, 'metricSample')}{' '}
           {lowSample ? (
             <Tip label={t(lang, 'lowSampleTitle', { n: LOW_SAMPLE })}>
-              <b className="cursor-help font-extrabold text-bronze tabular-nums">
-                {row.n} {t(lang, 'lowSample')}
-              </b>
+              <b className="cursor-help text-bronze tabular-nums">{row.n}</b>
             </Tip>
           ) : (
             <b className="text-ink tabular-nums">{row.n}</b>

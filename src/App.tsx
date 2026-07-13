@@ -22,7 +22,8 @@ function App() {
   const [reloadKey, setReloadKey] = useState(0)
 
   const [selection, setSelection] = useState<number[]>([])
-  const [sortKey, setSortKey] = useState<SortKey>('top4')
+  // 既定は平均順位。同点は 1位率 → Top4率 の順で決まる（CompList の PRIORITY）。
+  const [sortKey, setSortKey] = useState<SortKey>('place')
   const [minAdopt, setMinAdopt] = useState(5)
   const [lang, setLang] = useState<Lang>(() => {
     const saved = localStorage.getItem(LANG_STORAGE_KEY)
@@ -210,8 +211,8 @@ function App() {
               onChange={setSortKey}
               options={[
                 { key: 'place', label: t(lang, 'sortPlace') },
-                { key: 'top4', label: t(lang, 'sortTop4') },
                 { key: 'win', label: t(lang, 'sortWin') },
+                { key: 'top4', label: t(lang, 'sortTop4') },
                 { key: 'adopt', label: t(lang, 'sortAdopt') },
               ]}
             />

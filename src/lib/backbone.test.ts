@@ -1,10 +1,16 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { CompStats } from '../../shared/types'
+import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/types'
 import { buildTree, type Row, MIN_BACKBONE, MAX_DIFF } from './backbone'
+import { activeTraitCounts } from './format'
 
 /** 盤面 units だけを持つ最小の Row（クラスタリングは盤面のユニット集合しか見ない）。 */
-const row = (units: number[], n = 50, used: number[] = [0]): Row => {
+const row = (
+  units: number[],
+  n = 50,
+  used: number[] = [0],
+  stats?: { top4: number; win: number; place: number },
+): Row => {
   const comp: CompStats = {
     units,
     n,
@@ -13,9 +19,10 @@ const row = (units: number[], n = 50, used: number[] = [0]): Row => {
     holders: [],
     sigs: [],
   }
+  const s = stats ?? { top4: 0.8, win: 0.3, place: 3 }
   return {
     comp,
-    row: { used, match: used.length, n, top4: Math.round(n * 0.8), win: Math.round(n * 0.3), p: n * 3 },
+    row: { used, match: used.length, n, top4: n * s.top4, win: n * s.win, p: n * s.place },
     traitCount: new Map(),
     bronze: 0,
   }
@@ -164,4 +171,109 @@ test('行が MIN_FAMILY 未満なら全部フラット（ツリーを強制し�
   const { families, flat } = buildTree([row([...CORE, 9])])
   assert.equal(families.length, 0)
   assert.equal(flat.length, 1)
+})
+
+test('mixedEmblems: 系統内で紋章の使い方が割れていれば true（差分が同じ行を区別するため）', () => {
+  // 同じ盤面・同じ差分でも「紋章1枚だけ使う」と「2枚とも使う」は別の行になる。
+  // 画面上まったく同じに見えてしまうので、派生ごとに使用紋章を出す必要がある。
+  const same = [row([...CORE, 9], 50, [0]), row([...CORE, 10], 50, [0]), row([...CORE, 11], 50, [0])]
+  assert.equal(buildTree(same).families[0].mixedEmblems, false, '全行が同じ紋章の使い方')
+
+  const mixed = [
+    row([...CORE, 9], 50, [0, 1]), // 2枚とも使う
+    row([...CORE, 9], 40, [0]), // 同じ盤面だが1枚しか使わない
+    row([...CORE, 10], 50, [0, 1]),
+  ]
+  assert.equal(buildTree(mixed).families[0].mixedEmblems, true, '使い方が割れている')
+})
+
+// --- 体数グループの統計サマリ（最小・中央値・最大） ---
+
+test('統計サマリは「同じ体数のグループの中だけ」で集計する（体数をまたがない）', () => {
+  // 9体3件（平均 2.0 / 3.0 / 4.0）と 10体1件（平均 1.0）。
+  // 系統全体で集計すると 1.0〜4.0 になるが、これは生存バイアス。9体は 2.0〜4.0 でなければならない。
+  const sorted = [
+    row([...CORE, 20], 50, [0], { top4: 1.0, win: 0.5, place: 1.0 }), // 9体
+    row([...CORE, 9], 50, [0], { top4: 0.9, win: 0.4, place: 2.0 }),
+    row([...CORE, 10], 50, [0], { top4: 0.8, win: 0.3, place: 3.0 }),
+    row([...CORE, 11], 50, [0], { top4: 0.5, win: 0.1, place: 4.0 }),
+    row([...CORE, 30, 31], 50, [0], { top4: 1.0, win: 0.7, place: 1.0 }), // 10体
+  ]
+  const { families } = buildTree(sorted)
+  assert.equal(families.length, 1)
+
+  const nine = families[0].groups.find((g) => g.units === 9)!
+  assert.equal(nine.derivs.length, 4)
+  assert.equal(nine.place.min, 1.0)
+  assert.equal(nine.place.max, 4.0)
+  assert.equal(nine.place.median, 2.5, '4件の中央値は中央2つ(2.0,3.0)の平均')
+
+  const ten = families[0].groups.find((g) => g.units === 10)!
+  assert.equal(ten.derivs.length, 1)
+  assert.equal(ten.place.min, 1.0)
+  assert.equal(ten.place.max, 1.0)
+  assert.equal(ten.place.median, 1.0, '1件なら min=median=max')
+
+  // 10体の 1.0 が 9体グループの幅に混ざっていないこと（＝体数をまたいでいない）。
+  assert.ok(nine.place.max === 4.0 && ten.place.max === 1.0)
+})
+
+test('統計サマリ: Top4率・1位率も % で集計される', () => {
+  const sorted = [
+    row([...CORE, 9], 100, [0], { top4: 1.0, win: 0.5, place: 2.0 }),
+    row([...CORE, 10], 100, [0], { top4: 0.6, win: 0.1, place: 3.0 }),
+    row([...CORE, 11], 100, [0], { top4: 0.8, win: 0.3, place: 2.5 }),
+  ]
+  const g = buildTree(sorted).families[0].groups[0]
+  assert.equal(g.top4.min, 60)
+  assert.equal(g.top4.max, 100)
+  assert.equal(g.top4.median, 80)
+  assert.equal(g.win.min, 10)
+  assert.equal(g.win.max, 50)
+  assert.equal(g.win.median, 30)
+})
+
+// --- 派生のシナジー（コアから伸びる特性） ---
+
+const T: TraitInfo[] = [
+  // 0: 2/4/6 段。CORE は 2 体持ち（＝コアで既に発動中）
+  { api: 'A', name: 'A', nameJa: 'A', icon: '', tiers: [[2, 1], [4, 3], [6, 5]] },
+  // 1: 2/4 段。CORE は 1 体持ち（＝コアでは未発動）
+  { api: 'B', name: 'B', nameJa: 'B', icon: '', tiers: [[2, 1], [4, 3]] },
+]
+const U: UnitInfo[] = Array.from({ length: 32 }, (_, i) => ({
+  api: `u${i}`, name: `u${i}`, nameJa: `u${i}`, cost: 1, icon: '', code: 0,
+  traits: i === 1 || i === 2 ? [0] : i === 3 ? [1] : i === 9 ? [1] : i === 10 ? [0] : [],
+}))
+const E: EmblemInfo[] = [{ api: 'e', name: 'e', nameJa: 'e', trait: 0, icon: '', base: 'none' }]
+
+test('シナジー: コアから発動段が上がる／新たに発動する特性だけを出す', () => {
+  // CORE = [1..8]: trait0 を u1,u2 が持つ（2体）＋ 紋章 e(→trait0) で 3体 → A は 2段目未満、1段目発動中。
+  //                trait1 を u3 が持つ（1体）→ B は未発動。
+  const mk = (extra: number) => row([...CORE, extra])
+  const withCounts = (r: Row) => ({ ...r, traitCount: activeTraitCounts(r.comp, r.row.used, U, E) })
+
+  const sorted = [
+    withCounts(mk(9)), // +u9: trait1 が 2体 → B が新たに発動
+    withCounts(mk(10)), // +u10: trait0 が 4体 → A が 2段目に上がる
+    withCounts(mk(11)), // +u11: 特性なし → 伸びる特性なし
+  ]
+  const { families } = buildTree(sorted, U, E, T)
+  assert.equal(families.length, 1)
+
+  const byAdd = new Map(
+    families[0].groups.flatMap((g) => g.derivs).map((d) => [d.adds[0], d.synergy]),
+  )
+
+  assert.deepEqual(
+    byAdd.get(9)!.map(([ti, , min]) => [ti, min]),
+    [[1, 2]],
+    '+u9 は B が新たに 2 段で発動',
+  )
+  assert.deepEqual(
+    byAdd.get(10)!.map(([ti, , min]) => [ti, min]),
+    [[0, 4]],
+    '+u10 は A が 4 段へ上がる（既に発動中でも段が上がれば出す）',
+  )
+  assert.deepEqual(byAdd.get(11), [], '+u11 は何も伸びない')
 })

@@ -11,7 +11,7 @@
 
 import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/types'
 import type { CompRow } from './multiset'
-import { activeTraitCounts, bronzeTraitCount, holderMap } from './format'
+import { activeTier, activeTraitCounts, bronzeTraitCount, holderMap } from './format'
 
 /** ツリー化の対象は上位N行だけ。全行だと系統が40個に割れ、クラスタリングも 600ms 超で実用外。 */
 export const TOP_N = 20
@@ -40,25 +40,56 @@ export interface Deriv extends Row {
   adds: number[]
   /** 背骨にあるが、この盤面には居ないユニット（＝欠落）。 */
   removes: number[]
+  /**
+   * コアから**発動段が上がる／新たに発動する**特性。[traitIdx, style, 発動段]。
+   * 「この駒を足すと何が伸びるのか」＝派生を選ぶ理由そのもの。
+   */
+  synergy: [number, number, number][]
   /** sorted 内での順位（0 が最良）。系統の並び順に使う。 */
   rank: number
 }
 
-/** 同じ盤面ユニット数の派生の束。**比較が正当なのはこの中だけ。** */
+/** 最小・中央値・最大。「だいたいどのくらいか」を1行で示すための要約。 */
+export interface Span {
+  min: number
+  median: number
+  max: number
+}
+
+/**
+ * 同じ盤面ユニット数の派生の束。**比較が正当なのはこの中だけ。**
+ *
+ * 統計サマリ（place/top4/win）は**このグループの中だけ**で集計する。系統全体で集計すると
+ * 7体〜10体が混ざり、平均順位の幅（例 1.83〜6.74）が構成の差ではなく生存バイアスそのものになる。
+ */
 export interface UnitGroup {
   units: number
   derivs: Deriv[]
+  /** 平均順位（小さいほど良い）。 */
+  place: Span
+  /** Top4率 %。 */
+  top4: Span
+  /** 1位率 %。 */
+  win: Span
 }
 
 export interface Family {
-  /** 背骨ユニット（表示順）。 */
+  /** コアユニット（表示順）。 */
   backbone: number[]
-  /** 背骨側の装備者: unitIdx → emblemIdx[]。系統の最良行のものを使う。 */
+  /** コア側の装備者: unitIdx → emblemIdx[]。系統の最良行のものを使う。 */
   holders: Map<number, number[]>
-  /** 背骨の発動特性（最良行のもの）。 */
+  /** **コアだけ**で発動している特性（コアユニット ＋ 活用紋章）。派生のシナジー差分の基準。 */
   traitCount: Map<number, number>
   /** 最良行が使っている紋章の多重集合（特性チップの「紋章由来」判定に使う）。 */
   used: number[]
+  /**
+   * 系統内で「使う紋章」が派生ごとに違うか。
+   *
+   * 同じ盤面でも紋章の使い方（1枚だけ使う / 2枚とも使う）が違えば別の行になる。
+   * 差分（追加・欠落）が同じだと画面上まったく同じ行に見えてしまうので、
+   * このときは派生ごとに使用紋章を出して区別する。
+   */
+  mixedEmblems: boolean
   /** 盤面ユニット数の降順。 */
   groups: UnitGroup[]
   /** この系統の派生総数。 */
@@ -137,13 +168,74 @@ function backboneOf(members: Row[]): number[] {
     .map(([u]) => u)
 }
 
+/** 昇順ソートした配列の中央値（偶数個は中央2つの平均）。 */
+function median(xs: number[]): number {
+  if (xs.length === 0) return NaN
+  const s = xs.slice().sort((a, b) => a - b)
+  const m = s.length >> 1
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+}
+
+function spanOf(xs: number[]): Span {
+  return { min: Math.min(...xs), median: median(xs), max: Math.max(...xs) }
+}
+
 /**
- * 上位 TOP_N 行を系統に分け、系統ごとに背骨と派生（体数グループ）を作る。
- * 背骨が取れない系統・差分が大きすぎる行・1行だけの系統は flat に落とす（ツリーを強制しない）。
+ * コアだけで発動している特性（コアユニットの所持特性 ＋ 活用紋章の付与分）。
+ * 派生の「伸びる特性」は、これを基準にした差分として出す。
+ */
+function coreTraitCounts(
+  backbone: number[],
+  used: number[],
+  units: UnitInfo[],
+  emblems: EmblemInfo[],
+): Map<number, number> {
+  const counts = new Map<number, number>()
+  for (const ui of backbone) {
+    for (const ti of units[ui]?.traits ?? []) counts.set(ti, (counts.get(ti) ?? 0) + 1)
+  }
+  for (const ei of used) {
+    const ti = emblems[ei]?.trait
+    if (ti == null) continue
+    counts.set(ti, (counts.get(ti) ?? 0) + 1)
+  }
+  return counts
+}
+
+/**
+ * この派生でコアから**発動段が上がる／新たに発動する**特性。
+ * 「この駒を足すと何が伸びるのか」＝派生を選ぶ理由。発動段の高い順。
+ */
+function synergyGain(
+  derivCounts: Map<number, number>,
+  coreCounts: Map<number, number>,
+  traits: TraitInfo[],
+): [number, number, number][] {
+  const out: [number, number, number][] = []
+  for (const [ti, n] of derivCounts) {
+    const tr = traits[ti]
+    if (!tr) continue
+    const now = activeTier(n, tr.tiers)
+    if (!now) continue
+    const before = activeTier(coreCounts.get(ti) ?? 0, tr.tiers)
+    if (before && before.min >= now.min) continue // 段が上がっていない
+    out.push([ti, now.style, now.min])
+  }
+  return out.sort((a, b) => b[1] - a[1] || b[2] - a[2])
+}
+
+/**
+ * 上位 TOP_N 行を系統に分け、系統ごとにコアと派生（体数グループ）を作る。
+ * コアが取れない系統・差分が大きすぎる行・1行だけの系統は flat に落とす（ツリーを強制しない）。
  *
  * sorted は CompList が並べ替え済みの全行。先頭が最良。
  */
-export function buildTree(sorted: Row[]): Tree {
+export function buildTree(
+  sorted: Row[],
+  units: UnitInfo[] = [],
+  emblems: EmblemInfo[] = [],
+  traits: TraitInfo[] = [],
+): Tree {
   const head = sorted.slice(0, TOP_N)
   if (head.length < MIN_FAMILY) return { families: [], flat: sorted }
 
@@ -164,6 +256,9 @@ export function buildTree(sorted: Row[]): Tree {
     }
     const bset = new Set(backbone)
 
+    // コアだけの発動特性。系統の最良行が使う紋章を前提にする（紋章は系統内で共通）。
+    const coreCounts = coreTraitCounts(backbone, members[0].row.used, units, emblems)
+
     const derivs: Deriv[] = []
     const dropped: number[] = []
     for (let k = 0; k < members.length; k++) {
@@ -175,7 +270,13 @@ export function buildTree(sorted: Row[]): Tree {
         dropped.push(idxs[k]) // この行だけ縮退。同じ系統の他の行はツリーに残す。
         continue
       }
-      derivs.push({ ...m, adds, removes, rank: idxs[k] })
+      derivs.push({
+        ...m,
+        adds,
+        removes,
+        synergy: synergyGain(m.traitCount, coreCounts, traits),
+        rank: idxs[k],
+      })
     }
     // 差分の大きい行を落とした結果、派生が1件以下になったら系統として成立しない。
     if (derivs.length < MIN_FAMILY) {
@@ -185,23 +286,34 @@ export function buildTree(sorted: Row[]): Tree {
     flatRanks.push(...dropped)
 
     // 体数でグループ化（降順）。グループ内は sorted の順（＝選んだ指標の順）を保つ。
+    //
+    // 統計サマリはこのグループの中だけで集計する。系統全体で集計すると 7体〜10体が混ざり、
+    // 平均順位の幅が「構成の差」ではなく生存バイアスそのものになってしまう。
     const byUnits = new Map<number, Deriv[]>()
     for (const d of derivs) {
       const k = d.comp.units.length
       if (!byUnits.has(k)) byUnits.set(k, [])
       byUnits.get(k)!.push(d)
     }
-    const groups = [...byUnits]
+    const groups: UnitGroup[] = [...byUnits]
       .sort((a, b) => b[0] - a[0])
-      .map(([units, ds]) => ({ units, derivs: ds }))
+      .map(([unitCount, ds]) => ({
+        units: unitCount,
+        derivs: ds,
+        place: spanOf(ds.map((d) => d.row.p / d.row.n)),
+        top4: spanOf(ds.map((d) => (d.row.top4 / d.row.n) * 100)),
+        win: spanOf(ds.map((d) => (d.row.win / d.row.n) * 100)),
+      }))
 
-    // 背骨の装備者・特性は系統の最良行のものを使う（derivs は rank 昇順なので先頭が最良）。
+    // コアの装備者は系統の最良行のものを使う（derivs は rank 昇順なので先頭が最良）。
     const best = derivs[0]
+    const bestKey = best.row.used.join(',')
     families.push({
       backbone,
       holders: holderMap(best.comp, best.row.used),
-      traitCount: best.traitCount,
+      traitCount: coreCounts,
       used: best.row.used,
+      mixedEmblems: derivs.some((d) => d.row.used.join(',') !== bestKey),
       groups,
       total: derivs.length,
       rank: best.rank,

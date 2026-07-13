@@ -85,7 +85,7 @@ export function CompList({
     [rowsBeforeFullUse, fullUseOnly, sel.length],
   )
 
-  // 並び順は「選んだ指標」だけで決まる（生涯ブロンズ時のみブロンズ特性数が第1キー）。
+  // 並び順は「選んだ指標」が第1キー。同点は 平均順位 → 1位率 → Top4率 → 採用数 の順で決める。
   //
   // 以前は活用紋章数を第1キーにしていたが、それだと「Top4率」を選んでも活用数で層が分かれ、
   // 画面上は Top4率 の降順に見えない。ランキングの軸が信用できないと「どれが一番良いか」を
@@ -94,10 +94,11 @@ export function CompList({
   // 率は縮約値で比較する（生の率だと採用5件の 80% が採用500件の 62% より上に来る）。
   // 表示する数字は生の率のまま。詳細は format.ts の shrunk を参照。
   const sorted = useMemo(() => {
-    const metric = (r: CompRow): number => {
-      switch (sortKey) {
+    // すべて「小さいほど良い」に符号を揃える。
+    const metric = (r: CompRow, key: SortKey): number => {
+      switch (key) {
         case 'place':
-          return shrunk(r.p, r.n, PRIOR_PLACE) // 昇順が良い → 後で符号反転せず place のみ別扱い
+          return shrunk(r.p, r.n, PRIOR_PLACE) // 順位は小さいほど良いのでそのまま
         case 'win':
           return -shrunk(r.win, r.n, PRIOR_WIN)
         case 'adopt':
@@ -107,13 +108,25 @@ export function CompList({
           return -shrunk(r.top4, r.n, PRIOR_TOP4)
       }
     }
-    return rows
-      .slice()
-      .sort((a, b) => (bronzeMode ? b.bronze - a.bronze : 0) || metric(a.row) - metric(b.row))
+    // 同点の決着は常にこの優先順。選択中の指標を先頭に置き、残りをこの順で後ろに繋ぐ。
+    const PRIORITY: SortKey[] = ['place', 'win', 'top4', 'adopt']
+    const keys = [sortKey, ...PRIORITY.filter((k) => k !== sortKey)]
+
+    return rows.slice().sort((a, b) => {
+      if (bronzeMode && a.bronze !== b.bronze) return b.bronze - a.bronze
+      for (const k of keys) {
+        const d = metric(a.row, k) - metric(b.row, k)
+        if (d !== 0) return d
+      }
+      return 0
+    })
   }, [rows, sortKey, bronzeMode])
 
-  // 上位を「背骨 ＋ 派生」の系統に畳む。背骨が取れない行は flat に落ちて従来カードで描かれる。
-  const tree = useMemo(() => buildTree(sorted), [sorted])
+  // 上位を「コア ＋ 派生」の系統に畳む。コアが取れない行は flat に落ちて従来カードで描かれる。
+  const tree = useMemo(
+    () => buildTree(sorted, units, emblems, traits),
+    [sorted, units, emblems, traits],
+  )
 
   // 平均順位の**色**の根拠にだけ使う（数値も見出しも画面には出さない）。
   // 絶対値でティアを切ると 10体グループが全部 S になり、色が情報を運ばなくなるため。
