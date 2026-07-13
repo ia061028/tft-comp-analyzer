@@ -83,6 +83,15 @@ export function shrunk(successes: number, n: number, prior: number, weight = PRI
   return (successes + weight * prior) / (n + weight)
 }
 
+/**
+ * 低サンプル警告の閾値（採用数がこれ未満なら「率を信じるな」の印を出す）。
+ *
+ * 現データの採用数は中央値 9・大半が1桁で、閾値を上げるとほぼ全行に警告が付いて無意味になる
+ * （n<40 なら 92% の行が該当）。10 なら約 56% が該当し、かつ縮約ソートの上位カードには
+ * 滅多に出ない（上位＝サンプルが十分な行）ので、警告が「例外」として機能する。
+ */
+export const LOW_SAMPLE = 10
+
 /** スターレベル → ★の配色（3=金,2=銀,1=銅） */
 export function starColor(star: number): string {
   switch (star) {
