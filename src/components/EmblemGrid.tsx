@@ -59,12 +59,7 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                 return (
                   <Tip
                     key={emblem.api}
-                    label={
-                      <div className="flex flex-col items-center gap-1">
-                        <RecipeLabel label={label} recipe={emblem.recipe} />
-                        <span className="text-[10px] text-faint">{t(lang, 'emblemOpHint')}</span>
-                      </div>
-                    }
+                    label={<RecipeLabel label={label} recipe={emblem.recipe} />}
                   >
                     <button
                       type="button"

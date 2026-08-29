@@ -71,7 +71,6 @@ const ja = {
   emblemCatSpatula: 'へら',
   emblemCatPan: 'フライパン',
   emblemCatNone: '合成不可',
-  emblemOpHint: 'クリックで+1 / Shift+クリック・右クリックで-1',
 }
 
 /** 翻訳キー（ja を基準に型化。en はこの全キーを持つことを型で強制）。 */
@@ -141,7 +140,6 @@ const en: Record<UIKey, string> = {
   emblemCatSpatula: 'Spatula',
   emblemCatPan: 'Frying Pan',
   emblemCatNone: 'Non-craftable',
-  emblemOpHint: 'Click to add / Shift+click or right-click to remove',
 }
 
 const STRINGS: Record<Lang, Record<UIKey, string>> = { ja, en }
