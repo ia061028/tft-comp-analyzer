@@ -55,23 +55,53 @@ collect と aggregate は同じ CI ジョブ内で直列に実行されるが、
 
 ### 召喚ユニットの扱い
 
-Riot の `num_units`（トレイトごとの発動ユニット数）には、導き手などで盤面に追加される召喚・非ショップユニット（`NON_BOARD_UNIT_RE` = `_Summon$|Minion|PVE|Enemy_|TrainingDummy` にマッチするもの）も含まれる。これらは:
+導き手などで盤面に追加される召喚・非ショップユニット（`NON_BOARD_UNIT_RE` = `_Summon$|Minion|PVE|Enemy_|TrainingDummy` にマッチするもの）と、コスト1-5 の範囲外のユニットは、**構成キー（盤面ユニット集合）から除外**する（`splitBoardUnits`）。プレイヤーが実際に編成したユニットのみを構成として扱うため。
 
-- **構成キー（盤面ユニット集合）からは除外**する。プレイヤーが実際に編成したユニットのみを構成として扱うため。
-- ただし**特性寄与は記録**する（`summonTraitCount`）。紋章の活用判定で「盤面実効特性数 = Riot `num_units` − 召喚ユニットの当該特性寄与」を使うことで、召喚ユニットだけでブレークポイントに達しているケースを誤って「活用」と数えないようにする。
+この判定は apiName の命名規約に依存するので、新セットでは実データで取りこぼしを確認すること（診断の「未解決ユニット」警告と、構成の盤面ユニット数がプレイヤーレベルと整合するか）。
+
+`rec.tc`（トレイト→`num_units`）は収集しているが、現在の集計では使っていない（将来の効率分析用）。
 
 ### 紋章活用シグネチャ（sig）
 
-紋章を装備しているだけでなく、実際にその紋章の特性を発動に活かしているかを判定する:
+構成（盤面ユニット集合）の中を、**「その試合で実際に活用された紋章の組み合わせ」**でさらに分割したものが sig。Wire 上は `WireComp.g = [活用紋章idx[], n, top4, win, p]` の配列。
 
-- **one（+1）**: 盤面実効特性数がちょうどブレークポイント（発動しきい値）と一致する場合。
-- **half（+0.5）**: 盤面実効特性数がブレークポイントを超過している場合（紋章がなくても発動していた）。
-- 盤面実効特性数が最小ブレークポイント未満、または召喚ユニットのみでの発動は「活用」に数えない。
-- `rec.tc`（トレイト→num_units のマップ）が欠落している旧形式レコードはシグネチャ集計から除外し、診断カウンタ（`tcMissingRecords`）に計上する。
+「活用」の定義は**二値**（`classifyEmblems`）:
+
+- 装備している **AND** その紋章が付与するトレイト（変種を含むいずれか）が発動している（`rec.t` に存在する）。
+- 発動数がブレークポイントちょうどか超過か（＝紋章が余っているか）は区別しない。要件が「その紋章を使ったシナジーが1つでも発動していれば対象」であり、余りの区別は要求されていないため。
+- 同一紋章を複数装備した場合は `rec.e` の並びをそのまま辿るので多重度が保たれる。
+- レコード上の紋章 apiName は `staticData.emblemAliases` で canonical に正規化してから解決する（下記「紋章の解決」）。
+
+### 紋章の解決（セット非依存）
+
+紋章 apiName はセット固有で不規則なため、名前の正規表現マッチだけに頼らない。`resolveEmblemTraits`（`collector/cdragon.ts`）が2段階で解決する:
+
+1. **一次: `incompatibleTraits`**。紋章は「装備者にトレイトを付与する」アイテムで、その付与トレイトは同トレイト重複防止のため `incompatibleTraits` に記載される。apiName 完全一致 → 表示名一致 の順で選定セットのトレイトへ解決する。`associatedTraits` はオーグメントや Anima Squad 系アイテムにも付くため紋章判定には使えない。
+2. **フォールバック: アイコンパス＋表示名**。一次が0件のときのみ、`item_icons/traits/<base>/set<N>/` 配下にあり表示名が `"<トレイト名> Emblem"` のアイテムを表示名から解決する。セット18 は CDragon 上 `incompatibleTraits` が空で配信されるため、これが無いと紋章が1件も検出されない。
+   **セット限定のアイコンパスで絞るのは必須**で、外すと旧セットの同名紋章（例: セット3 の "Elderwood Emblem"）が新セットの同名トレイトへ誤マッチする。
+
+付随して:
+
+- **合成素材の分類**（`classifyBase`）は末尾一致（`_Spatula$` / `_FryingPan$`）で行う。接頭辞はセットで変わる（セット17 `TFT_Item_Spatula` → セット18 `DA_Component_Spatula`）。カテゴリヘッダ用の `baseItemIcons` も、選定セットの紋章 composition に実際に現れた素材から引く。
+- **重複紋章の統合**: 同一トレイトを付与する紋章が複数配信される場合（セット18 の Flora Fatalis は通常版とオーグメント版の2件）、canonical を1件だけ辞書に載せ、残りは `emblemAliases` に入れて集計時に寄せる。canonical は「合成レシピを持つ方」優先、同条件なら CDragon の `items` 配列の出現順で先勝ち。
+- **収集側**（`getEmblemContext`）はセット番号を持たないため、全セット横断の緩いゲート（`isEmblemItemLoose`: `incompatibleTraits` 非空 **または** アイコン置き場＋`" Emblem"` 名）を使う。records は生の apiName を保存しセット絞り込みは集計側が行うので過剰包含は無害だが、取りこぼすと収集し直しが効かないため意図的に緩くしている。
+
+### セットの判別と切り替え
+
+セット番号は決め打ちしない。`getStaticData` が `setData` の中から**集計対象レコードのトレイト apiName 集合との交差が最大**のセットを選ぶ（同数なら `number` が大きい方）。したがって新セットのレコードが集計対象になれば、辞書・日本語名・プランナーコードは自動で追従する。
+
+セット境界の分離は2段構え:
+
+1. **パッチ（`v`）**: `pickTargetPatch` が「ユニークマッチ数 >= `patchSwitchThreshold` の最新パッチ」を選ぶ（ヒステリシス）。新セットが別パッチで始まる通常ケースはこれで足りる。
+2. **セット番号（`s` = `tft_set_number`）**: 対象パッチ内でさらに最頻セットに絞る（`pickTargetSet`）。`s` を持たない旧レコードは残す。同一 `game_version` 内でセットが切り替わる場合にパッチだけでは分離できないため、一次情報として記録している。
+
+なお `config.tftPatchLabels`（内部パッチキー → TFT 表記）は計算で導けない手動マップ。未登録のときは内部パッチをそのまま表示し、aggregate が警告を出す。新パッチ・新セットでは collect ログの「パッチ×セット（新規分）」で実値を確認して1行追加する。
 
 ### 実装の分離
 
-- **`collector/aggregate-core.ts`**: 集計ロジック本体。`fs` / `fetch` / `process` / `console` に依存しない純関数群（`splitBoardUnits`, `classifyEmblems`, `buildStats` など）。テスト（`*.test.ts`）はここに対して書く。
+- **`collector/aggregate-core.ts`**: 集計ロジック本体。`fs` / `fetch` / `process` / `console` に依存しない純関数群（`splitBoardUnits`, `classifyEmblems`, `pickTargetSet`, `buildStats` など）。テスト（`*.test.ts`）はここに対して書く。
+- **`collector/cdragon.ts`**: CDragon 取得の I/O 層。ただし紋章判定（`isEmblemItemLoose`, `resolveEmblemTraits`, `classifyBase`, `emblemIconRe`）はネットワーク非依存の純関数として export しており、`cdragon.test.ts` がここを直接テストする。
+- **`collector/collect.ts`**: 収集の I/O 層。末尾にエントリガード（`process.argv[1]` と `import.meta.url` の一致判定）があり、テストから `buildRecords` を import しても収集は走らない。
 - **`collector/aggregate.ts`**: I/O 層。`data/state/records/*.ndjson` の読み込み、CDragon 静的データの取得、`aggregate-core.ts` の呼び出し、`public/data/stats.json` への書き出しを担当。
 
 ## CI フローとキー失効 no-op 設計

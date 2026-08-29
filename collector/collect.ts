@@ -18,7 +18,7 @@ import {
 } from './state.ts'
 import { readFileSync, existsSync, appendFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { ParticipantRecord } from '../shared/types.ts'
 
 /**
@@ -81,6 +81,7 @@ interface MatchDetail {
     queue_id: number
     tft_game_type: string
     game_version: string
+    tft_set_number?: number
     game_datetime: number
     participants: MatchParticipant[]
   }
@@ -219,8 +220,15 @@ interface RouteResult {
   dedupeSkipped: number
 }
 
+/**
+ * game_version × tft_set_number の出現数（今回の実行で新規に取り込んだ分のみ）。
+ * Unreal 移行でセット境界のパッチ表記がどうなるかを実データで確認するための診断。
+ * ここで観測した内部パッチキーを config.tftPatchLabels に登録する。
+ */
+const versionSetCounts = new Map<string, number>()
+
 /** 1マッチの詳細を ParticipantRecord[] に変換。フィルタ通過なら配列、不通過なら null。 */
-function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemContext): ParticipantRecord[] | null {
+export function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemContext): ParticipantRecord[] | null {
   const info = detail.info
   if (info.queue_id !== config.rankedQueueId || info.tft_game_type !== 'standard') {
     return null
@@ -228,7 +236,12 @@ function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemCon
 
   const versionMatch = info.game_version.match(/(\d+)\.(\d+)/)
   const v = versionMatch ? `${versionMatch[1]}.${versionMatch[2]}` : info.game_version
+  // セット番号。Unreal 移行以降 game_version の表記が変わりうるため一次情報として保存する。
+  const s = typeof info.tft_set_number === 'number' ? info.tft_set_number : undefined
   const ts = Math.floor(info.game_datetime / 1000)
+
+  const vsKey = `${v} / set=${s ?? '-'}`
+  versionSetCounts.set(vsKey, (versionSetCounts.get(vsKey) ?? 0) + 1)
 
   const records: ParticipantRecord[] = []
   for (const part of info.participants) {
@@ -266,6 +279,7 @@ function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemCon
     records.push({
       m: matchId,
       v,
+      s,
       p: part.placement,
       t,
       tc,
@@ -465,6 +479,13 @@ async function main(): Promise<void> {
     )
   }
   console.log(`  合計: 新規=${totalNew} 破棄=${totalFiltered} dedupe=${totalDedupe}`)
+  if (versionSetCounts.size > 0) {
+    const cross = [...versionSetCounts.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+      .map(([k, n]) => `${k}: ${n}マッチ`)
+      .join(' / ')
+    console.log(`  パッチ×セット（新規分）: ${cross}`)
+  }
   console.log(`  経過時間: ${elapsedSec}s`)
   console.log(`  Riot統計(全体): req=${stats.total.requests} 429retry=${stats.total.retries429}`)
   console.log(`  ステータス別: ${JSON.stringify(stats.total.byStatus)}`)
@@ -489,4 +510,9 @@ async function main(): Promise<void> {
   ghOutput({ status: 'ok', new_records: String(totalNew) })
 }
 
-await main()
+// エントリガード: 直接実行されたときだけ収集を走らせる。
+// buildRecords をテストから import しても収集が始まらないようにするため。
+// （import.meta.main は Node 24.2+ 限定で CI の Node 22 では使えないので argv で判定する。）
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main()
+}

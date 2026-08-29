@@ -11,7 +11,7 @@ import { config } from './config.ts'
 import { pickTargetPatch, compareVersions } from './patches.ts'
 import { getStaticData, type StaticData } from './cdragon.ts'
 import type { ParticipantRecord, WireStatsFile } from '../shared/types.ts'
-import { type LoadedRecord, dedupeRecords, buildStats } from './aggregate-core.ts'
+import { type LoadedRecord, dedupeRecords, buildStats, pickTargetSet } from './aggregate-core.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(here, '..')
@@ -82,7 +82,22 @@ async function main(): Promise<void> {
   }
   console.log(`対象パッチ（ヒステリシス選定）: ${targetPatch}`)
 
-  const target = deduped.filter((lr) => lr.rec.v === targetPatch)
+  let target = deduped.filter((lr) => lr.rec.v === targetPatch)
+
+  // 3b. セット絞り込み。tft_set_number を持つレコードがあれば最頻セットに絞る。
+  // s を持たない旧レコードは残す（既存レコードは全て s 無しであり、落とすと集計が空になる）。
+  const targetSet = pickTargetSet(target)
+  if (targetSet !== null) {
+    const before = target.length
+    target = target.filter((lr) => lr.rec.s === targetSet || lr.rec.s === undefined)
+    const withS = target.filter((lr) => lr.rec.s === targetSet).length
+    console.log(
+      `対象セット（tft_set_number 最頻値）: ${targetSet} — ` +
+        `${before} → ${target.length} レコード（s=${targetSet}: ${withS}, s無し: ${target.length - withS}）`,
+    )
+  } else {
+    console.log('対象セット: 判定不可（tft_set_number を持つレコードなし）。パッチのみで絞り込む。')
+  }
 
   // 4. 静的データ
   const recordTraitNames = new Set<string>()
@@ -97,9 +112,10 @@ async function main(): Promise<void> {
   )
 
   // 5-8. 盤面グルーピング〜シグネチャ集計〜インターン〜Wire 圧縮（純関数）。
+  const tftPatchLabel = config.tftPatchLabels[targetPatch]
   const { out, diag } = buildStats(target, staticData, {
     targetPatch,
-    tftPatch: config.tftPatchLabels[targetPatch] ?? targetPatch,
+    tftPatch: tftPatchLabel ?? targetPatch,
     generatedAt: new Date().toISOString(),
   })
 
@@ -143,6 +159,12 @@ async function main(): Promise<void> {
 
   const warnLines: string[] = []
   for (const w of staticData.warnings) warnLines.push(`[静的データ] ${w}`)
+  if (tftPatchLabel === undefined) {
+    warnLines.push(
+      `[パッチ表記] 内部パッチ ${targetPatch} が config.tftPatchLabels に未登録のため、` +
+        `TFT表記にフォールバック（${targetPatch} をそのまま表示）。新セット/新パッチなら1行追加すること。`,
+    )
+  }
   if (parseFailures > 0) warnLines.push(`[parse失敗] ${parseFailures} 行`)
   if (diag.unresolvedTraitNames.size > 0) {
     warnLines.push(

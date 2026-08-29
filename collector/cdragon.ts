@@ -44,8 +44,91 @@ interface CDragonData {
   setData?: CDragonSetData[]
 }
 
+// ---- 紋章判定（セット非依存の純関数） ----
+
+/** 紋章アイコンの置き場（セット番号を問わない緩いゲート）。 */
+const EMBLEM_ICON_DIR_RE = /item_icons\/traits\//i
+
+/** en_us の紋章アイテム表示名は必ず "<トレイト名> Emblem"。 */
+const EMBLEM_NAME_RE = /^(.+) Emblem$/
+
+/** 合成素材の apiName 判定。接頭辞はセットごとに変わる（TFT_Item_ / DA_Component_）ため末尾一致。 */
+const SPATULA_RE = /_Spatula$/
+const FRYING_PAN_RE = /_FryingPan$/
+
+/** 紋章判定に使うアイテムの部分形。CDragonItem と構造的に互換。 */
+export interface EmblemItemLike {
+  apiName?: string
+  name?: string
+  icon?: string
+  incompatibleTraits?: string[]
+  composition?: string[]
+}
+
+/**
+ * 紋章アイコンは全セット共通で `item_icons/traits/<base>/set<N>/` 配下に置かれる。
+ * 付与トレイトが CDragon 上で空のセットで、紋章を構造的に特定するために使う。
+ */
+export function emblemIconRe(setNumber: number): RegExp {
+  return new RegExp(`/item_icons/traits/[^/]+/set${setNumber}/`, 'i')
+}
+
+/**
+ * セット番号を問わない「紋章アイテムらしさ」の緩いゲート（収集側・完成アイテム除外用）。
+ * 一次情報は incompatibleTraits。それが空でも、紋章アイコン置き場にあり表示名が
+ * "... Emblem" のものは紋章とみなす（セット18 の紋章は incompatibleTraits が空）。
+ * 表示名の条件は必須。外すとセット6の Mercenary アイテム等が大量に紛れ込む。
+ */
+export function isEmblemItemLoose(item: EmblemItemLike): boolean {
+  if (Array.isArray(item.incompatibleTraits) && item.incompatibleTraits.length > 0) return true
+  return EMBLEM_ICON_DIR_RE.test(item.icon ?? '') && EMBLEM_NAME_RE.test(item.name ?? '')
+}
+
+/**
+ * 1アイテムを選定セットの紋章として解決し、付与トレイト apiName 群を返す（空配列＝当セットの紋章でない）。
+ *
+ * - 一次: incompatibleTraits を apiName 完全一致 → 表示名一致 の順で解決する。紋章は
+ *   「装備者にトレイトを付与する」アイテムで、その付与トレイトは同トレイト重複防止のため
+ *   incompatibleTraits に記載される（associatedTraits はオーグメント等にも付くため使えない）。
+ * - フォールバック: 一次が0件のときのみ、当該セットのアイコン置き場にあり表示名が
+ *   "<トレイト名> Emblem" のものを表示名から解決する。セット18 のように
+ *   incompatibleTraits が空で配信されるセットへの対応。
+ *   セット限定のアイコンパスで絞るのは必須で、これが無いと旧セットの同名紋章
+ *   （例: セット3 の "Elderwood Emblem"）が新セットの同名トレイトに誤マッチする。
+ */
+export function resolveEmblemTraits(
+  item: EmblemItemLike,
+  traitApis: ReadonlySet<string>,
+  traitNameToApi: ReadonlyMap<string, string>,
+  setNumber: number,
+): string[] {
+  const resolved: string[] = []
+  for (const raw of item.incompatibleTraits ?? []) {
+    if (traitApis.has(raw)) {
+      resolved.push(raw)
+      continue
+    }
+    const api = traitNameToApi.get(raw)
+    if (api !== undefined) resolved.push(api)
+  }
+  if (resolved.length > 0) return resolved
+
+  if (!emblemIconRe(setNumber).test(item.icon ?? '')) return []
+  const m = EMBLEM_NAME_RE.exec(item.name ?? '')
+  if (!m) return []
+  const api = traitNameToApi.get(m[1])
+  return api === undefined ? [] : [api]
+}
+
+/** composition から合成素材分類を返す。空 composition（合成不可）は 'none'。 */
+export function classifyBase(composition: readonly string[]): 'none' | 'spatula' | 'fryingpan' {
+  if (composition.some((c) => SPATULA_RE.test(c))) return 'spatula'
+  if (composition.some((c) => FRYING_PAN_RE.test(c))) return 'fryingpan'
+  return 'none'
+}
+
 export interface EmblemContext {
-  /** incompatibleTraits が非空のアイテム（＝紋章/スパチュラ系）の apiName 集合。 */
+  /** 紋章とみなすアイテムの apiName 集合（全セット横断・緩いゲート）。 */
   emblemSet: Set<string>
   /** items 全体の apiName 集合（CDragon が知っている全アイテム）。 */
   knownItems: Set<string>
@@ -55,11 +138,9 @@ export interface EmblemContext {
 
 /**
  * 紋章判定用コンテキストを取得する。
- * 名前の正規表現マッチは禁止（紋章 apiName はセット固有で不規則）。
- * 紋章は「装備者にトレイトを付与する」アイテムで、その付与トレイトは
- * incompatibleTraits（同トレイト重複防止のため記載）に入る。associatedTraits は
- * オーグメントや Anima Squad 系アイテム等にも付くため紋章判定には使えない。
- * よって incompatibleTraits が非空のアイテムのみを紋章とみなす。
+ * セット番号を持たないため判定は全セット横断の緩いゲート（isEmblemItemLoose）で行う。
+ * records は生の apiName を保存し、セット絞り込みは集計側が行うため過剰包含は無害だが、
+ * 取りこぼすと収集し直しが効かないため、収集側は意図的に緩くする。
  */
 export async function getEmblemContext(): Promise<EmblemContext> {
   const res = await fetch(CDRAGON_URL)
@@ -75,7 +156,7 @@ export async function getEmblemContext(): Promise<EmblemContext> {
   for (const item of items) {
     if (!item.apiName) continue
     knownItems.add(item.apiName)
-    const isEmblem = Array.isArray(item.incompatibleTraits) && item.incompatibleTraits.length > 0
+    const isEmblem = isEmblemItemLoose(item)
     if (isEmblem) emblemSet.add(item.apiName)
     // 完成アイテム = 2コンポーネント合成 かつ 紋章でない。
     if (!isEmblem && Array.isArray(item.composition) && item.composition.length === 2) {
@@ -103,11 +184,18 @@ export interface StaticData {
   /** champions apiName → 表示名(en/ja)・コスト・アイコンURL・プランナーcode・所持トレイト(apiName) */
   units: Map<string, { name: string; nameJa: string; cost: number; icon: string; code: number; traits: string[] }>
   /**
-   * 紋章(incompatibleTraits で付与トレイトを示すアイテム) apiName → 表示名・解決済み traitApi・アイコンURL。
+   * 紋章 apiName → 表示名・解決済み traitApi・アイコンURL。
    * traitApi は表示/クラスタ参照用の単一トレイト（先頭の解決トレイト）。
    * traitApis は発動判定用の全付与トレイト集合（Stargazer 等は基底＋変種が全て入る）。
+   * 同一トレイトに解決される紋章が複数ある場合は canonical のみをここに載せる（残りは emblemAliases）。
    */
   emblems: Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string; base: 'none' | 'spatula' | 'fryingpan'; recipe?: [string, string] }>
+  /**
+   * 重複紋章 apiName → canonical 紋章 apiName。
+   * 同一トレイトを付与する紋章が複数配信されるセット（例: セット18 の Flora Fatalis）で、
+   * 選択肢が二重に出て統計が分散するのを防ぐ。レコード解決時に正規化する。
+   */
+  emblemAliases: Map<string, string>
   /** 完成アイテム apiName → 表示名(en/ja)・アイコンURL */
   items: Map<string, { name: string; nameJa: string; icon: string; recipe?: [string, string] }>
   /** 合成素材アイテムアイコン（紋章グリッドのカテゴリヘッダ用） */
@@ -161,6 +249,16 @@ async function fetchPlannerCodes(setNumber: number): Promise<Map<string, number>
     // 取得失敗時はコード未設定（プランナーコードはその分 00 になる）。
   }
   return map
+}
+
+/** 紋章候補（canonical 選定前）。 */
+interface EmblemCandidate {
+  api: string
+  name: string
+  icon: string
+  traitApi: string
+  traitApis: string[]
+  comp: string[]
 }
 
 /**
@@ -222,6 +320,7 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
       tiers,
     })
   }
+  const traitApiSet = new Set(traits.keys())
 
   // カバレッジ警告
   const uncovered: string[] = []
@@ -255,8 +354,7 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
     })
   }
 
-  // emblems（incompatibleTraits で付与トレイトを示すアイテム）
-  // 付与トレイトが選定セットのトレイトに解決できるものだけを紋章として採用する。
+  // emblems。付与トレイトが選定セットのトレイトに解決できるものだけを紋章として採用する。
   // これにより他セットのスパチュラ系アイテムや、別機構（オーグメント/Anima 系）は自然に除外される。
   const allIconsMap = new Map<string, string>()
   for (const item of data.items ?? []) {
@@ -265,40 +363,25 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
     }
   }
 
-  const emblems = new Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string; base: 'none' | 'spatula' | 'fryingpan'; recipe?: [string, string] }>()
+  const candidates: EmblemCandidate[] = []
   let unresolvedEmblemCount = 0
   for (const item of data.items ?? []) {
     if (!item.apiName) continue
-    const incompat = item.incompatibleTraits
-    if (!Array.isArray(incompat) || incompat.length === 0) continue
-    // incompatibleTraits は付与トレイトの apiName 群（Stargazer 等は基底＋変種が列挙される）。
-    // apiName 完全一致 → 表示名一致 の順で、選定セットのトレイトに解決する。
-    // 解決できた全 apiName を発動判定用の集合 traitApis とし、先頭を表示/クラスタ用 traitApi とする。
-    const traitApis: string[] = []
-    for (const raw of incompat) {
-      if (traits.has(raw)) traitApis.push(raw)
-      else if (traitNameToApi.has(raw)) traitApis.push(traitNameToApi.get(raw)!)
-    }
+    const traitApis = resolveEmblemTraits(item, traitApiSet, traitNameToApi, setNumber)
     if (traitApis.length === 0) {
-      // 選定セットのトレイトに解決できない＝他セットのアイテム。紋章ではないので静かに除外。
-      unresolvedEmblemCount++
+      // 付与トレイトを持つ（＝他セットの紋章）が選定セットに解決できないものだけ警告に数える。
+      if (Array.isArray(item.incompatibleTraits) && item.incompatibleTraits.length > 0) {
+        unresolvedEmblemCount++
+      }
       continue
     }
-    const name = item.name ?? item.apiName
-    const comp = item.composition ?? []
-    const base: 'none' | 'spatula' | 'fryingpan' =
-      comp.length === 0 ? 'none'
-      : comp.includes('TFT_Item_Spatula') ? 'spatula'
-      : comp.includes('TFT_Item_FryingPan') ? 'fryingpan'
-      : 'none'
-    emblems.set(item.apiName, {
-      name,
-      nameJa: ja.items.get(item.apiName) ?? name,
+    candidates.push({
+      api: item.apiName,
+      name: item.name ?? item.apiName,
+      icon: item.icon ?? '',
       traitApi: traitApis[0],
       traitApis,
-      icon: iconUrl(item.icon),
-      base,
-      recipe: comp.length === 2 ? [allIconsMap.get(comp[0]) ?? '', allIconsMap.get(comp[1]) ?? ''] : undefined,
+      comp: item.composition ?? [],
     })
   }
   if (unresolvedEmblemCount > 0) {
@@ -307,30 +390,69 @@ export async function getStaticData(recordTraitNames: Set<string>): Promise<Stat
     )
   }
 
+  // 同一トレイトに解決される紋章が複数ある場合の canonical 選定。
+  // 「合成レシピを持つ方」を優先し、同条件なら items 配列の出現順で先勝ち（決定的）。
+  const canonicalByTrait = new Map<string, EmblemCandidate>()
+  for (const c of candidates) {
+    const prev = canonicalByTrait.get(c.traitApi)
+    if (prev === undefined || (prev.comp.length !== 2 && c.comp.length === 2)) {
+      canonicalByTrait.set(c.traitApi, c)
+    }
+  }
+
+  const emblems = new Map<string, { name: string; nameJa: string; traitApi: string; traitApis: string[]; icon: string; base: 'none' | 'spatula' | 'fryingpan'; recipe?: [string, string] }>()
+  const emblemAliases = new Map<string, string>()
+  for (const c of candidates) {
+    const canonical = canonicalByTrait.get(c.traitApi)!
+    if (canonical.api !== c.api) {
+      emblemAliases.set(c.api, canonical.api)
+      continue
+    }
+    emblems.set(c.api, {
+      name: c.name,
+      nameJa: ja.items.get(c.api) ?? c.name,
+      traitApi: c.traitApi,
+      traitApis: c.traitApis,
+      icon: iconUrl(c.icon),
+      base: classifyBase(c.comp),
+      recipe: c.comp.length === 2 ? [allIconsMap.get(c.comp[0]) ?? '', allIconsMap.get(c.comp[1]) ?? ''] : undefined,
+    })
+  }
+  if (emblemAliases.size > 0) {
+    warnings.push(
+      `同一トレイトに解決される重複紋章 ${emblemAliases.size} 種を canonical に統合: ` +
+        [...emblemAliases].map(([a, c]) => `${a}→${c}`).sort().join(', '),
+    )
+  }
+
   // items（完成アイテム = composition 2要素 かつ 非紋章）。推奨アイテム表示用。
+  // 紋章判定は収集側と同じ緩いゲートを使う（他セットの紋章も完成アイテムに混ぜない）。
   const items = new Map<string, { name: string; nameJa: string; icon: string; recipe?: [string, string] }>()
   for (const item of data.items ?? []) {
     if (!item.apiName) continue
-    const isEmblem = Array.isArray(item.incompatibleTraits) && item.incompatibleTraits.length > 0
-    if (isEmblem) continue
+    if (isEmblemItemLoose(item)) continue
     if (!Array.isArray(item.composition) || item.composition.length !== 2) continue
     const name = item.name ?? item.apiName
     const comp = item.composition ?? []
-    items.set(item.apiName, { 
-      name, 
-      nameJa: ja.items.get(item.apiName) ?? name, 
+    items.set(item.apiName, {
+      name,
+      nameJa: ja.items.get(item.apiName) ?? name,
       icon: iconUrl(item.icon),
       recipe: comp.length === 2 ? [allIconsMap.get(comp[0]) ?? '', allIconsMap.get(comp[1]) ?? ''] : undefined
     })
   }
 
   // 合成素材アイコン（紋章グリッドのカテゴリヘッダ用）。
-  const spatulaItem = (data.items ?? []).find((it) => it.apiName === 'TFT_Item_Spatula')
-  const fryingPanItem = (data.items ?? []).find((it) => it.apiName === 'TFT_Item_FryingPan')
+  // 素材の apiName はセットごとに変わる（TFT_Item_Spatula / DA_Component_Spatula）ため、
+  // 選定セットの紋章 composition に実際に現れた素材から引く。無ければ旧来値にフォールバック。
+  const usedComponents: string[] = []
+  for (const c of candidates) for (const x of c.comp) if (!usedComponents.includes(x)) usedComponents.push(x)
+  const spatulaApi = usedComponents.find((c) => SPATULA_RE.test(c)) ?? 'TFT_Item_Spatula'
+  const fryingPanApi = usedComponents.find((c) => FRYING_PAN_RE.test(c)) ?? 'TFT_Item_FryingPan'
   const baseItemIcons = {
-    spatula: iconUrl(spatulaItem?.icon),
-    fryingPan: iconUrl(fryingPanItem?.icon),
+    spatula: allIconsMap.get(spatulaApi) ?? '',
+    fryingPan: allIconsMap.get(fryingPanApi) ?? '',
   }
 
-  return { setNumber, traits, units, emblems, items, baseItemIcons, warnings }
+  return { setNumber, traits, units, emblems, emblemAliases, items, baseItemIcons, warnings }
 }

@@ -4,8 +4,14 @@
 export interface ParticipantRecord {
   /** マッチID（例: "SG2_88412345"） */
   m: string
-  /** パッチ（例: "16.11"） */
+  /** パッチ（例: "16.11"）。game_version 由来の major.minor。 */
   v: string
+  /**
+   * TFTセット番号（tft_set_number）。旧レコードは欠落。
+   * game_version だけではセット境界を分離できない場合（同一パッチでセットが切り替わる等）に、
+   * 集計対象セットを一次情報で絞るために記録する。
+   */
+  s?: number
   /** 順位 1-8 */
   p: number
   /** 発動トレイト（tier_current>=1）→ style（1=ブロンズ,2=シルバー,3=ゴールド,4=プリズム） */

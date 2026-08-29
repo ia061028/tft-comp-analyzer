@@ -12,8 +12,10 @@ import type {
   ItemInfo,
 } from '../shared/types.ts'
 
-// 召喚ユニット（ビア＆バイン=TFT17_Summon・ミィプシー=TFT17_IvernMinion・PVE等）は
+// 召喚・非ショップユニット（apiName が _Summon で終わる／Minion・PVE・Enemy_・TrainingDummy を含む）は
 // 導き手等で盤面にレベル+1で出現するため構成ユニットから除外（レベルと整合）。
+// 命名規約に依存するためセット固有の実体は書かない。新セットでは診断の未解決ユニット警告と
+// 盤面ユニット数で取りこぼしを確認すること。
 export const NON_BOARD_UNIT_RE = /_Summon$|Minion|PVE|Enemy_|TrainingDummy/
 
 // 集計定数。
@@ -67,6 +69,18 @@ export function dedupeRecords(all: LoadedRecord[]): { deduped: LoadedRecord[]; d
   return { deduped, dupSkipped }
 }
 
+/**
+ * 対象レコード群から集計対象のセット番号を選ぶ（s を持つレコードの最頻値・同数なら大きい方）。
+ * s を持つレコードが1件も無ければ null（＝セット絞り込みをしない）。
+ * 同一 game_version 内でセットが切り替わる場合にパッチ選定だけでは分離できないため、
+ * tft_set_number を一次情報として使う。
+ */
+export function pickTargetSet(records: LoadedRecord[]): number | null {
+  const sets: number[] = []
+  for (const lr of records) if (typeof lr.rec.s === 'number') sets.push(lr.rec.s)
+  return modeMaxNumber(sets) ?? null
+}
+
 export interface SplitBoardResult {
   /** 盤面ユニット apiName（昇順・構成キー用）。 */
   boardApis: string[]
@@ -108,6 +122,7 @@ export interface ClassifyEmblemsResult {
  * 発動数がブレークポイントちょうどか超過か（＝余っているか）は区別しない。要件が
  * 「その紋章を使ったシナジーが1つでも発動していれば対象」であり、余りの区別は要求されていないため。
  * 同一紋章を複数装備した場合は rec.e の並びをそのまま辿ることで多重度が保たれる。
+ * apiName は staticData.emblemAliases で canonical に正規化してから解決する。
  */
 export function classifyEmblems(
   rec: ParticipantRecord,
@@ -115,10 +130,12 @@ export function classifyEmblems(
 ): ClassifyEmblemsResult {
   const active: string[] = []
   const unresolvedEmblems: string[] = []
-  for (const eApi of rec.e) {
+  for (const rawApi of rec.e) {
+    // 同一トレイトを付与する重複紋章は canonical に正規化してから辞書を引く。
+    const eApi = staticData.emblemAliases.get(rawApi) ?? rawApi
     const emb = staticData.emblems.get(eApi)
     if (!emb) {
-      unresolvedEmblems.push(eApi)
+      unresolvedEmblems.push(rawApi)
       continue
     }
     if (emb.traitApis.some((a) => a in rec.t)) active.push(eApi)

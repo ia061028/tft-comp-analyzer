@@ -7,6 +7,7 @@ import {
   dedupeRecords,
   splitBoardUnits,
   classifyEmblems,
+  pickTargetSet,
   buildStats,
   type LoadedRecord,
 } from './aggregate-core.ts'
@@ -33,6 +34,8 @@ function makeStaticData(): StaticData {
       // 変種を持つ紋章（付与トレイトのいずれかが発動していれば活用）。
       ['TFT_Item_EmblemB', { name: 'EmblemB', nameJa: '紋章B', traitApi: 'TraitB', traitApis: ['TraitB', 'TraitA'], icon: 'embB.png', base: 'spatula', recipe: ['spat.png', 'baseB.png'] as [string, string] }],
     ]),
+    // 同一トレイトを付与する重複紋章（canonical へ正規化される想定）。
+    emblemAliases: new Map([['TFT_Item_EmblemA_Dup', 'TFT_Item_EmblemA']]),
     items: new Map([
       ['TFT_Item_ItemX', { name: 'ItemX', nameJa: 'アイテムX', icon: 'itemX.png', recipe: ['c1.png', 'c2.png'] as [string, string] }],
       ['TFT_Item_ItemY', { name: 'ItemY', nameJa: 'アイテムY', icon: 'itemY.png', recipe: ['c3.png', 'c4.png'] as [string, string] }],
@@ -55,6 +58,33 @@ function rec(p: Partial<ParticipantRecord> & Pick<ParticipantRecord, 'm'>): Part
     ...p,
   }
 }
+
+// ---- pickTargetSet ----
+test('pickTargetSet: s を持つレコードの最頻値を返す', () => {
+  const recs: LoadedRecord[] = [
+    { rec: rec({ m: 'm1', s: 17 }), route: 'asia' },
+    { rec: rec({ m: 'm2', s: 18 }), route: 'asia' },
+    { rec: rec({ m: 'm3', s: 18 }), route: 'asia' },
+    { rec: rec({ m: 'm4' }), route: 'asia' },
+  ]
+  assert.equal(pickTargetSet(recs), 18)
+})
+
+test('pickTargetSet: s を持つレコードが無ければ null', () => {
+  const recs: LoadedRecord[] = [
+    { rec: rec({ m: 'm1' }), route: 'asia' },
+    { rec: rec({ m: 'm2' }), route: 'asia' },
+  ]
+  assert.equal(pickTargetSet(recs), null)
+})
+
+test('pickTargetSet: 同数なら大きいセット番号', () => {
+  const recs: LoadedRecord[] = [
+    { rec: rec({ m: 'm1', s: 17 }), route: 'asia' },
+    { rec: rec({ m: 'm2', s: 18 }), route: 'asia' },
+  ]
+  assert.equal(pickTargetSet(recs), 18)
+})
 
 // ---- modeMaxNumber ----
 test('modeMaxNumber: 最頻値', () => {
@@ -156,6 +186,15 @@ test('classifyEmblems: 未解決紋章は記録して無視', () => {
   const { active, unresolvedEmblems } = classifyEmblems(r, sd)
   assert.deepEqual(active, ['TFT_Item_EmblemA'])
   assert.deepEqual(unresolvedEmblems, ['TFT_Item_Unknown'])
+})
+
+test('classifyEmblems: 重複紋章は emblemAliases で canonical に正規化される', () => {
+  const sd = makeStaticData()
+  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemA_Dup'] })
+  const { active, activeEmblemApis, unresolvedEmblems } = classifyEmblems(r, sd)
+  assert.deepEqual(active, ['TFT_Item_EmblemA'])
+  assert.deepEqual([...activeEmblemApis], ['TFT_Item_EmblemA'])
+  assert.deepEqual(unresolvedEmblems, [])
 })
 
 // ---- buildStats（ミニゴールデン） ----

@@ -64,4 +64,6 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 ## 既知の課題 / TODO
 
 - **チームコードの形式**: 現行は `02` + 各チャンピオン12bit(3桁hex, team_planner_code) + `TFTSet{n}`。実機での有効性は要再検証（クライアント生成コードとの突き合わせ）。
+  セット18 では Lux の9変種（`DA_18_Lux_*` 等、Avatar 特性でトレイト別に姿が変わる5コスト）が Riot のチームプランナー定義に無く `team_planner_code` を持たないため、その枠は `000` になる。
+- **セット18 対応の残作業**: `config.tftPatchLabels` にセット18（TFT 18.1〜）の内部パッチキーが未登録。APIキー復旧後の最初の成功 collect のログ「パッチ×セット（新規分）」で実値を確認して追記する（`game_version` が既に TFT 表記なら追記不要）。
 - **本番APIキー**: 取得後に Secret 差替え＋`config.enableDiamond=true` で Diamond 帯収集も有効化可能（現状は dev キーのレート上限回避で off）。
