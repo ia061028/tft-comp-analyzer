@@ -26,14 +26,10 @@ interface CompListProps {
   lang: Lang
   /** 生涯ブロンズモード: ブロンズ特性数の多い順に並べる。 */
   bronzeMode: boolean
-  /** 選択紋章を1枚残らず使う構成だけに絞る。OFF なら一部だけ使う構成も出す（＝見比べ用）。 */
-  fullUseOnly: boolean
-  /** 「すべて使う」を解除する導線（0件時の回復操作）。 */
-  onDisableFullUse: () => void
 }
 
-/** 統計の信頼性のための最小サンプル（該当レコードがこの未満は除外）。 */
-const MIN_SAMPLE = 3
+/** 統計の信頼性のための最小サンプル。採用数下限の入力欄の下限値でもある（App が参照）。 */
+export const MIN_SAMPLE = 3
 
 type Row = {
   comp: CompStats
@@ -52,19 +48,16 @@ export function CompList({
   minAdopt,
   lang,
   bronzeMode,
-  fullUseOnly,
-  onDisableFullUse,
 }: CompListProps) {
   const { units, emblems, traits } = stats
 
-  const floor = Math.max(MIN_SAMPLE, minAdopt)
+  // 下限は入力欄側で MIN_SAMPLE 未満にできないので、ここでは素直に使う。
+  const floor = minAdopt
 
   // 1構成は「紋章の積み方」ごとに複数行へ分解される（2枚使う行と1枚だけ使う行は別カード）。
   // compRows / activeTraitCounts / bronzeTraitCount は構成数×選択紋章に比例して重いため、
   // comps・sel・floor・stats の該当サブフィールドが変わらない限り再計算しない。
-  // 採用数下限までを適用した行。「すべて使う」の絞り込みはまだ掛けない —
-  // 0件になったときに原因（採用数下限 なのか すべて使う なのか）を切り分けるために必要。
-  const rowsBeforeFullUse = useMemo<Row[]>(() => {
+  const rows = useMemo<Row[]>(() => {
     const out: Row[] = []
     for (const comp of comps) {
       for (const row of compRows(comp, sel)) {
@@ -77,28 +70,31 @@ export function CompList({
     return out
   }, [comps, sel, floor, units, emblems, traits])
 
-  const rows = useMemo<Row[]>(
-    () =>
-      fullUseOnly
-        ? rowsBeforeFullUse.filter(({ row }) => row.match >= sel.length)
-        : rowsBeforeFullUse,
-    [rowsBeforeFullUse, fullUseOnly, sel.length],
-  )
+  // 同体数コホートの平均順位。Tier バッジの色と、Tier順ソートの両方の基準にする。
+  // 絶対値で切ると 10体グループが全部 S になり、色も順位も情報を運ばなくなる。
+  const cohort = useMemo(() => cohortPlace(stats.comps), [stats.comps])
 
-  // 並び順は「選んだ指標」が第1キー。同点は 平均順位 → 1位率 → Top4率 → 採用数 の順で決める。
+  // 並び順は「選んだ指標」が第1キー。同点は Tier → 1位率 → Top4率 → 採用数 の順で決める。
   //
   // 以前は活用紋章数を第1キーにしていたが、それだと「Top4率」を選んでも活用数で層が分かれ、
   // 画面上は Top4率 の降順に見えない。ランキングの軸が信用できないと「どれが一番良いか」を
-  // 判断できないので、絞り込み（＝すべて使うか）と順位付け（＝どの指標か）を分離した。
+  // 判断できないので、絞り込みと順位付け（＝どの指標か）を分離した。
+  //
+  // 'place'（＝Tier）は**同体数コホートからの差**で測る。素の平均順位で並べると体数の多い順に
+  // なるだけで（実測 7体=5.28 … 10体=1.76）、「10体まで揃えろ」以上のことを言わない一覧になる。
+  // カードの Tier バッジも同じ基準（tierOfEdge）なので、これで表示と並び順が一致する。
   //
   // 率は縮約値で比較する（生の率だと採用5件の 80% が採用500件の 62% より上に来る）。
   // 表示する数字は生の率のまま。詳細は format.ts の shrunk を参照。
   const sorted = useMemo(() => {
     // すべて「小さいほど良い」に符号を揃える。
-    const metric = (r: CompRow, key: SortKey): number => {
+    const metric = (r: CompRow, unitCount: number, key: SortKey): number => {
       switch (key) {
-        case 'place':
-          return shrunk(r.p, r.n, PRIOR_PLACE) // 順位は小さいほど良いのでそのまま
+        case 'place': {
+          // 同体数の平均を事前分布に使い、そこからの差を取る。順位は小さいほど良いのでそのまま。
+          const base = cohort.get(unitCount) ?? PRIOR_PLACE
+          return shrunk(r.p, r.n, base) - base
+        }
         case 'win':
           return -shrunk(r.win, r.n, PRIOR_WIN)
         case 'adopt':
@@ -115,22 +111,18 @@ export function CompList({
     return rows.slice().sort((a, b) => {
       if (bronzeMode && a.bronze !== b.bronze) return b.bronze - a.bronze
       for (const k of keys) {
-        const d = metric(a.row, k) - metric(b.row, k)
+        const d = metric(a.row, a.comp.units.length, k) - metric(b.row, b.comp.units.length, k)
         if (d !== 0) return d
       }
       return 0
     })
-  }, [rows, sortKey, bronzeMode])
+  }, [rows, sortKey, bronzeMode, cohort])
 
   // 上位を「コア ＋ 派生」の系統に畳む。コアが取れない行は flat に落ちて従来カードで描かれる。
   const tree = useMemo(
     () => buildTree(sorted, units, emblems, traits),
     [sorted, units, emblems, traits],
   )
-
-  // 平均順位の**色**の根拠にだけ使う（数値も見出しも画面には出さない）。
-  // 絶対値でティアを切ると 10体グループが全部 S になり、色が情報を運ばなくなるため。
-  const cohort = useMemo(() => cohortPlace(stats.comps), [stats.comps])
 
   if (sel.length === 0) {
     return (
@@ -154,23 +146,10 @@ export function CompList({
   }
 
   if (sorted.length === 0) {
-    // 0件の原因は2つしかない。取り違えると回復操作を間違えるので、原因ごとに導線を出し分ける。
-    // 「すべて使う」を外せば行が戻ってくる場合だけが「すべて使う」起因。そうでなければ採用数下限。
-    const byFullUse = fullUseOnly && rowsBeforeFullUse.length > 0
+    // 0件の原因は採用数下限だけ（選択紋章を1枚も使わない行はデータ上存在しないため）。
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-line bg-surface/40 px-4 py-10 text-center text-sm text-muted">
-        {byFullUse
-          ? t(lang, 'noCompsFullUse', { n: sel.length, x: floor })
-          : t(lang, 'noCompsAdopt', { x: floor })}
-        {byFullUse && (
-          <button
-            type="button"
-            onClick={onDisableFullUse}
-            className="rounded-md border border-line-strong bg-surface-2 px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-faint hover:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
-          >
-            {t(lang, 'noCompsFullUseAction')}
-          </button>
-        )}
+        {t(lang, 'noCompsAdopt', { x: floor })}
       </div>
     )
   }
@@ -217,7 +196,7 @@ export function CompList({
               sortKey={sortKey}
               lang={lang}
               bronzeMode={bronzeMode}
-              showUtilization={sel.length > 1 && !fullUseOnly}
+              showUtilization={sel.length > 1}
             />
           ))}
         </div>
