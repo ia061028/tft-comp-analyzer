@@ -22,15 +22,22 @@ export const PLATFORM_TO_ROUTE: Record<string, RegionalRoute> = {
 export const config = {
   /** 有効なリージョナルルート。Phase 5 で全4ルート（全15プラットフォーム）に拡大。 */
   enabledRoutes: ['americas', 'asia', 'europe', 'sea'] as RegionalRoute[],
-  /** マッチID取得時の count パラメータ */
-  matchIdsPerPlayer: 20,
+  /**
+   * マッチID取得時の count パラメータ（API 上限は 200）。
+   *
+   * ここが収集効率を直接決める。1プレイヤーにつき ID 取得リクエストが必ず1回要るので、
+   * 1回で拾える試合数が少ないほどレート上限を ID 取得で食い潰す。
+   * count=20・取得窓6時間だった時の実測は「1人あたり新規0.5試合」で、
+   * リージョナルホストの全リクエストの約7割が ID 取得に消えていた（効率30%）。
+   * 200 にして取得窓もセット開始まで広げると、1回の ID 取得で数十試合を拾えるようになる。
+   */
+  matchIdsPerPlayer: 200,
   /**
    * 1ルート1実行あたりの新規マッチ詳細取得の上限。
-   * レート上限（リージョナルホストごとに 100req/120s = 50req/分）と runBudgetMinutes から算出。
-   * 収集115分 × 50req/分 = 5,750 リクエストが1ルートの上限で、うち約7割がマッチ詳細。
-   * 実際にはデッドラインが先に効くので、これは暴走防止の非拘束キャップ。
+   * ローリング窓の1ルート分（maxRecordsPerRoute / 8人 ≒ 11,250マッチ）を1ランで埋め切れる値にする。
+   * 実際にはレート上限由来のデッドラインが先に効くので、暴走防止の非拘束キャップ。
    */
-  maxNewMatchesPerRoutePerRun: 6000,
+  maxNewMatchesPerRoutePerRun: 12000,
   /** Master帯からプラットフォームごとに抽選する人数の上限 */
   masterSamplePerPlatform: 100,
   /**
@@ -69,6 +76,14 @@ export const config = {
   runBudgetMinutes: 120,
   /** ランク戦TFTの queue_id */
   rankedQueueId: 1100,
+  /**
+   * 試合ID取得の下限時刻（epoch秒）。既定は セット18 の稼働開始 2026-08-26T00:00:00Z。
+   *
+   * 前回実行時刻を基準に窓を刻むのをやめ、常にセット全期間を対象にする。重複は seen が
+   * 弾くのでリクエストを消費せず、代わりに ID 取得1回あたりの収穫が跳ね上がる。
+   * セットが替わったらこの値を新セットの開始時刻に更新する（tftPatchLabels と同じ運用）。
+   */
+  collectSinceEpoch: 1787702400,
   /**
    * 内部パッチキー（game_version 由来）→ 表示用 TFT バージョン。
    * 計算で導けないため手動マップ。新パッチごとに1行追加。未登録は素のパッチ表示にフォールバック

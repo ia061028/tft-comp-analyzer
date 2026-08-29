@@ -13,7 +13,6 @@ import {
   appendSeen,
   appendRecords,
   pruneRecords,
-  type Meta,
 } from './state.ts'
 import { appendFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
@@ -286,7 +285,6 @@ export function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: Em
 async function collectRoute(
   route: RegionalRoute,
   deadlineMs: number,
-  meta: Meta,
   emblemCtx: EmblemContext,
   preloadedChallenger: Map<string, LeagueList | null>,
 ): Promise<RouteResult> {
@@ -295,8 +293,11 @@ async function collectRoute(
   const seen = loadSeen(route)
   // 今回実行内で処理済み（seen に追記済みでもメモリ上で再確認するため別管理は不要だが、
   // appendSeen の前にメモリで弾けるよう seen 自体に都度追加する）。
-  const lastRun = meta.routes[route]?.lastRunStartedAt
-  const startTime = lastRun ? lastRun - 3600 : undefined
+  // 取得窓は前回実行時刻ではなく、セット開始で固定する（config.collectSinceEpoch）。
+  // 前回実行基準だと窓が数時間しかなく、1人あたりの新規試合が0.5件程度にしかならず
+  // ID 取得1回ぶんのコストを回収できない。全期間を対象にしても、取得済みのマッチは
+  // seen がリクエスト前に弾くので消費は増えない。
+  const startTime = config.collectSinceEpoch
 
   const pool = await buildPuuidPool(route, preloadedChallenger)
   const rHost = regionalHost(route)
@@ -419,7 +420,7 @@ async function main(): Promise<void> {
   console.log(`\n=== ルート並列収集開始: ${config.enabledRoutes.join(', ')} ===`)
   const settled = await Promise.allSettled(
     config.enabledRoutes.map((route) =>
-      collectRoute(route, deadlineMs, meta, emblemCtx, preloaded).then(
+      collectRoute(route, deadlineMs, emblemCtx, preloaded).then(
         (result) => ({ route, result }),
       ),
     ),
