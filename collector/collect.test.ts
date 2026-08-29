@@ -86,8 +86,31 @@ test('buildRecords: game_version から major.minor を取り出す', () => {
   assert.equal(recs[0].v, '16.17')
 })
 
+test('buildRecords: game_version がプレースホルダなら set 番号から v を合成する', () => {
+  // Unreal 版 TFT の実データ。数値が1つも入っていない。
+  // ここで生文字列のまま v にすると compareVersions が最小値扱いし、prune が新セットを即削除する。
+  const recs = buildRecords(
+    'KR_1',
+    makeDetail({ game_version: 'TFT Unreal Version ?.?.?.?' }) as never,
+    makeEmblemCtx(),
+  )
+  assert.ok(recs !== null)
+  assert.equal(recs[0].v, '18.0')
+  assert.equal(recs[0].s, 18)
+})
+
+test('buildRecords: プレースホルダで set 番号も無ければ生文字列のまま', () => {
+  const detail = makeDetail({ game_version: 'TFT Unreal Version ?.?.?.?' }) as unknown as {
+    info: Record<string, unknown>
+  }
+  delete detail.info.tft_set_number
+  const recs = buildRecords('KR_1', detail as never, makeEmblemCtx())
+  assert.ok(recs !== null)
+  assert.equal(recs[0].v, 'TFT Unreal Version ?.?.?.?')
+})
+
 test('buildRecords: TFT表記の game_version でもそのまま major.minor を取る', () => {
-  // Unreal 移行後に game_version が TFT 表記になった場合も壊れないこと。
+  // Riot が game_version を修正して TFT 表記になった場合も壊れないこと。
   const recs = buildRecords(
     'VN2_1',
     makeDetail({ game_version: 'Version 18.1.700.1234' }) as never,

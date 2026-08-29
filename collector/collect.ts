@@ -235,9 +235,20 @@ export function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: Em
   }
 
   const versionMatch = info.game_version.match(/(\d+)\.(\d+)/)
-  const v = versionMatch ? `${versionMatch[1]}.${versionMatch[2]}` : info.game_version
-  // セット番号。Unreal 移行以降 game_version の表記が変わりうるため一次情報として保存する。
+  // セット番号。Unreal 移行以降 game_version が使い物にならないため一次情報として保存する。
   const s = typeof info.tft_set_number === 'number' ? info.tft_set_number : undefined
+
+  // パッチキー。Unreal 版 TFT（セット18〜）は game_version が
+  // "TFT Unreal Version ?.?.?.?" というプレースホルダで、パッチ番号を一切返さない。
+  // 数値が取れない場合はセット番号から "{set}.0" を合成する（TFT の実パッチは x.1 始まりなので衝突しない）。
+  // これが無いと v がパース不能 → compareVersions が最小値扱い → prune（上位2パッチ保持）で
+  // 新セットのレコードが収集直後に全削除される。2026-08-29 の実行で実際に 498 マッチを失った。
+  // Riot が game_version を直せば実パッチ（例 18.2）が入り、18.0 より新しいので自然に切り替わる。
+  const v = versionMatch
+    ? `${versionMatch[1]}.${versionMatch[2]}`
+    : s !== undefined
+      ? `${s}.0`
+      : info.game_version
   const ts = Math.floor(info.game_datetime / 1000)
 
   const vsKey = `${v} / set=${s ?? '-'}`
