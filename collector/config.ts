@@ -24,21 +24,33 @@ export const config = {
   enabledRoutes: ['americas', 'asia', 'europe', 'sea'] as RegionalRoute[],
   /** マッチID取得時の count パラメータ */
   matchIdsPerPlayer: 20,
-  /** 1ルート1実行あたりの新規マッチ詳細取得の上限 */
-  maxNewMatchesPerRoutePerRun: 1000,
+  /**
+   * 1ルート1実行あたりの新規マッチ詳細取得の上限。
+   * レート上限（リージョナルホストごとに 100req/120s = 50req/分）と runBudgetMinutes から算出。
+   * 収集30分 × 50req/分 = 1,500 が1ルートの理論上限。
+   */
+  maxNewMatchesPerRoutePerRun: 1500,
   /** Master帯からプラットフォームごとに抽選する人数の上限 */
   masterSamplePerPlatform: 100,
   /**
-   * Diamond帯も収集対象に含めるか。dev キーのレート上限を避けるため既定 false。
-   * 本番APIキー切替後に true にする。
+   * entries エンドポイント（DIAMOND 以下）で puuid プールに加えるティア。
+   * 高レート帯だけだと母集団が枯れる（セット開始直後は全15プラットフォームで
+   * Challenger/GM が 0人、Master 計30人だった）。サンプル数を最大化するため全ティアを対象にする。
+   * 注意: 低レート帯の構成は最適解とは限らないので、統計の解釈は「その帯で実際に組まれた構成」。
    */
-  enableDiamond: false,
-  /** Diamond帯からプラットフォーム×ディビジョンごとに抽選する人数の上限 */
-  diamondSamplePerDivision: 50,
-  /** 新パッチがこの試合数を超えたら集計対象を切替・旧パッチをprune */
+  entryTiers: ['DIAMOND', 'EMERALD', 'PLATINUM', 'GOLD', 'SILVER', 'BRONZE', 'IRON'] as const,
+  /** entries ティア×ディビジョンごとに抽選する人数の上限（1ページ205件上限から抽選） */
+  entrySamplePerDivision: 15,
+  /**
+   * ローリング窓: records/{route}.ndjson に保持する最大レコード数。
+   * GitHub のハード上限は 100MB/ファイル。実測 約900バイト/レコードなので
+   * 90,000 レコード ≒ 81MB（約11,250マッチ）に抑える。4ルートで約45,000マッチが定常サンプル。
+   */
+  maxRecordsPerRoute: 90000,
+  /** 集計対象パッチのヒステリシス閾値（この試合数を超えた最新パッチへ切替）。prune とは無関係。 */
   patchSwitchThreshold: 200,
   /** 実行時間バジェット（分）。残り5分で取得を打ち切り集計とflushを実施 */
-  runBudgetMinutes: 30,
+  runBudgetMinutes: 35,
   /** ランク戦TFTの queue_id */
   rankedQueueId: 1100,
   /**

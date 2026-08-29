@@ -77,52 +77,119 @@ export function appendRecords(route: string, records: ParticipantRecord[]): void
   ensureDirs()
   appendFileSync(recordsPath(route), records.map((r) => JSON.stringify(r) + '\n').join(''))
 }
-
-/**
- * NDJSON 内容を `v`（パッチ）が keep に含まれる行だけ残してフィルタする純関数。
- * - パース不能行は保持（安全側）。
- * - `v` が無い／keep 外の行は dropped としてカウント。
- * 末尾の改行有無は元コンテンツに合わせる（dropped が 0 ならそもそも書き換えない方針）。
- */
-export function filterNdjsonByPatch(
-  content: string,
-  keep: Set<string>,
-): { out: string; kept: number; dropped: number } {
-  let kept = 0
-  let dropped = 0
-  const keptLines: string[] = []
-  for (const line of content.split('\n')) {
-    if (line.trim() === '') continue
-    let v: unknown
-    try {
-      v = (JSON.parse(line) as { v?: unknown }).v
-    } catch {
-      // パース不能行は保持（安全側）。
-      keptLines.push(line)
-      kept++
-      continue
-    }
-    if (typeof v === 'string' && keep.has(v)) {
-      keptLines.push(line)
-      kept++
-    } else {
-      dropped++
-    }
-  }
-  const out = keptLines.length > 0 ? keptLines.join('\n') + '\n' : ''
-  return { out, kept, dropped }
+/** prune の1行分の解析結果。 */
+interface PruneLine {
+  line: string
+  /** JSON として読めなかった行（常に保持する安全側の扱い）。 */
+  unparsable: boolean
+  s?: number
+  m?: string
+  ts: number
 }
 
 /**
- * records/{route}.ndjson を読み、`v` が keep に含まれる行だけ残して書き換える。
- * dropped が 0 ならファイルに触らない（append-only を維持し git delta を保つ）。
+ * NDJSON 内容をローリング窓ポリシーでフィルタする純関数。
+ *
+ * 1. **旧セットの切り捨て**: `s`(tft_set_number) を持つ行が1件でもあれば、最大の `s` 以外を落とす。
+ *    `s` を持たない旧形式レコードもここで落ちる。`s` を持つ行が皆無なら何もしない（全消し防止）。
+ * 2. **窓あふれの切り捨て**: 残った行が maxRecords を超える場合、マッチ単位（`m`）で新しい順に
+ *    保持し、はみ出したマッチを丸ごと落とす。マッチを分断しないのは、1マッチ8参加者が
+ *    揃っていないと totals.matches が実態とずれるため。
+ *
+ * パース不能行は常に保持し、窓の予算からも除外する（安全側）。
+ * 出力は元の行順を維持する（append-only に近い形を保ち、git のデルタ圧縮を効かせるため）。
+ */
+export function filterNdjsonForWindow(
+  content: string,
+  maxRecords: number,
+): { out: string; kept: number; droppedOldSet: number; droppedOverflow: number; targetSet: number | null } {
+  const parsed: PruneLine[] = []
+  for (const line of content.split('\n')) {
+    if (line.trim() === '') continue
+    try {
+      const rec = JSON.parse(line) as { s?: unknown; m?: unknown; ts?: unknown }
+      parsed.push({
+        line,
+        unparsable: false,
+        s: typeof rec.s === 'number' ? rec.s : undefined,
+        m: typeof rec.m === 'string' ? rec.m : undefined,
+        ts: typeof rec.ts === 'number' ? rec.ts : 0,
+      })
+    } catch {
+      parsed.push({ line, unparsable: true, ts: 0 })
+    }
+  }
+
+  // 1. 旧セットの切り捨て。
+  let targetSet: number | null = null
+  for (const p of parsed) {
+    if (p.s !== undefined && (targetSet === null || p.s > targetSet)) targetSet = p.s
+  }
+  let droppedOldSet = 0
+  const afterSet = parsed.filter((p) => {
+    if (p.unparsable) return true
+    if (targetSet === null) return true
+    if (p.s === targetSet) return true
+    droppedOldSet++
+    return false
+  })
+
+  // 2. 窓あふれの切り捨て（マッチ単位・新しい順）。
+  let droppedOverflow = 0
+  let survivors = afterSet
+  const budgeted = afterSet.filter((p) => !p.unparsable)
+  if (maxRecords > 0 && budgeted.length > maxRecords) {
+    // マッチごとの代表 ts（最大値）と行数を集計。
+    const byMatch = new Map<string, { ts: number; n: number }>()
+    for (const p of budgeted) {
+      const key = p.m ?? ''
+      const cur = byMatch.get(key)
+      if (cur === undefined) byMatch.set(key, { ts: p.ts, n: 1 })
+      else {
+        cur.n++
+        if (p.ts > cur.ts) cur.ts = p.ts
+      }
+    }
+    // 新しい順。同 ts はマッチID昇順で決定的に。
+    const order = [...byMatch.entries()].sort((a, b) =>
+      b[1].ts !== a[1].ts ? b[1].ts - a[1].ts : a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+    )
+    const keepMatches = new Set<string>()
+    let budget = maxRecords
+    for (const [m, info] of order) {
+      if (info.n > budget) break
+      keepMatches.add(m)
+      budget -= info.n
+    }
+    survivors = afterSet.filter((p) => {
+      if (p.unparsable) return true
+      if (keepMatches.has(p.m ?? '')) return true
+      droppedOverflow++
+      return false
+    })
+  }
+
+  const keptLines = survivors.map((p) => p.line)
+  const out = keptLines.length > 0 ? keptLines.join('\n') + '\n' : ''
+  return { out, kept: keptLines.length, droppedOldSet, droppedOverflow, targetSet }
+}
+
+/**
+ * records/{route}.ndjson をローリング窓ポリシーで書き換える。
+ * 1行も落ちなければファイルに触らない（append-only を維持し git delta を保つ）。
  * ファイルが存在しなければ何もしない。
  */
-export function pruneRecords(route: string, keep: Set<string>): { kept: number; dropped: number } {
+export function pruneRecords(
+  route: string,
+  maxRecords: number,
+): { kept: number; droppedOldSet: number; droppedOverflow: number; targetSet: number | null } {
   const path = recordsPath(route)
-  if (!existsSync(path)) return { kept: 0, dropped: 0 }
+  if (!existsSync(path)) return { kept: 0, droppedOldSet: 0, droppedOverflow: 0, targetSet: null }
   const content = readFileSync(path, 'utf8')
-  const { out, kept, dropped } = filterNdjsonByPatch(content, keep)
-  if (dropped > 0) writeFileSync(path, out)
-  return { kept, dropped }
+  const { out, kept, droppedOldSet, droppedOverflow, targetSet } = filterNdjsonForWindow(
+    content,
+    maxRecords,
+  )
+  if (droppedOldSet + droppedOverflow > 0) writeFileSync(path, out)
+  return { kept, droppedOldSet, droppedOverflow, targetSet }
 }

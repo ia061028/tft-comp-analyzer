@@ -56,12 +56,3 @@ export function pickTargetPatch(
   }
   return best[0]
 }
-
-/**
- * prune 用: 存在するパッチのうちバージョン上位2つを返す。
- * 2つ以下なら全部。直近2パッチを保持する方針に対応。
- */
-export function patchesToKeep(present: string[]): Set<string> {
-  const sorted = [...new Set(present)].sort((a, b) => compareVersions(b, a))
-  return new Set(sorted.slice(0, 2))
-}

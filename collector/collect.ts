@@ -6,7 +6,6 @@ import 'dotenv/config'
 import { config, PLATFORM_TO_ROUTE, type RegionalRoute } from './config.ts'
 import { RiotClient, AuthError } from './riot.ts'
 import { getEmblemContext, type EmblemContext } from './cdragon.ts'
-import { patchesToKeep } from './patches.ts'
 import {
   loadMeta,
   saveMeta,
@@ -16,9 +15,8 @@ import {
   pruneRecords,
   type Meta,
 } from './state.ts'
-import { readFileSync, existsSync, appendFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { appendFileSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
 import type { ParticipantRecord } from '../shared/types.ts'
 
 /**
@@ -85,28 +83,6 @@ interface MatchDetail {
     game_datetime: number
     participants: MatchParticipant[]
   }
-}
-
-const here = dirname(fileURLToPath(import.meta.url))
-const RECORDS_DIR = join(here, '..', 'data', 'state', 'records')
-
-/** route の records ファイルに出現するパッチ（v）の一覧を集める。 */
-function presentPatches(route: RegionalRoute): string[] {
-  const path = join(RECORDS_DIR, `${route}.ndjson`)
-  if (!existsSync(path)) return []
-  const raw = readFileSync(path, 'utf8')
-  const set = new Set<string>()
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    try {
-      const v = (JSON.parse(trimmed) as { v?: unknown }).v
-      if (typeof v === 'string') set.add(v)
-    } catch {
-      // パース不能行は無視（prune 側で保持される）。
-    }
-  }
-  return [...set]
 }
 
 // ---- ホスト構築ヘルパ ----
@@ -188,24 +164,25 @@ async function buildPuuidPool(
     const masterSampled = sample(masterValid, config.masterSamplePerPlatform)
     addAll(masterSampled)
 
-    // Diamond I〜IV。entries エンドポイントは LeagueEntry[] を直接返す（page=1 のみ取得）。
-    // 本番APIキー前提のため config.enableDiamond で切替（dev キーではレート上限回避のため既定 off）。
-    let diamondSampled = 0
-    if (config.enableDiamond) {
+    // DIAMOND 以下は entries エンドポイント（LeagueEntry[] を直接返す。page=1 のみ取得）。
+    // リーグ一覧はプラットフォームホスト＝マッチ取得のリージョナルホストとは別のレート枠なので、
+    // 母集団を広げるコストはマッチ取得の予算を食わない。
+    let entrySampled = 0
+    for (const tier of config.entryTiers) {
       for (const div of ['I', 'II', 'III', 'IV'] as const) {
         const entries = await client.get<LeagueEntry[]>(
-          `${host}/tft/league/v1/entries/DIAMOND/${div}?page=1`,
+          `${host}/tft/league/v1/entries/${tier}/${div}?page=1`,
         )
         const valid = (entries ?? []).filter((e) => e.puuid)
-        const sampled = sample(valid, config.diamondSamplePerDivision)
+        const sampled = sample(valid, config.entrySamplePerDivision)
         addAll(sampled)
-        diamondSampled += sampled.length
+        entrySampled += sampled.length
       }
     }
 
     console.log(
       `  [${platform}] challenger=${chalEntries.length} grandmaster=${gmEntries.length} ` +
-        `master=${masterEntries.length}(抽選${masterSampled.length}) diamond(抽選${diamondSampled}) → 新規puuid+${added}`,
+        `master=${masterEntries.length}(抽選${masterSampled.length}) entries(抽選${entrySampled}) → 新規puuid+${added}`,
     )
   }
 
@@ -464,13 +441,18 @@ async function main(): Promise<void> {
   }
   saveMeta(meta)
 
-  // prune: ルートごとに records に出現するパッチを集め、上位2パッチのみ保持。
-  console.log('\n=== prune（旧パッチ削除） ===')
+  // prune: ローリング窓（最新セットのみ保持 ＋ 最大レコード数でマッチ単位に切り詰め）。
+  // パッチ単位の prune は Unreal 移行後に機能しない（game_version が使えず全レコードが
+  // 単一パッチキーに潰れるため、旧セットが永久に残る）。セットと新しさで切る。
+  console.log('\n=== prune（ローリング窓） ===')
   for (const route of config.enabledRoutes) {
-    const keep = patchesToKeep(presentPatches(route))
-    const { kept, dropped } = pruneRecords(route, keep)
+    const { kept, droppedOldSet, droppedOverflow, targetSet } = pruneRecords(
+      route,
+      config.maxRecordsPerRoute,
+    )
     console.log(
-      `  [${route}] 保持パッチ={${[...keep].join(', ')}} kept=${kept} dropped=${dropped}`,
+      `  [${route}] 保持セット=${targetSet ?? '-'} kept=${kept} ` +
+        `旧セット削除=${droppedOldSet} 窓あふれ削除=${droppedOverflow}`,
     )
   }
 

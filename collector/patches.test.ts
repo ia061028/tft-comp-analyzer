@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { compareVersions, pickTargetPatch, patchesToKeep } from './patches.ts'
+import { compareVersions, pickTargetPatch } from './patches.ts'
 
 test('compareVersions: "16.9" < "16.10"（数値比較）', () => {
   assert.ok(compareVersions('16.9', '16.10') < 0)
@@ -66,19 +66,4 @@ test('pickTargetPatch: 実 sea データ相当（16.12=651 >= 200 で 16.12）',
     ['16.10', 43],
   ])
   assert.equal(pickTargetPatch(m, 200), '16.12')
-})
-
-test('patchesToKeep: 3パッチ→上位2', () => {
-  const keep = patchesToKeep(['16.10', '16.12', '16.11'])
-  assert.deepEqual([...keep].sort(), ['16.11', '16.12'])
-})
-
-test('patchesToKeep: 1パッチ→そのまま', () => {
-  const keep = patchesToKeep(['16.12'])
-  assert.deepEqual([...keep], ['16.12'])
-})
-
-test('patchesToKeep: 重複は畳んで上位2', () => {
-  const keep = patchesToKeep(['16.12', '16.12', '16.11', '16.10'])
-  assert.deepEqual([...keep].sort(), ['16.11', '16.12'])
 })

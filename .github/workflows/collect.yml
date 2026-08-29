@@ -26,7 +26,7 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       # main を作業ツリーへ（stats.json のコミット先）。persist-credentials 既定 true で push 可能。
       - uses: actions/checkout@v4
