@@ -92,16 +92,17 @@ interface PruneLine {
  *
  * 1. **旧セットの切り捨て**: `s`(tft_set_number) を持つ行が1件でもあれば、最大の `s` 以外を落とす。
  *    `s` を持たない旧形式レコードもここで落ちる。`s` を持つ行が皆無なら何もしない（全消し防止）。
- * 2. **窓あふれの切り捨て**: 残った行が maxRecords を超える場合、マッチ単位（`m`）で新しい順に
- *    保持し、はみ出したマッチを丸ごと落とす。マッチを分断しないのは、1マッチ8参加者が
+ * 2. **窓あふれの切り捨て**: 残った行の合計バイト数が maxBytes を超える場合、マッチ単位（`m`）で
+ *    新しい順に保持し、はみ出したマッチを丸ごと落とす。マッチを分断しないのは、1マッチ8参加者が
  *    揃っていないと totals.matches が実態とずれるため。
+ *    件数ではなくバイト数で切るのは GitHub の 100MB/ファイル上限に当てないため。
  *
  * パース不能行は常に保持し、窓の予算からも除外する（安全側）。
  * 出力は元の行順を維持する（append-only に近い形を保ち、git のデルタ圧縮を効かせるため）。
  */
 export function filterNdjsonForWindow(
   content: string,
-  maxRecords: number,
+  maxBytes: number,
 ): { out: string; kept: number; droppedOldSet: number; droppedOverflow: number; targetSet: number | null } {
   const parsed: PruneLine[] = []
   for (const line of content.split('\n')) {
@@ -134,19 +135,26 @@ export function filterNdjsonForWindow(
     return false
   })
 
-  // 2. 窓あふれの切り捨て（マッチ単位・新しい順）。
+  // 2. 窓あふれの切り捨て（マッチ単位・新しい順・バイト予算）。
+  // 件数ではなくバイト数で切るのは、GitHub のハード上限が 100MB/ファイルであり、
+  // レコードの実サイズが変わっても上限に当たらないようにするため。
+  // 件数で切っていた頃は「1レコード約705バイト」という実測を前提に 120,000件としていたが、
+  // レコードが少し大きくなるだけで push が弾かれ、収集が完全停止するリスクがあった。
   let droppedOverflow = 0
   let survivors = afterSet
   const budgeted = afterSet.filter((p) => !p.unparsable)
-  if (maxRecords > 0 && budgeted.length > maxRecords) {
-    // マッチごとの代表 ts（最大値）と行数を集計。
-    const byMatch = new Map<string, { ts: number; n: number }>()
+  const bytesOf = (line: string): number => Buffer.byteLength(line, 'utf8') + 1 // +1 は改行
+  const totalBytes = budgeted.reduce((s, p) => s + bytesOf(p.line), 0)
+  if (maxBytes > 0 && totalBytes > maxBytes) {
+    // マッチごとの代表 ts（最大値）とバイト数を集計。
+    const byMatch = new Map<string, { ts: number; bytes: number }>()
     for (const p of budgeted) {
       const key = p.m ?? ''
+      const b = bytesOf(p.line)
       const cur = byMatch.get(key)
-      if (cur === undefined) byMatch.set(key, { ts: p.ts, n: 1 })
+      if (cur === undefined) byMatch.set(key, { ts: p.ts, bytes: b })
       else {
-        cur.n++
+        cur.bytes += b
         if (p.ts > cur.ts) cur.ts = p.ts
       }
     }
@@ -155,11 +163,11 @@ export function filterNdjsonForWindow(
       b[1].ts !== a[1].ts ? b[1].ts - a[1].ts : a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
     )
     const keepMatches = new Set<string>()
-    let budget = maxRecords
+    let budget = maxBytes
     for (const [m, info] of order) {
-      if (info.n > budget) break
+      if (info.bytes > budget) break
       keepMatches.add(m)
-      budget -= info.n
+      budget -= info.bytes
     }
     survivors = afterSet.filter((p) => {
       if (p.unparsable) return true
@@ -181,14 +189,14 @@ export function filterNdjsonForWindow(
  */
 export function pruneRecords(
   route: string,
-  maxRecords: number,
+  maxBytes: number,
 ): { kept: number; droppedOldSet: number; droppedOverflow: number; targetSet: number | null } {
   const path = recordsPath(route)
   if (!existsSync(path)) return { kept: 0, droppedOldSet: 0, droppedOverflow: 0, targetSet: null }
   const content = readFileSync(path, 'utf8')
   const { out, kept, droppedOldSet, droppedOverflow, targetSet } = filterNdjsonForWindow(
     content,
-    maxRecords,
+    maxBytes,
   )
   if (droppedOldSet + droppedOverflow > 0) writeFileSync(path, out)
   return { kept, droppedOldSet, droppedOverflow, targetSet }

@@ -113,7 +113,19 @@ jobs:
           git commit -m "chore: stats $(date -u +%FT%TZ)"
           for i in 1 2 3; do
             git push && exit 0
-            echo "push 失敗（$i 回目）。pull --rebase して再試行。"
-            git pull --rebase
+            echo "push 失敗（$i 回目）。origin/main に載せ直して再試行。"
+            # stats.json は生成物なので、競合したら常に今回の生成結果を採用する。
+            # pull --rebase だと JSON 全体が競合してマージ不能になり、ジョブごと落ちる
+            # （2026-08-29 の実例）。ours を退避して origin/main に載せ直す。
+            cp public/data/stats.json "$RUNNER_TEMP/stats.json"
+            git fetch origin main
+            git reset --hard origin/main
+            cp "$RUNNER_TEMP/stats.json" public/data/stats.json
+            if git diff --quiet -- public/data/stats.json; then
+              echo "取り込み後は実質差分なし。コミット不要。"
+              exit 0
+            fi
+            git add public/data/stats.json
+            git commit -m "chore: stats $(date -u +%FT%TZ)"
           done
           exit 1

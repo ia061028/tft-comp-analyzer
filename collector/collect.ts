@@ -449,7 +449,7 @@ async function main(): Promise<void> {
   for (const route of config.enabledRoutes) {
     const { kept, droppedOldSet, droppedOverflow, targetSet } = pruneRecords(
       route,
-      config.maxRecordsPerRoute,
+      config.maxBytesPerRoute,
     )
     console.log(
       `  [${route}] 保持セット=${targetSet ?? '-'} kept=${kept} ` +
