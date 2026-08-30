@@ -90,7 +90,9 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line px-4 py-2.5 transition-colors hover:bg-surface-2/40">
       {/* 盤面のユニットを全部出す。コアからの追加分だけは枠で示す。 */}
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        {/* 1段目: 盤面のユニットと、この行が活用している紋章 */}
+        <div className="flex flex-wrap items-center gap-2">
         {comp.units.map((unitIdx, pos) => {
           const unit = units[unitIdx]
           if (!unit) return null
@@ -180,13 +182,15 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
           </span>
         )}
 
+        </div>
+
         {/*
          * この盤面で発動している特性を**すべて**出す（コアだけの行も空にならない）。
          * そのうえで、この駒を足したことで伸びた特性は明るく・太く出す ＝ この派生を選ぶ理由。
          * 金は紋章の色なので使わない（役割が混ざる）。強調は明度と太さでやる。
          */}
         {chips.length > 0 && (
-          <div className="ml-1 flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {chips.map(([traitIdx, style, count, gained]) => {
               const trait = traits[traitIdx]
               const name = trait ? pickName(lang, trait) : `#${traitIdx}`
