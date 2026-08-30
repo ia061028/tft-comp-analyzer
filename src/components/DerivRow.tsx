@@ -39,7 +39,9 @@ interface DerivRowProps {
  */
 export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowProps) {
   const { traits, units, emblems, items } = stats
-  const { comp, row, adds, removes, synergy } = deriv
+  const { comp, row, adds, synergy } = deriv
+  // コアに無いユニット（＝この派生で足す駒）。全ユニットを出すので枠で示すためだけに使う。
+  const addSet = new Set(adds)
   const [copied, setCopied] = useState(false)
 
   const unitCount = comp.units.length
@@ -87,29 +89,23 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line px-4 py-2.5 transition-colors hover:bg-surface-2/40">
-      {/* 差分: ＋追加ユニット / −欠落 */}
+      {/* 盤面のユニットを全部出す。コアからの追加分だけは枠で示す。 */}
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-2 text-sm font-extrabold leading-none text-muted ring-1 ring-line-strong"
-          aria-hidden
-        >
-          +
-        </span>
-
-        {adds.map((unitIdx, i) => {
+        {comp.units.map((unitIdx, pos) => {
           const unit = units[unitIdx]
           if (!unit) return null
           const unitName = pickName(lang, unit)
-          const pos = comp.units.indexOf(unitIdx)
           const star = comp.unitStars?.[pos] ?? 0
           const unitItems = comp.unitItems
             .filter((ui) => ui[0] === unitIdx)
             .map((ui) => items?.[ui[1]])
             .filter(Boolean)
           const held = (holders.get(unitIdx) ?? []).map((ei) => emblems[ei]).filter(Boolean)
+          // コアに無いユニット＝この派生で足す駒。全部出すぶん、差分は枠で示す。
+          const isAdd = addSet.has(unitIdx)
 
           return (
-            <div key={`${unitIdx}-${i}`} className="flex w-[46px] flex-col items-center gap-0.5">
+            <div key={`${unitIdx}-${pos}`} className="flex w-[46px] flex-col items-center gap-0.5">
               <div className={`h-3 text-[10px] leading-none tracking-[1px] ${starColor(star)}`}>
                 {star > 0 ? '★'.repeat(star) : ''}
               </div>
@@ -123,7 +119,9 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
                     style={
                       held.length > 0
                         ? { boxShadow: '0 0 0 2px var(--color-gold), 0 0 12px rgba(232,183,92,.45)' }
-                        : undefined
+                        : isAdd
+                          ? { boxShadow: '0 0 0 2px var(--color-ink)' }
+                          : undefined
                     }
                   />
                 </Tip>
@@ -159,12 +157,8 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
           )
         })}
 
-        {adds.length === 0 && (
-          <span className="text-[11px] text-faint">{t(lang, 'derivBackboneOnly')}</span>
-        )}
-
         {/*
-         * この行が実際に活用している紋章。同じ盤面・同じ差分でも「1枚だけ使う」と「2枚とも使う」は
+         * この行が実際に活用している紋章。同じ盤面でも「1枚だけ使う」と「2枚とも使う」は
          * 別の構成なので、系統内で使い方が割れているときは出さないと2行が同一に見える。
          */}
         {showEmblems && (
@@ -185,56 +179,6 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
             })}
           </span>
         )}
-
-        {/* コアから抜くユニット。「足す」と取り違えないよう、記号・色・打ち消し線の3重で示す。 */}
-        {removes.length > 0 && (
-          <span
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-bronze/15 text-sm font-extrabold leading-none text-bronze ring-1 ring-bronze/50"
-            aria-hidden
-          >
-            −
-          </span>
-        )}
-        {removes.map((unitIdx) => {
-          const unit = units[unitIdx]
-          if (!unit) return null
-          const unitName = pickName(lang, unit)
-          return (
-            <div key={`r${unitIdx}`} className="flex w-[46px] flex-col items-center gap-0.5">
-              <div className="h-3" />
-              <Tip label={`${unitName} — ${t(lang, 'missing')}`}>
-                <span className="relative block h-[42px] w-[42px] shrink-0">
-                  <img
-                    src={unit.icon}
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full rounded-lg border-2 border-dashed border-bronze/70 object-cover opacity-30 grayscale"
-                  />
-                  {/* 打ち消しの斜線。アイコンが薄いだけだと「弱いユニット」に見えてしまう。 */}
-                  <svg
-                    className="pointer-events-none absolute inset-0 h-full w-full text-bronze"
-                    viewBox="0 0 42 42"
-                    aria-hidden
-                  >
-                    <line
-                      x1="7"
-                      y1="35"
-                      x2="35"
-                      y2="7"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </span>
-              </Tip>
-              <div className="h-[15px]" />
-              <span className="max-w-[46px] truncate text-[9px] leading-none text-bronze line-through">
-                {unitName}
-              </span>
-            </div>
-          )
-        })}
 
         {/*
          * この盤面で発動している特性を**すべて**出す（コアだけの行も空にならない）。

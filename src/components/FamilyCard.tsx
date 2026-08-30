@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { StatsFile } from '../../shared/types'
 import type { Family, Span } from '../lib/backbone'
 import { activeTier, costBorder, starColor, styleClasses } from '../lib/format'
@@ -27,17 +26,6 @@ export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
   const { backbone, holders, traitCount, used, groups } = family
   // コアユニットのスター・アイテムは系統の最良行のものを代表値として使う。
   const bestComp = groups.flatMap((g) => g.derivs).reduce((a, b) => (a.rank <= b.rank ? a : b)).comp
-
-  // 既定は全グループを閉じる。プレイ中は自分のレベル（＝置ける体数）が決まっているので、
-  // 開いた1つだけを見れば足りる。最初から開いていると、関係ない体数まで読まされる。
-  const [open, setOpen] = useState<Set<number>>(new Set())
-  const toggle = (u: number) =>
-    setOpen((s) => {
-      const next = new Set(s)
-      if (next.has(u)) next.delete(u)
-      else next.add(u)
-      return next
-    })
 
   // 紋章由来の特性は、この系統を選ぶ理由そのものなので先頭に出して金リングで区別する。
   const emblemTraits = new Set(
@@ -185,64 +173,44 @@ export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
         </div>
       </div>
 
-      {/* ───── 体数グループ（アコーディオン）。グループ間に線を引かない ───── */}
-      {groups.map((g, i) => {
-        const isOpen = open.has(g.units)
-        const last = i === groups.length - 1
-        return (
-          <div key={g.units}>
-            <button
-              type="button"
-              onClick={() => toggle(g.units)}
-              aria-expanded={isOpen}
-              title={t(lang, 'compareWithin')}
-              className={`flex w-full items-center gap-x-3 gap-y-1 border-t border-line bg-black/20 px-4 py-2.5 text-left transition-colors hover:bg-black/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold/50 ${
-                last && !isOpen ? 'rounded-b-xl' : ''
-              }`}
-            >
-              <svg
-                className={`h-3 w-3 shrink-0 text-faint transition-transform duration-150 ${
-                  isOpen ? 'rotate-90' : ''
-                }`}
-                viewBox="0 0 12 12"
-                fill="currentColor"
-                aria-hidden
-              >
-                <path d="M4 2l5 4-5 4z" />
-              </svg>
-              <span className="w-[52px] shrink-0 text-[15px] font-extrabold text-ink">
-                {t(lang, 'unitsGroup', { n: g.units })}
-              </span>
+      {/* ───── 体数グループ。常に開いた状態で出す（畳まない） ───── */}
+      {groups.map((g) => (
+        <div key={g.units}>
+          <div
+            title={t(lang, 'compareWithin')}
+            className="flex w-full items-center gap-x-3 gap-y-1 border-t border-line bg-black/20 px-4 py-2.5 text-left"
+          >
+            <span className="w-[52px] shrink-0 text-[15px] font-extrabold text-ink">
+              {t(lang, 'unitsGroup', { n: g.units })}
+            </span>
 
-              {/*
-               * このグループの成績の幅。**同じ体数の中だけ**で集計しているので、数字が歪まない。
-               * 系統全体で集計すると 7体〜10体が混ざり、平均順位の幅（例 1.83〜6.74）が
-               * 構成の差ではなく生存バイアスそのものになる。
-               */}
-              <span className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] text-faint tabular-nums">
-                {span(t(lang, 'avgPlace'), g.place, (x) => x.toFixed(2))}
-                {span(t(lang, 'metricTop4'), g.top4, pct)}
-                {span(t(lang, 'metricWin'), g.win, pct)}
-              </span>
+            {/*
+             * このグループの成績の幅。**同じ体数の中だけ**で集計しているので、数字が歪まない。
+             * 系統全体で集計すると 7体〜10体が混ざり、平均順位の幅（例 1.83〜6.74）が
+             * 構成の差ではなく生存バイアスそのものになる。
+             */}
+            <span className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] text-faint tabular-nums">
+              {span(t(lang, 'avgPlace'), g.place, (x) => x.toFixed(2))}
+              {span(t(lang, 'metricTop4'), g.top4, pct)}
+              {span(t(lang, 'metricWin'), g.win, pct)}
+            </span>
 
-              <span className="ml-auto shrink-0 text-[11px] text-faint tabular-nums">
-                {t(lang, 'derivCount', { n: g.derivs.length })}
-              </span>
-            </button>
-            {isOpen &&
-              g.derivs.map((d) => (
-                <DerivRow
-                  key={`${d.comp.units.join(',')}|${d.row.used.join(',')}`}
-                  stats={stats}
-                  deriv={d}
-                  cohort={cohort}
-                  showEmblems={family.mixedEmblems}
-                  lang={lang}
-                />
-              ))}
+            <span className="ml-auto shrink-0 text-[11px] text-faint tabular-nums">
+              {t(lang, 'derivCount', { n: g.derivs.length })}
+            </span>
           </div>
-        )
-      })}
+          {g.derivs.map((d) => (
+            <DerivRow
+              key={`${d.comp.units.join(',')}|${d.row.used.join(',')}`}
+              stats={stats}
+              deriv={d}
+              cohort={cohort}
+              showEmblems={family.mixedEmblems}
+              lang={lang}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   )
 
