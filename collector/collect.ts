@@ -194,6 +194,8 @@ interface RouteResult {
   newMatches: number
   filteredOut: number
   dedupeSkipped: number
+  /** 収集の途中でAPIキーが失効し、このルートを打ち切ったか。 */
+  authExpired: boolean
 }
 
 /**
@@ -288,7 +290,7 @@ async function collectRoute(
   emblemCtx: EmblemContext,
   preloadedChallenger: Map<string, LeagueList | null>,
 ): Promise<RouteResult> {
-  const result: RouteResult = { newMatches: 0, filteredOut: 0, dedupeSkipped: 0 }
+  const result: RouteResult = { newMatches: 0, filteredOut: 0, dedupeSkipped: 0, authExpired: false }
 
   const seen = loadSeen(route)
   // 今回実行内で処理済み（seen に追記済みでもメモリ上で再確認するため別管理は不要だが、
@@ -304,6 +306,7 @@ async function collectRoute(
 
   let processedSinceLog = 0
 
+  try {
   outer: for (const puuid of pool) {
     if (Date.now() >= deadlineMs) {
       console.log(`  [${route}] デッドライン到達。取得打ち切り。`)
@@ -362,6 +365,18 @@ async function collectRoute(
         )
         processedSinceLog = 0
       }
+    }
+  }
+  } catch (err) {
+    // 開発キーは24時間で失効するため、収集の途中で 401 になるのは想定内の事象。
+    // ここで例外を投げるとジョブが赤失敗し、後段の aggregate / push が全てスキップされて
+    // ここまでディスクに書いた収集分がまるごと捨てられる（2026-08-30 に約14,900マッチを失った）。
+    // 打ち切って部分結果を返し、保存は通常どおり行う。
+    if (err instanceof AuthError) {
+      console.warn(`  [${route}] APIキー失効を検出。このルートの収集を打ち切り、ここまでの分を保存する。`)
+      result.authExpired = true
+    } else {
+      throw err
     }
   }
 
@@ -429,11 +444,14 @@ async function main(): Promise<void> {
   // 成功ルートのみ meta 更新。saveMeta は全ルート完了後に1回だけ呼ぶ。
   const routeResults: { route: RegionalRoute; result: RouteResult }[] = []
   let anyRouteFailed = false
+  /** 収集の途中でAPIキーが失効したか（打ち切りであって失敗ではない）。 */
+  let keyExpired = false
   for (let i = 0; i < settled.length; i++) {
     const route = config.enabledRoutes[i]
     const s = settled[i]
     if (s.status === 'fulfilled') {
       routeResults.push(s.value)
+      if (s.value.result.authExpired) keyExpired = true
       meta.routes[route] = { lastRunStartedAt: runStartedAt }
     } else {
       anyRouteFailed = true
@@ -498,10 +516,24 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  // 全ルート成功。後段（aggregate → data ブランチ squash push → stats.json コミット/デプロイ）を起動。
   // new_records は「今回追記した新規マッチ数の合計」（＝各ルート result.newMatches の総和 totalNew）。
   // 1マッチ=最大8参加者レコードだが、収集側で追跡している集計単位はマッチ数なのでこれを採用する。
-  ghOutput({ status: 'ok', new_records: String(totalNew) })
+  //
+  // キーが途中で失効しても、そこまでの収集は有効なので status=ok にして後段（aggregate →
+  // data ブランチ push → stats.json コミット）を通す。1件も取れていない場合だけ no-op 扱い。
+  // key_expired は status とは独立に立て、スティッキー issue の起票条件に使う。
+  if (keyExpired) {
+    console.warn(
+      totalNew > 0
+        ? `収集中にAPIキーが失効した。ここまでの ${totalNew} マッチを保存して正常終了する。`
+        : '収集中にAPIキーが失効し、新規マッチは0件だった。no-op として正常終了する。',
+    )
+  }
+  ghOutput({
+    status: keyExpired && totalNew === 0 ? 'auth_expired' : 'ok',
+    new_records: String(totalNew),
+    key_expired: String(keyExpired),
+  })
 }
 
 // エントリガード: 直接実行されたときだけ収集を走らせる。

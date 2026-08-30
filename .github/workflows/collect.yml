@@ -58,8 +58,10 @@ jobs:
 
       # キー失効: スティッキー issue（ラベル riot-key）。初回のみ作成、以後は body 編集（通知なし）。
       # これにより「6時間ごとに失効通知が飛び続ける」ことを避けつつ、失効状態は可視化される。
+      # 開始時の失効（status=auth_expired）と、収集途中の失効（key_expired=true）の両方で起票する。
+      # 後者は収集分を保存したうえで status=ok になるので、status だけでは検知できない。
       - name: notify key expired (sticky issue)
-        if: steps.collect.outputs.status == 'auth_expired'
+        if: steps.collect.outputs.status == 'auth_expired' || steps.collect.outputs.key_expired == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -74,7 +76,7 @@ jobs:
 
       # 復旧: キー更新で収集が再開したら、開いている失効 issue を閉じる。
       - name: close key issue on recovery
-        if: steps.collect.outputs.status == 'ok'
+        if: steps.collect.outputs.status == 'ok' && steps.collect.outputs.key_expired != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
