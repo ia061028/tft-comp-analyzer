@@ -70,6 +70,7 @@ const ja = {
   emblemCatSpatula: 'へら',
   emblemCatPan: 'フライパン',
   emblemCatNone: '合成不可',
+  legal: "TFT Emblem Comp Analyzer isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 }
 
 /** 翻訳キー（ja を基準に型化。en はこの全キーを持つことを型で強制）。 */
@@ -138,6 +139,7 @@ const en: Record<UIKey, string> = {
   emblemCatSpatula: 'Spatula',
   emblemCatPan: 'Frying Pan',
   emblemCatNone: 'Non-craftable',
+  legal: "TFT Emblem Comp Analyzer isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 }
 
 const STRINGS: Record<Lang, Record<UIKey, string>> = { ja, en }
