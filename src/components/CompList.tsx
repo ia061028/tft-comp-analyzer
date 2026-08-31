@@ -28,8 +28,15 @@ interface CompListProps {
   bronzeMode: boolean
 }
 
-/** 統計の信頼性のための最小サンプル。採用数下限の入力欄の下限値でもある（App が参照）。 */
-export const MIN_SAMPLE = 3
+/**
+ * 採用数下限として選べる最小値（入力欄の min。App が参照）。
+ *
+ * 1 まで下げられる。stats.json には採用数1の行が全体の約74%あり（63,245マッチ時点で
+ * 33,876 sig 中 24,901件）、複数紋章を同時に使う構成はほぼここに含まれる。
+ * 3 で切っていた頃はそれらが一切見えなかった。
+ * 少サンプルの極端な率が上位に来る問題は、並び順側の縮約（format.ts の shrunk）で抑える。
+ */
+export const MIN_SAMPLE = 1
 
 type Row = {
   comp: CompStats
@@ -51,7 +58,7 @@ export function CompList({
 }: CompListProps) {
   const { units, emblems, traits } = stats
 
-  // 下限は入力欄側で MIN_SAMPLE 未満にできないので、ここでは素直に使う。
+  // 入力欄側で MIN_SAMPLE 未満にできないので、ここでは素直に使う。
   const floor = minAdopt
 
   // 1構成は「紋章の積み方」ごとに複数行へ分解される（2枚使う行と1枚だけ使う行は別カード）。
