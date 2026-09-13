@@ -1,6 +1,6 @@
 # TFT 紋章構成アナライザー
 
-TFT（Teamfight Tactics）のプレイ支援用Webアプリ。Riot API から高ランク帯（Master以上）のランク戦績を収集・集計し、**紋章(emblem)を選ぶと、その紋章を活用している構成**を平均順位・Top4率・採用率などで提示する自分専用ツール。データ収集は GitHub Actions、配信は Cloudflare Pages（静的 `stats.json` を読むSPA）。
+TFT（Teamfight Tactics）のプレイ支援用Webアプリ。Riot API から高ランク帯（Master以上。母集団が薄い時期だけ Diamond 以下で補充）のランク戦績を収集・集計し、**紋章(emblem)を選ぶと、その紋章を活用している構成**を平均順位・Top4率・採用率などで提示する自分専用ツール。データ収集は GitHub Actions、配信は Cloudflare Pages（静的 `stats.json` を読むSPA）。
 
 ライブ: https://tft-comp-analyzer.pages.dev/ ／ アーキテクチャの詳細は [ARCHITECTURE.md](ARCHITECTURE.md) を参照。
 
@@ -19,7 +19,9 @@ TFT（Teamfight Tactics）のプレイ支援用Webアプリ。Riot API から高
 
 ```
 collector/ (GitHub Actions, 6時間ごと)
-  collect.ts        Riot API → data ブランチの records/{route}.ndjson（参加者1人=1レコード）に追記
+  collect.ts        Riot API → data ブランチの records/{route}.ndjson（参加者1人=1レコード）に追記。末尾で封印/保持適用
+  shards.ts         シャード I/O（一覧・ストリーム読み・gzip 封印・保持適用）
+  retention.ts      封印シャードの命名と保持計画（純関数、テスト付き）
   aggregate.ts       records → public/data/stats.json ＋ パッチ別 stats-{patch}.json（集計I/O層）
   patches.ts         パッチ比較・日時ベースのパッチ割り当て・出力ビュー選定（純関数、テスト付き）
   aggregate-core.ts  集計ロジック本体（純関数、テスト付き）
@@ -53,6 +55,7 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 | `npm run collect` | Riot API からマッチ収集 → `data/state/` に追記（`.env` のキー使用） |
 | `npm run aggregate` | `data/state/` → `public/data/stats.json`（既定パッチ）＋ `stats-{patch}.json` / `stats-all.json` 集計 |
 | `npm run data:pull` | `data/state` を orphan ブランチ `data` の最新スナップショットに同期 |
+| `npm run data:seal` | 収集せずに封印（アクティブ → gzip シャード）と保持適用だけ行う（キー不要） |
 
 ## データ運用
 
@@ -62,6 +65,7 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 - **キー失効 = no-op**: collect は冒頭の認証プリフライトで 401/403 を検出すると `status=auth_expired` を出して exit 0（state 不変）。この場合 aggregate・data ブランチ push・stats.json コミットは全てスキップされ、コミット0・デプロイ0。スティッキー issue（ラベル `riot-key`）が起票され（初回のみ通知、以後は本文編集のみ）、キー復旧後の次回実行で自動クローズされる。実際のルート例外時のみジョブが赤失敗する。
 - **APIキー**: CI が使うのは **GitHubリポジトリ Secret `RIOT_API_KEY`**（ローカル `.env` ではない）。開発キーは**24時間で失効**するので、上記の no-op パスに入る。`gh secret set RIOT_API_KEY --body "RGAPI-..."`（パイプ流し込みは BOM/改行混入の恐れがあるため `--body`）または Settings→Secrets→Actions で更新。恒久対応は**本番APIキー**への切替。
 - **ローカルでの収集状態同期**: 初回は `git clone --depth 1 --branch data https://github.com/ia061028/tft-comp-analyzer.git data/state`、以後は `npm run data:pull`。
+- **保持**: レコードは `records/{route}.ndjson`（追記中）と `records/{route}/*.ndjson.gz`（封印済み・不変）に分かれ、直近2パッチ・1ルート 64MB gz を上限に古いシャードから消える。母集団は Master 以上（薄い時だけ Diamond 以下で補充）。詳細は [ARCHITECTURE.md](ARCHITECTURE.md) の「保持ポリシー」「母集団」。
 - 手動収集: ローカルで有効な `.env` と `data/state` があれば `npm run collect && npm run aggregate` で更新可能（main へのコミットは別途）。
 
 ## 既知の課題 / TODO
@@ -69,5 +73,6 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 - **チームコードの形式**: 現行は `02` + 各チャンピオン12bit(3桁hex, team_planner_code) + `TFTSet{n}`。実機での有効性は要再検証（クライアント生成コードとの突き合わせ）。
   セット18 では Lux の9変種（`DA_18_Lux_*` 等、Avatar 特性でトレイト別に姿が変わる5コスト）が Riot のチームプランナー定義に無く `team_planner_code` を持たないため、その枠は `000` になる。
 - **パッチ境界は日時で近似**: セット18 以降 `game_version` がプレースホルダのため、パッチは `config.patchSchedule` の配信日時（UTC 00:00 目安）で割り当てている。実際の配信はリージョンごとに数時間ずれるので境界付近の試合は数時間分ずれうる。Riot が `game_version` を直せば実パッチキーが優先される（その場合は `config.tftPatchLabels` に表記を追加）。
-- **本番APIキー**: 開発キーは24時間で失効する。レート上限も開発キーは 100req/120s（リージョナルホストごと）で、これが1ランあたり約6,000マッチの天井を決めている。本番キーで上限が上がればサンプル数はストレージ（100MB/ファイル）側の天井まで伸ばせる。
-- **サンプル数をさらに増やすには**: 1レコード約900バイトのうち未使用の `tc` や `ui` を削るとレコードが縮み、同じ100MB枠で保持マッチ数を増やせる（レコードスキーマの破壊的変更を伴う）。
+- **本番APIキー**: 開発キーは24時間で失効する。レート上限も開発キーは 100req/120s（リージョナルホストごと）で、1ランあたり約5,000マッチ/ルートの天井を決めている。ただし母集団を Master 以上に絞った後は取得能力より母集団の新規試合数（1日5,000〜10,000試合）が上限になる。
+- **保持量の天井**: レコードは gzip 分割シャードで保持し、1ルート 64MB gz（約10万マッチ）＋直近2パッチが上限（`config.maxSealedBytesPerRoute` / `patchesToKeep`）。増やすなら前者を上げる（集計時間とメモリ、`stats-*.json` のサイズが比例して増える。構成数は `maxCompsPerView` で抑えている）。
+- **母集団変更の遡及不可**: レコードに参加者のティアを持たないため、母集団を変えても過去のレコードは絞れない（保持窓から押し出されるまで残る）。

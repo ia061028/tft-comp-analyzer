@@ -137,3 +137,29 @@ export function planPatchViews(
   }
   return { defaultKey, views }
 }
+
+/**
+ * 保持下限パッチ（floor）。
+ * schedule のうち「メジャー == set」かつ「since <= now」のエントリを since 昇順に並べ、
+ * 末尾 patchesToKeep 件の先頭の patch を返す。該当エントリが無ければ null（＝パッチ規則を適用しない）。
+ *
+ * 保持判定は「compareVersions(p, floor) >= 0」で行う（floor 以上を残す）。「保持リストに含まれるか」
+ * ではなく下限比較にしているのは、Riot が game_version を直して schedule より新しい実パッチが
+ * 現れても落とさないため。"{set}.0"（最初の配信前の ts）は floor 未満になり落ちる。
+ */
+export function retentionFloor(
+  schedule: PatchScheduleEntry[],
+  set: number,
+  patchesToKeep: number,
+  nowMs: number,
+): string | null {
+  const prefix = `${set}.`
+  const live = schedule
+    .filter((e) => e.patch.startsWith(prefix))
+    .map((e) => ({ patch: e.patch, since: Date.parse(e.since) }))
+    .filter((e) => !Number.isNaN(e.since) && e.since <= nowMs)
+    .sort((a, b) => a.since - b.since)
+  if (live.length === 0) return null
+  const keep = Math.max(1, Math.floor(patchesToKeep))
+  return live[Math.max(0, live.length - keep)].patch
+}

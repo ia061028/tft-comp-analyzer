@@ -4,11 +4,14 @@ import type { StaticData } from './cdragon.ts'
 import type { ParticipantRecord } from '../shared/types.ts'
 import {
   modeMaxNumber,
-  dedupeRecords,
+  modeMaxFromCounts,
   splitBoardUnits,
   classifyEmblems,
+  classifyRecord,
   pickTargetSet,
+  pickTargetSetFromCounts,
   buildStats,
+  createStatsBuilder,
   type LoadedRecord,
 } from './aggregate-core.ts'
 
@@ -99,18 +102,17 @@ test('modeMaxNumber: 空 → undefined', () => {
   assert.equal(modeMaxNumber([]), undefined)
 })
 
-// ---- dedupeRecords ----
-test('dedupeRecords: 同一 (m,p) は先勝ち', () => {
-  const all: LoadedRecord[] = [
-    { rec: rec({ m: 'M1', p: 1, u: ['first'] }), route: 'sea' },
-    { rec: rec({ m: 'M1', p: 1, u: ['dup'] }), route: 'sea' }, // 同一(m,p) → スキップ
-    { rec: rec({ m: 'M1', p: 2 }), route: 'sea' }, // 同一 m だが p 違い → 保持
-    { rec: rec({ m: 'M2', p: 1 }), route: 'asia' },
-  ]
-  const { deduped, dupSkipped } = dedupeRecords(all)
-  assert.equal(dupSkipped, 1)
-  assert.equal(deduped.length, 3)
-  assert.deepEqual(deduped[0].rec.u, ['first']) // 先頭が勝つ
+// ---- pickTargetSetFromCounts / modeMaxFromCounts ----
+test('pickTargetSetFromCounts: 最頻値、同数なら大きい方、空は null', () => {
+  assert.equal(pickTargetSetFromCounts(new Map([[17, 5], [18, 7]])), 18)
+  assert.equal(pickTargetSetFromCounts(new Map([[17, 5], [18, 5]])), 18)
+  assert.equal(pickTargetSetFromCounts(new Map()), null)
+})
+
+test('modeMaxFromCounts: modeMaxNumber と同じ規則', () => {
+  assert.equal(modeMaxFromCounts(new Map([[1, 1], [2, 2], [3, 1]])), 2)
+  assert.equal(modeMaxFromCounts(new Map([[1, 2], [2, 2]])), 2)
+  assert.equal(modeMaxFromCounts(new Map()), undefined)
 })
 
 // ---- splitBoardUnits ----
@@ -275,4 +277,93 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
   assert.equal(diag.boardGroupCount, 2)
   assert.equal(diag.noBoard, 0)
   assert.equal(diag.excludedUnresolvedTrait, 0)
+})
+
+// ---- classifyRecord ----
+test('classifyRecord: 未解決トレイト / 盤面なし / ok（構成キー）', () => {
+  const sd = makeStaticData()
+  const bad = classifyRecord(rec({ m: 'M', t: { Unknown: 1 }, u: ['TFT_UnitA'] }), sd)
+  assert.equal(bad.kind, 'unresolvedTrait')
+  if (bad.kind === 'unresolvedTrait') assert.deepEqual(bad.names, ['Unknown'])
+
+  const empty = classifyRecord(rec({ m: 'M', u: ['TFT_UnitE_Summon', 'UNKNOWN'] }), sd)
+  assert.equal(empty.kind, 'noBoard')
+  if (empty.kind === 'noBoard') assert.deepEqual(empty.unresolvedUnits, ['UNKNOWN'])
+
+  const ok = classifyRecord(rec({ m: 'M', u: ['TFT_UnitB', 'TFT_UnitA'] }), sd)
+  assert.equal(ok.kind, 'ok')
+  if (ok.kind === 'ok') {
+    assert.equal(ok.boardKey, splitBoardUnits(rec({ m: 'M', u: ['TFT_UnitB', 'TFT_UnitA'] }), sd).boardApis.join('|'))
+    assert.equal(ok.boardKey, 'TFT_UnitA|TFT_UnitB')
+  }
+})
+
+// ---- createStatsBuilder（buildStats との等価性・boardFilter・maxComps） ----
+
+/** 3構成（n=5/4/3）のフィクスチャ。 */
+function threeComps(): LoadedRecord[] {
+  const mk = (m: string, p: number, u: string[], extra: Partial<ParticipantRecord> = {}): LoadedRecord => ({
+    route: 'asia',
+    rec: rec({ m, p, t: { TraitA: 3 }, u, us: u.map(() => 2), ...extra }),
+  })
+  const out: LoadedRecord[] = []
+  for (let i = 0; i < 5; i++) out.push(mk(`A${i}`, 1 + i, ['TFT_UnitA', 'TFT_UnitB'], { e: ['TFT_Item_EmblemA'], eh: ['TFT_UnitB'], ui: [[], ['TFT_Item_ItemX']] }))
+  for (let i = 0; i < 4; i++) out.push(mk(`B${i}`, 1 + i, ['TFT_UnitA', 'TFT_UnitC']))
+  for (let i = 0; i < 3; i++) out.push(mk(`C${i}`, 1 + i, ['TFT_UnitB', 'TFT_UnitD'], { ui: [['TFT_Item_ItemY'], []] }))
+  return out
+}
+
+test('createStatsBuilder: 1件ずつ add した結果は buildStats と一致する', () => {
+  const sd = makeStaticData()
+  const target = threeComps()
+  const opts = { targetPatch: '16.12', tftPatch: '17.5', generatedAt: 'T' }
+  const b = createStatsBuilder(sd, opts)
+  for (const lr of target) b.add(lr.rec, lr.route)
+  assert.deepStrictEqual(b.finish(), buildStats(target, sd, opts))
+})
+
+test('buildStats: comps は n 降順・同数は盤面キー昇順', () => {
+  const sd = makeStaticData()
+  const { out } = buildStats(threeComps(), sd, { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T' })
+  assert.deepEqual(out.comps.map((c) => c.n), [5, 4, 3])
+})
+
+test('buildStats: boardFilter で除外した盤面は accumulate されないが totals には数える', () => {
+  const sd = makeStaticData()
+  const target = threeComps()
+  const full = buildStats(target, sd, { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T' })
+  const filtered = buildStats(target, sd, {
+    targetPatch: 'x',
+    tftPatch: 'x',
+    generatedAt: 'T',
+    boardFilter: (key) => key !== 'TFT_UnitA|TFT_UnitC',
+  })
+  assert.equal(filtered.diag.boardGroupCount, 2)
+  assert.deepEqual(filtered.out.totals, full.out.totals)
+  assert.deepEqual(filtered.out.comps.map((c) => c.n), [5, 3])
+  // フィルタで残った構成の中身は同じ。
+  assert.deepStrictEqual(filtered.out.comps[0], full.out.comps[0])
+})
+
+test('buildStats: maxComps で n 上位だけ残り、辞書も残った構成の分だけになる', () => {
+  const sd = makeStaticData()
+  const target = threeComps()
+  const { out } = buildStats(target, sd, { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T', maxComps: 1 })
+  assert.equal(out.comps.length, 1)
+  assert.equal(out.comps[0].n, 5)
+  assert.deepEqual(out.units.map((u) => u.api), ['TFT_UnitA', 'TFT_UnitB'])
+  assert.deepEqual(out.items.map((i) => i.api), ['TFT_Item_ItemX']) // ItemY は切られた構成のみ
+  // maxComps 0 は無制限。
+  const all = buildStats(target, sd, { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T', maxComps: 0 })
+  assert.equal(all.out.comps.length, 3)
+})
+
+test('buildStats: 代表スターは最頻値（同数なら大きい方）を件数から求める', () => {
+  const sd = makeStaticData()
+  const mk = (m: string, star: number): LoadedRecord => ({
+    route: 'asia',
+    rec: rec({ m, p: 1, t: { TraitA: 3 }, u: ['TFT_UnitA', 'TFT_UnitB'], us: [star, 2] }),
+  })
+  const { out } = buildStats([mk('1', 1), mk('2', 3), mk('3', 3), mk('4', 1)], sd, { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T' })
+  assert.deepEqual(out.comps[0].k, [3, 2])
 })

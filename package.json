@@ -11,6 +11,7 @@
     "collect": "tsx collector/collect.ts",
     "aggregate": "tsx collector/aggregate.ts",
     "data:pull": "tsx collector/data-pull.ts",
+    "data:seal": "tsx collector/seal.ts",
     "test": "tsx --test \"collector/*.test.ts\" \"src/**/*.test.ts\""
   },
   "dependencies": {

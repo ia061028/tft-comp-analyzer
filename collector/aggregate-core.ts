@@ -35,10 +35,8 @@ export interface LoadedRecord {
   route: string
 }
 
-/** 最頻値（同数なら大きい方）。空なら undefined。 */
-export function modeMaxNumber(values: number[]): number | undefined {
-  const counts = new Map<number, number>()
-  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1)
+/** 値→件数の Map から最頻値（同数なら大きい方）。空なら undefined。 */
+export function modeMaxFromCounts(counts: Map<number, number>): number | undefined {
   let best: number | undefined
   let bestCount = -1
   for (const [v, c] of counts) {
@@ -50,35 +48,30 @@ export function modeMaxNumber(values: number[]): number | undefined {
   return best
 }
 
-/**
- * 重複ガード（同一 (m, p) は最初の1件のみ）。
- */
-export function dedupeRecords(all: LoadedRecord[]): { deduped: LoadedRecord[]; dupSkipped: number } {
-  const seenMP = new Set<string>()
-  let dupSkipped = 0
-  const deduped: LoadedRecord[] = []
-  for (const lr of all) {
-    const key = `${lr.rec.m}|${lr.rec.p}`
-    if (seenMP.has(key)) {
-      dupSkipped++
-      continue
-    }
-    seenMP.add(key)
-    deduped.push(lr)
-  }
-  return { deduped, dupSkipped }
+/** 最頻値（同数なら大きい方）。空なら undefined。 */
+export function modeMaxNumber(values: number[]): number | undefined {
+  const counts = new Map<number, number>()
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1)
+  return modeMaxFromCounts(counts)
 }
 
 /**
- * 対象レコード群から集計対象のセット番号を選ぶ（s を持つレコードの最頻値・同数なら大きい方）。
+ * セット番号ごとの件数から集計対象のセット番号を選ぶ（最頻値・同数なら大きい方）。
  * s を持つレコードが1件も無ければ null（＝セット絞り込みをしない）。
  * 同一 game_version 内でセットが切り替わる場合にパッチ選定だけでは分離できないため、
  * tft_set_number を一次情報として使う。
  */
+export function pickTargetSetFromCounts(counts: Map<number, number>): number | null {
+  return modeMaxFromCounts(counts) ?? null
+}
+
+/** 配列版（テスト・小規模用）。ストリーミング集計は pickTargetSetFromCounts を使う。 */
 export function pickTargetSet(records: LoadedRecord[]): number | null {
-  const sets: number[] = []
-  for (const lr of records) if (typeof lr.rec.s === 'number') sets.push(lr.rec.s)
-  return modeMaxNumber(sets) ?? null
+  const counts = new Map<number, number>()
+  for (const lr of records) {
+    if (typeof lr.rec.s === 'number') counts.set(lr.rec.s, (counts.get(lr.rec.s) ?? 0) + 1)
+  }
+  return pickTargetSetFromCounts(counts)
 }
 
 export interface SplitBoardResult {
@@ -148,7 +141,7 @@ export interface AggregateDiag {
   noBoard: number
   /** 未解決トレイトを含み除外したレコード数。 */
   excludedUnresolvedTrait: number
-  /** 盤面グループ（構成キー）数。 */
+  /** accumulate した盤面グループ（構成キー）数。boardFilter で除外した盤面は含まない。 */
   boardGroupCount: number
   /** 未解決トレイト apiName 集合（該当レコード除外）。 */
   unresolvedTraitNames: Set<string>
@@ -158,16 +151,54 @@ export interface AggregateDiag {
   unresolvedEmblemNames: Set<string>
 }
 
+export type RecordClass =
+  | { kind: 'ok'; boardKey: string; boardApis: string[]; boardSet: Set<string>; unresolvedUnits: string[] }
+  | { kind: 'unresolvedTrait'; names: string[] }
+  | { kind: 'noBoard'; unresolvedUnits: string[] }
+
 /**
- * 盤面グルーピング〜シグネチャ集計〜出力整形〜インターン〜Wire 圧縮までの集計本体。
- * generatedAt / targetPatch / tftPatch は副作用（時刻・設定）を排除するため引数注入する。
- * 診断カウンタ・警告元データは diag として返す（呼び出し側がログ整形する）。
+ * レコードを集計上の扱いで分類する。
+ * - unresolvedTrait: 未解決トレイトを含む（レコードごと除外。カバレッジ100%なら発生しない）
+ * - noBoard: 盤面ユニットが1体も無い（除外）
+ * - ok: 構成キー（盤面ユニット apiName 昇順を '|' 連結）付き
  */
-export function buildStats(
-  target: LoadedRecord[],
-  staticData: StaticData,
-  opts: { targetPatch: string; tftPatch: string; generatedAt: string },
-): { out: WireStatsFile; diag: AggregateDiag } {
+export function classifyRecord(rec: ParticipantRecord, staticData: StaticData): RecordClass {
+  const names: string[] = []
+  for (const tApi of Object.keys(rec.t)) {
+    if (!staticData.traits.has(tApi)) names.push(tApi)
+  }
+  if (names.length > 0) return { kind: 'unresolvedTrait', names }
+  const { boardApis, boardSet, unresolvedUnits } = splitBoardUnits(rec, staticData)
+  if (boardSet.size === 0) return { kind: 'noBoard', unresolvedUnits }
+  return { kind: 'ok', boardKey: boardApis.join('|'), boardApis, boardSet, unresolvedUnits }
+}
+
+export interface StatsBuilderOptions {
+  targetPatch: string
+  tftPatch: string
+  generatedAt: string
+  /** 出力構成数の上限（n 降順、同数は盤面キー昇順で切る）。0/undefined = 無制限。 */
+  maxComps?: number
+  /**
+   * 2パス集計用の事前フィルタ。false の盤面は totals / 除外カウントには数えるが accumulate しない
+   * （最終的に n < MIN_OUTPUT_N で落ちる盤面のアキュムレータを最初から作らないため）。
+   */
+  boardFilter?: (boardKey: string) => boolean
+}
+
+export interface StatsBuilder {
+  /** レコードを1件取り込む（同期）。 */
+  add(rec: ParticipantRecord, route: string): void
+  /** 集計を確定して WireStatsFile と診断を返す。 */
+  finish(): { out: WireStatsFile; diag: AggregateDiag }
+}
+
+/**
+ * ストリーミング集計器。add() でレコードを1件ずつ取り込み、finish() で
+ * 出力整形〜インターン〜Wire 圧縮を行う。全レコードをメモリに持たない。
+ * generatedAt / targetPatch / tftPatch は副作用（時刻・設定）を排除するため引数注入する。
+ */
+export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOptions): StatsBuilder {
   const unresolvedTraitNames = new Set<string>()
   const unresolvedUnitNames = new Set<string>()
   const unresolvedEmblemNames = new Set<string>()
@@ -183,8 +214,8 @@ export function buildStats(
   interface CompAcc {
     unitApis: string[] // 盤面ユニット apiName（ソート済み・構成キー）
     n: number
-    // 表示用
-    unitStarLists: Map<string, number[]>
+    // 表示用（スターは件数 Map。レコード数に比例して伸びる配列を持たない）
+    unitStarCounts: Map<string, Map<number, number>>
     itemCounts: Map<string, Map<string, number>>
     holderCounts: Map<string, Map<string, number>>
     // 紋章活用シグネチャ
@@ -194,37 +225,35 @@ export function buildStats(
   const map = new Map<string, CompAcc>()
   let noBoard = 0
   let excludedUnresolvedTrait = 0
+  const byRoute: Record<string, number> = {}
+  const uniqueMatches = new Set<string>()
+  let participants = 0
 
-  for (const lr of target) {
-    const rec = lr.rec
+  function add(rec: ParticipantRecord, route: string): void {
+    byRoute[route] = (byRoute[route] ?? 0) + 1
+    uniqueMatches.add(rec.m)
+    participants++
 
-    // 未解決トレイトを含むレコードは集計から除外（カバレッジ100%なら発生しない）。
-    let hasUnresolvedTrait = false
-    for (const tApi of Object.keys(rec.t)) {
-      if (!staticData.traits.has(tApi)) {
-        unresolvedTraitNames.add(tApi)
-        hasUnresolvedTrait = true
-      }
-    }
-    if (hasUnresolvedTrait) {
+    const cls = classifyRecord(rec, staticData)
+    if (cls.kind === 'unresolvedTrait') {
+      for (const n of cls.names) unresolvedTraitNames.add(n)
       excludedUnresolvedTrait++
-      continue
+      return
     }
-
-    const { boardApis, boardSet, unresolvedUnits } = splitBoardUnits(rec, staticData)
-    for (const u of unresolvedUnits) unresolvedUnitNames.add(u)
-    if (boardSet.size === 0) {
+    for (const u of cls.unresolvedUnits) unresolvedUnitNames.add(u)
+    if (cls.kind === 'noBoard') {
       noBoard++
-      continue
+      return
     }
-    const boardKey = boardApis.join('|')
+    const { boardKey, boardApis, boardSet } = cls
+    if (opts.boardFilter && !opts.boardFilter(boardKey)) return
 
     let acc = map.get(boardKey)
     if (!acc) {
       acc = {
         unitApis: boardApis,
         n: 0,
-        unitStarLists: new Map(),
+        unitStarCounts: new Map(),
         itemCounts: new Map(),
         holderCounts: new Map(),
         sigs: new Map(),
@@ -239,9 +268,12 @@ export function buildStats(
       if (!boardSet.has(uApi)) continue
       const star = rec.us?.[i]
       if (star && star > 0) {
-        const list = acc.unitStarLists.get(uApi) ?? []
-        list.push(star)
-        acc.unitStarLists.set(uApi, list)
+        let sc = acc.unitStarCounts.get(uApi)
+        if (!sc) {
+          sc = new Map()
+          acc.unitStarCounts.set(uApi, sc)
+        }
+        sc.set(star, (sc.get(star) ?? 0) + 1)
       }
       const unitItemList = rec.ui?.[i]
       if (unitItemList && unitItemList.length) {
@@ -275,7 +307,7 @@ export function buildStats(
       }
     }
 
-    if (active.length === 0) continue // 活用紋章なし → シグネチャ対象外
+    if (active.length === 0) return // 活用紋章なし → シグネチャ対象外
 
     const emblemApis = active.slice().sort()
     const sigKey = emblemApis.join('|')
@@ -290,236 +322,251 @@ export function buildStats(
     sig.p += rec.p
   }
 
-  // 出力対象（総レコード n>=MIN_OUTPUT_N）。
-  const usedTraitApis = new Set<string>()
-  const usedUnitApis = new Set<string>()
-  const usedEmblemApis = new Set<string>()
-  const usedItemApis = new Set<string>()
+  function finish(): { out: WireStatsFile; diag: AggregateDiag } {
+    // 出力対象（総レコード n>=MIN_OUTPUT_N）。n 降順・同数は盤面キー昇順で決定的に並べ、maxComps で切る。
+    const selected = [...map.entries()]
+      .filter(([, acc]) => acc.n >= MIN_OUTPUT_N)
+      .sort((a, b) => b[1].n - a[1].n || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    const capped = opts.maxComps && opts.maxComps > 0 ? selected.slice(0, opts.maxComps) : selected
 
-  interface PreComp {
-    unitApis: string[]
-    n: number
-    unitStarByApi: Map<string, number>
-    unitItems: [string, string, number][] // [unitApi, itemApi, count]
-    holders: [string, string, number][] // [emblemApi, unitApi, count]
-    sigs: SigAcc[]
-  }
+    const usedTraitApis = new Set<string>()
+    const usedUnitApis = new Set<string>()
+    const usedEmblemApis = new Set<string>()
+    const usedItemApis = new Set<string>()
 
-  const preComps: PreComp[] = []
-  for (const acc of map.values()) {
-    if (acc.n < MIN_OUTPUT_N) continue
-
-    // 盤面ユニットと、その所持トレイトを used に追加（フロントの発動数算出に使う）。
-    for (const u of acc.unitApis) {
-      usedUnitApis.add(u)
-      for (const tApi of staticData.units.get(u)?.traits ?? []) usedTraitApis.add(tApi)
+    interface PreComp {
+      unitApis: string[]
+      n: number
+      unitStarByApi: Map<string, number>
+      unitItems: [string, string, number][] // [unitApi, itemApi, count]
+      holders: [string, string, number][] // [emblemApi, unitApi, count]
+      sigs: SigAcc[]
     }
 
-    // 代表スター。
-    const unitStarByApi = new Map<string, number>()
-    for (const uApi of acc.unitApis) {
-      const ms = modeMaxNumber(acc.unitStarLists.get(uApi) ?? [])
-      if (ms) unitStarByApi.set(uApi, ms)
-    }
+    const preComps: PreComp[] = []
+    for (const [, acc] of capped) {
+      // 盤面ユニットと、その所持トレイトを used に追加（フロントの発動数算出に使う）。
+      for (const u of acc.unitApis) {
+        usedUnitApis.add(u)
+        for (const tApi of staticData.units.get(u)?.traits ?? []) usedTraitApis.add(tApi)
+      }
 
-    // 推奨アイテム（保持総数上位 CARRY_UNITS ユニット × 上位 ITEMS_PER_UNIT）。
-    const unitItems: [string, string, number][] = []
-    const carries = [...acc.itemCounts.entries()]
-      .map(([uApi, im]) => ({ uApi, im, total: [...im.values()].reduce((s, x) => s + x, 0) }))
-      .sort(
-        (a, b) =>
-          b.total - a.total ||
-          (staticData.units.get(a.uApi)!.name < staticData.units.get(b.uApi)!.name ? -1 : 1),
-      )
-      .slice(0, CARRY_UNITS)
-    for (const { uApi, im } of carries) {
-      const topItems = [...im.entries()]
+      // 代表スター。
+      const unitStarByApi = new Map<string, number>()
+      for (const uApi of acc.unitApis) {
+        const sc = acc.unitStarCounts.get(uApi)
+        const ms = sc ? modeMaxFromCounts(sc) : undefined
+        if (ms) unitStarByApi.set(uApi, ms)
+      }
+
+      // 推奨アイテム（保持総数上位 CARRY_UNITS ユニット × 上位 ITEMS_PER_UNIT）。
+      const unitItems: [string, string, number][] = []
+      const carries = [...acc.itemCounts.entries()]
+        .map(([uApi, im]) => ({ uApi, im, total: [...im.values()].reduce((s, x) => s + x, 0) }))
         .sort(
           (a, b) =>
-            b[1] - a[1] ||
-            (staticData.items.get(a[0])!.name < staticData.items.get(b[0])!.name ? -1 : 1),
+            b.total - a.total ||
+            (staticData.units.get(a.uApi)!.name < staticData.units.get(b.uApi)!.name ? -1 : 1),
         )
-        .slice(0, ITEMS_PER_UNIT)
-      for (const [itApi, count] of topItems) {
-        unitItems.push([uApi, itApi, count])
-        usedUnitApis.add(uApi)
-        usedItemApis.add(itApi)
+        .slice(0, CARRY_UNITS)
+      for (const { uApi, im } of carries) {
+        const topItems = [...im.entries()]
+          .sort(
+            (a, b) =>
+              b[1] - a[1] ||
+              (staticData.items.get(a[0])!.name < staticData.items.get(b[0])!.name ? -1 : 1),
+          )
+          .slice(0, ITEMS_PER_UNIT)
+        for (const [itApi, count] of topItems) {
+          unitItems.push([uApi, itApi, count])
+          usedUnitApis.add(uApi)
+          usedItemApis.add(itApi)
+        }
       }
-    }
 
-    // 装備者。
-    const holders: [string, string, number][] = []
-    for (const [emblemApi, hc] of acc.holderCounts) {
-      const total = [...hc.values()].reduce((s, x) => s + x, 0)
-      const sorted = [...hc.entries()].sort((a, b) => {
-        if (b[1] !== a[1]) return b[1] - a[1]
-        const na = staticData.units.get(a[0])!.name
-        const nb = staticData.units.get(b[0])!.name
-        return na < nb ? -1 : na > nb ? 1 : a[0] < b[0] ? -1 : 1
+      // 装備者。
+      const holders: [string, string, number][] = []
+      for (const [emblemApi, hc] of acc.holderCounts) {
+        const total = [...hc.values()].reduce((s, x) => s + x, 0)
+        const sorted = [...hc.entries()].sort((a, b) => {
+          if (b[1] !== a[1]) return b[1] - a[1]
+          const na = staticData.units.get(a[0])!.name
+          const nb = staticData.units.get(b[0])!.name
+          return na < nb ? -1 : na > nb ? 1 : a[0] < b[0] ? -1 : 1
+        })
+        const picked = sorted.filter(([, c], i) => i === 0 || c / total >= HOLDER_MIN_SHARE)
+        for (const [unitApi, count] of picked.slice(0, HOLDERS_PER_EMBLEM)) {
+          holders.push([emblemApi, unitApi, count])
+          usedUnitApis.add(unitApi)
+          usedEmblemApis.add(emblemApi)
+        }
+      }
+
+      // シグネチャ（紋章 idx は後でインターン）。
+      const sigs = [...acc.sigs.values()]
+      for (const s of sigs) for (const e of s.e) usedEmblemApis.add(e)
+
+      preComps.push({
+        unitApis: acc.unitApis,
+        n: acc.n,
+        unitStarByApi,
+        unitItems,
+        holders,
+        sigs,
       })
-      const picked = sorted.filter(([, c], i) => i === 0 || c / total >= HOLDER_MIN_SHARE)
-      for (const [unitApi, count] of picked.slice(0, HOLDERS_PER_EMBLEM)) {
-        holders.push([emblemApi, unitApi, count])
-        usedUnitApis.add(unitApi)
-        usedEmblemApis.add(emblemApi)
-      }
     }
 
-    // シグネチャ（紋章 idx は後でインターン）。
-    const sigs = [...acc.sigs.values()]
-    for (const s of sigs) for (const e of s.e) usedEmblemApis.add(e)
+    // emblems の traitApi 参照先も used に追加。
+    for (const eApi of usedEmblemApis) {
+      const emb = staticData.emblems.get(eApi)
+      if (emb) usedTraitApis.add(emb.traitApi)
+    }
 
-    preComps.push({
-      unitApis: acc.unitApis,
-      n: acc.n,
-      unitStarByApi,
-      unitItems,
-      holders,
-      sigs,
+    // インターン配列（決定的順序）。
+    const traitApisSorted = [...usedTraitApis].sort((a, b) => {
+      const na = staticData.traits.get(a)!.name
+      const nb = staticData.traits.get(b)!.name
+      return na < nb ? -1 : na > nb ? 1 : a < b ? -1 : a > b ? 1 : 0
     })
+    const traitIndex = new Map<string, number>()
+    const traitsOut: TraitInfo[] = traitApisSorted.map((api, i) => {
+      traitIndex.set(api, i)
+      const t = staticData.traits.get(api)!
+      return { api, name: t.name, nameJa: t.nameJa, icon: t.icon, tiers: t.tiers }
+    })
+
+    const unitApisSorted = [...usedUnitApis].sort((a, b) => {
+      const ua = staticData.units.get(a)!
+      const ub = staticData.units.get(b)!
+      if (ua.cost !== ub.cost) return ua.cost - ub.cost
+      return ua.name < ub.name ? -1 : ua.name > ub.name ? 1 : a < b ? -1 : a > b ? 1 : 0
+    })
+    const unitIndex = new Map<string, number>()
+    const unitsOut: UnitInfo[] = unitApisSorted.map((api, i) => {
+      unitIndex.set(api, i)
+      const u = staticData.units.get(api)!
+      // 所持トレイトを traitIdx へ（インターン済みのもののみ）。
+      const traitIdxs = u.traits
+        .map((t) => traitIndex.get(t))
+        .filter((x): x is number => x !== undefined)
+      return { api, name: u.name, nameJa: u.nameJa, cost: u.cost, icon: u.icon, code: u.code, traits: traitIdxs }
+    })
+
+    const emblemApisSorted = [...usedEmblemApis].sort((a, b) => {
+      const ea = staticData.emblems.get(a)!
+      const eb = staticData.emblems.get(b)!
+      return ea.name < eb.name ? -1 : ea.name > eb.name ? 1 : a < b ? -1 : a > b ? 1 : 0
+    })
+    const emblemIndex = new Map<string, number>()
+    const emblemsOut: EmblemInfo[] = emblemApisSorted.map((api, i) => {
+      emblemIndex.set(api, i)
+      const e = staticData.emblems.get(api)!
+      return { api, name: e.name, nameJa: e.nameJa, trait: traitIndex.get(e.traitApi)!, icon: e.icon, base: e.base, recipe: e.recipe }
+    })
+
+    const itemApisSorted = [...usedItemApis].sort((a, b) => {
+      const ia = staticData.items.get(a)!
+      const ib = staticData.items.get(b)!
+      return ia.name < ib.name ? -1 : ia.name > ib.name ? 1 : a < b ? -1 : a > b ? 1 : 0
+    })
+    const itemIndex = new Map<string, number>()
+    const itemsOut: ItemInfo[] = itemApisSorted.map((api, i) => {
+      itemIndex.set(api, i)
+      const it = staticData.items.get(api)!
+      return { api, name: it.name, nameJa: it.nameJa, icon: it.icon, recipe: it.recipe }
+    })
+
+    // PreComp → WireComp。
+    function toWire(pc: PreComp): WireComp {
+      const unitIdxs = pc.unitApis
+        .map((api) => unitIndex.get(api)!)
+        .sort((a, b) => {
+          const ua = unitsOut[a]
+          const ub = unitsOut[b]
+          if (ua.cost !== ub.cost) return ua.cost - ub.cost
+          return ua.name < ub.name ? -1 : ua.name > ub.name ? 1 : a - b
+        })
+      const unitStars = unitIdxs.map((idx) => pc.unitStarByApi.get(unitsOut[idx].api) ?? 0)
+
+      const unitItems: [number, number, number][] = pc.unitItems
+        .map(([unitApi, itemApi, count]): [number, number, number] => [
+          unitIndex.get(unitApi)!,
+          itemIndex.get(itemApi)!,
+          count,
+        ])
+        .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+
+      const holders: [number, number, number][] = pc.holders
+        .map(([emblemApi, unitApi, count]): [number, number, number] => [
+          emblemIndex.get(emblemApi)!,
+          unitIndex.get(unitApi)!,
+          count,
+        ])
+        .sort((a, b) => a[0] - b[0])
+
+      const g: [number[], number, number, number, number][] = pc.sigs
+        .map((s): [number[], number, number, number, number] => [
+          s.e.map((e) => emblemIndex.get(e)!).sort((x, y) => x - y),
+          s.n,
+          s.top4,
+          s.win,
+          s.p,
+        ])
+        .sort((a, b) => b[1] - a[1])
+
+      const wire: WireComp = { u: unitIdxs, n: pc.n, g }
+      if (unitStars.some((s) => s > 0)) wire.k = unitStars
+      if (unitItems.length) wire.i = unitItems
+      if (holders.length) wire.h = holders
+      return wire
+    }
+
+    // preComps は既に n 降順・盤面キー昇順。
+    const comps: WireComp[] = preComps.map(toWire)
+
+    const out: WireStatsFile = {
+      schemaVersion: 4,
+      generatedAt: opts.generatedAt,
+      patch: opts.targetPatch,
+      tftPatch: opts.tftPatch,
+      setNumber: staticData.setNumber,
+      totals: {
+        matches: uniqueMatches.size,
+        participants,
+        byRoute,
+      },
+      traits: traitsOut,
+      emblems: emblemsOut,
+      units: unitsOut,
+      items: itemsOut,
+      comps,
+      baseItemIcons: staticData.baseItemIcons,
+    }
+
+    const diag: AggregateDiag = {
+      noBoard,
+      excludedUnresolvedTrait,
+      boardGroupCount: map.size,
+      unresolvedTraitNames,
+      unresolvedUnitNames,
+      unresolvedEmblemNames,
+    }
+
+    return { out, diag }
   }
 
-  // emblems の traitApi 参照先も used に追加。
-  for (const eApi of usedEmblemApis) {
-    const emb = staticData.emblems.get(eApi)
-    if (emb) usedTraitApis.add(emb.traitApi)
-  }
+  return { add, finish }
+}
 
-  // インターン配列（決定的順序）。
-  const traitApisSorted = [...usedTraitApis].sort((a, b) => {
-    const na = staticData.traits.get(a)!.name
-    const nb = staticData.traits.get(b)!.name
-    return na < nb ? -1 : na > nb ? 1 : a < b ? -1 : a > b ? 1 : 0
-  })
-  const traitIndex = new Map<string, number>()
-  const traitsOut: TraitInfo[] = traitApisSorted.map((api, i) => {
-    traitIndex.set(api, i)
-    const t = staticData.traits.get(api)!
-    return { api, name: t.name, nameJa: t.nameJa, icon: t.icon, tiers: t.tiers }
-  })
-
-  const unitApisSorted = [...usedUnitApis].sort((a, b) => {
-    const ua = staticData.units.get(a)!
-    const ub = staticData.units.get(b)!
-    if (ua.cost !== ub.cost) return ua.cost - ub.cost
-    return ua.name < ub.name ? -1 : ua.name > ub.name ? 1 : a < b ? -1 : a > b ? 1 : 0
-  })
-  const unitIndex = new Map<string, number>()
-  const unitsOut: UnitInfo[] = unitApisSorted.map((api, i) => {
-    unitIndex.set(api, i)
-    const u = staticData.units.get(api)!
-    // 所持トレイトを traitIdx へ（インターン済みのもののみ）。
-    const traitIdxs = u.traits
-      .map((t) => traitIndex.get(t))
-      .filter((x): x is number => x !== undefined)
-    return { api, name: u.name, nameJa: u.nameJa, cost: u.cost, icon: u.icon, code: u.code, traits: traitIdxs }
-  })
-
-  const emblemApisSorted = [...usedEmblemApis].sort((a, b) => {
-    const ea = staticData.emblems.get(a)!
-    const eb = staticData.emblems.get(b)!
-    return ea.name < eb.name ? -1 : ea.name > eb.name ? 1 : a < b ? -1 : a > b ? 1 : 0
-  })
-  const emblemIndex = new Map<string, number>()
-  const emblemsOut: EmblemInfo[] = emblemApisSorted.map((api, i) => {
-    emblemIndex.set(api, i)
-    const e = staticData.emblems.get(api)!
-    return { api, name: e.name, nameJa: e.nameJa, trait: traitIndex.get(e.traitApi)!, icon: e.icon, base: e.base, recipe: e.recipe }
-  })
-
-  const itemApisSorted = [...usedItemApis].sort((a, b) => {
-    const ia = staticData.items.get(a)!
-    const ib = staticData.items.get(b)!
-    return ia.name < ib.name ? -1 : ia.name > ib.name ? 1 : a < b ? -1 : a > b ? 1 : 0
-  })
-  const itemIndex = new Map<string, number>()
-  const itemsOut: ItemInfo[] = itemApisSorted.map((api, i) => {
-    itemIndex.set(api, i)
-    const it = staticData.items.get(api)!
-    return { api, name: it.name, nameJa: it.nameJa, icon: it.icon, recipe: it.recipe }
-  })
-
-  // PreComp → WireComp。
-  function toWire(pc: PreComp): WireComp {
-    const unitIdxs = pc.unitApis
-      .map((api) => unitIndex.get(api)!)
-      .sort((a, b) => {
-        const ua = unitsOut[a]
-        const ub = unitsOut[b]
-        if (ua.cost !== ub.cost) return ua.cost - ub.cost
-        return ua.name < ub.name ? -1 : ua.name > ub.name ? 1 : a - b
-      })
-    const unitStars = unitIdxs.map((idx) => pc.unitStarByApi.get(unitsOut[idx].api) ?? 0)
-
-    const unitItems: [number, number, number][] = pc.unitItems
-      .map(([unitApi, itemApi, count]): [number, number, number] => [
-        unitIndex.get(unitApi)!,
-        itemIndex.get(itemApi)!,
-        count,
-      ])
-      .sort((a, b) => a[0] - b[0] || a[1] - b[1])
-
-    const holders: [number, number, number][] = pc.holders
-      .map(([emblemApi, unitApi, count]): [number, number, number] => [
-        emblemIndex.get(emblemApi)!,
-        unitIndex.get(unitApi)!,
-        count,
-      ])
-      .sort((a, b) => a[0] - b[0])
-
-    const g: [number[], number, number, number, number][] = pc.sigs
-      .map((s): [number[], number, number, number, number] => [
-        s.e.map((e) => emblemIndex.get(e)!).sort((x, y) => x - y),
-        s.n,
-        s.top4,
-        s.win,
-        s.p,
-      ])
-      .sort((a, b) => b[1] - a[1])
-
-    const wire: WireComp = { u: unitIdxs, n: pc.n, g }
-    if (unitStars.some((s) => s > 0)) wire.k = unitStars
-    if (unitItems.length) wire.i = unitItems
-    if (holders.length) wire.h = holders
-    return wire
-  }
-
-  const comps: WireComp[] = preComps.map(toWire).sort((a, b) => b.n - a.n)
-
-  const byRoute: Record<string, number> = {}
-  const uniqueMatches = new Set<string>()
-  for (const lr of target) {
-    byRoute[lr.route] = (byRoute[lr.route] ?? 0) + 1
-    uniqueMatches.add(lr.rec.m)
-  }
-
-  const out: WireStatsFile = {
-    schemaVersion: 4,
-    generatedAt: opts.generatedAt,
-    patch: opts.targetPatch,
-    tftPatch: opts.tftPatch,
-    setNumber: staticData.setNumber,
-    totals: {
-      matches: uniqueMatches.size,
-      participants: target.length,
-      byRoute,
-    },
-    traits: traitsOut,
-    emblems: emblemsOut,
-    units: unitsOut,
-    items: itemsOut,
-    comps,
-    baseItemIcons: staticData.baseItemIcons,
-  }
-
-  const diag: AggregateDiag = {
-    noBoard,
-    excludedUnresolvedTrait,
-    boardGroupCount: map.size,
-    unresolvedTraitNames,
-    unresolvedUnitNames,
-    unresolvedEmblemNames,
-  }
-
-  return { out, diag }
+/**
+ * 配列版の集計（テスト・小規模用）。createStatsBuilder を配列で回す薄いラッパ。
+ */
+export function buildStats(
+  target: LoadedRecord[],
+  staticData: StaticData,
+  opts: StatsBuilderOptions,
+): { out: WireStatsFile; diag: AggregateDiag } {
+  const builder = createStatsBuilder(staticData, opts)
+  for (const lr of target) builder.add(lr.rec, lr.route)
+  return builder.finish()
 }

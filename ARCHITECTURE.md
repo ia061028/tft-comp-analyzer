@@ -24,7 +24,8 @@ TFT紋章構成アナライザーの実装アーキテクチャ。設計判断�
                          ▼
       ┌───────────────────────────────────┐
       │  data ブランチ（orphan, 正本）       │
-      │  records/{route}.ndjson            │
+      │  records/{route}.ndjson  (アクティブ)│
+      │  records/{route}/*.ndjson.gz (封印) │
       │  seen/{route}.ndjson               │
       │  meta.json                         │
       └───────────────┬────────────────────┘
@@ -32,7 +33,7 @@ TFT紋章構成アナライザーの実装アーキテクチャ。設計判断�
                          ▼
                 ┌──────────────────┐
                 │  aggregate.ts /   │  collector/aggregate-core.ts（純関数）
-                │  aggregate-core   │
+                │  aggregate-core   │  ストリーミング3パス（全件をメモリに持たない）
                 └───────┬───────────┘
                          │ 実質差分がある時だけ
                          ▼
@@ -115,48 +116,62 @@ collect と aggregate は同じ CI ジョブ内で直列に実行されるが、
 
 全ファイルは同じスキーマ（`WireStatsFile`）で、`patches` に同一の一覧（`key` / `label` / `file` / `matches`）を埋め込む。フロントは最初に `stats.json` を読み、その `patches` からセグメントコントロールを作り、選択に応じて該当ファイルを fetch してメモリにキャッシュする。紋章の intern（`emblems` 配列）はファイルごとに「レコードに現れた紋章」だけなのでインデックスが変わりうる。切替時は選択中の紋章を apiName 経由で新ファイルのインデックスへ写す（`remapSelection`）。
 
-パッチがローリング窓から消えれば、そのビューは次回の aggregate で生成されず、aggregate が旧 `stats-*.json` を削除する（CI は `public/data` をディレクトリごと `git add -A` する）。
+パッチが保持窓から消えれば、そのビューは次回の aggregate で生成されず、aggregate が旧 `stats-*.json` を削除する（CI は `public/data` をディレクトリごと `git add -A` する）。
 
-### ローリング窓（prune ポリシー）
+**出力サイズの歯止め**: 1ビューの構成数は `config.maxCompsPerView`（既定 20,000。n 降順・同数は盤面キー昇順で決定的に切る）で抑える。1構成約260バイトなので約5MB/ビュー。辞書（traits/units/emblems/items）のインターンは生き残った構成だけを対象にする。`MIN_OUTPUT_N = 3` は据え置き。
 
-収集レコードは `data` ブランチの `records/{route}.ndjson` に追記され、collect の末尾で prune される。GitHub のハード上限が **100MB/ファイル**なので、サンプル数の天井はここで決まる（実測 約900バイト/レコード、1マッチ8参加者＝約7.2KB/マッチ）。
+### ストリーミング集計（3パス）
 
-prune は2段階（`filterNdjsonForWindow`）:
+保持レコードが数百万件になるため、aggregate は全件をメモリに展開しない。`shards.ts` の `forEachRecord` で封印シャード（gunzip）→ アクティブの順に1件ずつ読み、3回なめる:
 
-1. **旧セットの切り捨て**: `s`(tft_set_number) を持つ行が1件でもあれば、最大の `s` 以外を落とす。`s` を持たない旧形式レコード（セット17以前）もここで落ちる。`s` を持つ行が皆無なら何もしない（全消し防止のガード）。
-2. **窓あふれの切り捨て**: 残りが `config.maxRecordsPerRoute`（90,000 ≒ 81MB ≒ 約11,250マッチ）を超えたら、マッチ単位で新しい順に保持し、はみ出したマッチを丸ごと落とす。マッチを分断しないのは、8参加者が揃っていないと `totals.matches` が実態とずれるため。
+1. **パス A（走査）**: `resolvePatch` でパッチを割り当て、セット分布・(セット, パッチ) ごとのユニークマッチ・トレイト名集合を取る。ここから対象セット（`pickTargetSetFromCounts`）、保持下限パッチ（`retentionFloor`）、ビュー（`planPatchViews`）を決め、静的データを1回だけ解決する。
+2. **パス B（盤面カウント）**: 対象レコード（対象セット かつ floor 以上）を `classifyRecord` し、構成キー → パッチ別件数を数える。
+3. **パス C（集計）**: ビューごとの `createStatsBuilder` に取り込む。`boardFilter` でそのビュー内の n >= `MIN_OUTPUT_N` の盤面だけアキュムレータを作る（盤面の約9割は n<3 で最終的に落ちるので、これが無いとメモリが数倍になる）。
 
-パース不能行は常に保持し、窓の予算からも除外する（安全側）。出力は元の行順を維持する（append-only に近い形を保ち git のデルタ圧縮を効かせるため）。1行も落ちなければファイルに触らない。
+`buildStats(target[])` は builder を配列で回す薄いラッパとして残しており、テストのゴールデンはそのまま。実測（48万レコード）: パス A 5秒・B 7秒・C 15秒、ピークヒープ約380MB。CI は `NODE_OPTIONS=--max-old-space-size=4096` で実行する。
 
-**パッチ単位の prune は廃止した**（旧 `patchesToKeep`）。Unreal 移行後は `game_version` が使えず全レコードが単一パッチキー（`{set}.0`）に潰れるため、「上位2パッチを保持」では旧セットが永久に残ってしまう。セットと新しさで切るのが正しい。
+### 保持ポリシー（シャード化＋パッチ窓）
 
-定常状態のサンプルは 4ルート × 約11,250マッチ = **約45,000マッチ**。6時間ごとの実行で約2日かけて窓が埋まり、以後は常に最新のマッチで置き換わる。
+収集レコードは `data` ブランチの `records/` に置く。GitHub のハード上限（**100MB/ファイル**、非圧縮 blob）を1ファイルの分割と gzip で回避し、保持量はパッチ窓と容量予算で決める。
+
+```
+records/{route}.ndjson                                       アクティブシャード: 生 NDJSON、追記専用、書き換えない
+records/{route}/000001_s18_1787702400-1788867459.ndjson.gz   封印シャード: 不変（seq 6桁_s{set}_{minTs}-{maxTs}）
+```
+
+- **封印**（`shards.ts` `sealActiveShard`）: collect の末尾（と `npm run data:seal`）で、アクティブが `config.sealThresholdBytes`（64MB）を超えていれば丸ごと gzip して封印シャードにし、アクティブを消す。封印シャードは最大でも閾値＋1ラン分で 100MB に当たらない。gzip は実測約 1/10（88MB → 8.5MB）。ファイル名が自己記述（セット・ts 範囲）なので索引ファイルは持たない。
+- **保持**（`retention.ts` `planRetention`。封印シャード単位で削除するだけで、レコード単位の書き換えはしない）:
+  1. 現行セット（最大の `s`）以外は落とす（`old-set`）。
+  2. 最新レコード（maxTs）のパッチが保持下限パッチ（floor）より古いシャードは落とす（`old-patch`）。floor は `retentionFloor`: `config.patchSchedule` のうち配信済みエントリの末尾 `config.patchesToKeep`（2）件の先頭。境界をまたぐシャードは最新レコードが窓外になるまで残す（その間の旧パッチレコードは aggregate 側の同じ規則で出力から除外する）。
+  3. 残りの gz 合計が `config.maxSealedBytesPerRoute`（64MB ≒ 約10万マッチ/ルート ≒ パッチ約2本分）を超えたら古い seq から落とす（`byte-cap`）。**定常時に実際に効くのはこの規則**で、現パッチが増えるにつれ前パッチのシャードが古い順に押し出される。アクティブは予算に数えない。
+- **取得窓との整合**: collect のマッチ ID 取得の下限時刻（`collectStartTime`）は「セット開始」と「floor の配信開始」の遅い方。集計で捨てるパッチにリクエスト予算を使わない。
+- **seen**（処理済みマッチID）はセット1本分だけ持つ。`meta.collectSince` が `config.collectSinceEpoch` と異なれば（＝セット切替）空にする。旧レイアウト（`collectSince` 無し）では現値を採用するだけでリセットしない。
+- **`.gitattributes`**: collect が `data/state/.gitattributes` に `*.gz binary` を含む内容を書く（CI の push は `git add -A`）。gz を text 扱いにすると Windows で CRLF 変換されて壊れる。
+
+旧レイアウト（`records/{route}.ndjson` のみ）は「封印シャード0個のアクティブ」として読めるので、移行手順は無い。最初のランの末尾でアクティブが閾値超えで封印され、以後は新レイアウトになる。
+
+定常状態のサンプルは 4ルート × 約10万マッチ = **約40万マッチ**（母集団を Master 以上に絞った後の流入は1日5,000〜10,000試合なので、予算に達するまで1〜2か月。それまでは「直近2パッチ」の上限規則が先に効く）。
 
 ### 母集団（puuid プール）
 
-Challenger / Grandmaster / Master に加え、`config.entryTiers`（DIAMOND〜IRON）を entries エンドポイントからティア×ディビジョンごとに抽選する。高レート帯だけでは母集団が枯れるため（セット18開始3日目の実測で全15プラットフォームの Challenger/GM が 0人、Master が計30人）。
+全15プラットフォームの Challenger / Grandmaster / Master を**全員**プールに入れる（抽選しない）。ルート内の Master 以上の合計が `config.minHighTierPoolPerRoute`（500人）未満のときだけ、`config.entryTiers`（DIAMOND〜IRON）を entries エンドポイントからティア×ディビジョンごとに取って補充する（フォールバック。セット開始直後は全15プラットフォームで Challenger/GM が 0人、Master 計30人だった）。どちらのモードで動いたかはログに出る。プールが `config.maxPoolPerRoute`（6,000）を超えたら間引く。
 
-リーグ一覧はプラットフォームホスト（`kr.api` 等）、マッチ取得はリージョナルホスト（`asia.api` 等）で、**レート枠が別**。よって母集団を広げるコストはマッチ取得の予算を食わない。
+2026-09-12 の実測: Master 以上は americas 1,132 / asia 1,703 / europe 1,365 / sea 4,292 人。以前は Diamond 以下を常に混ぜ、Master を 100人/プラットフォームに間引いていたため、プールの8〜9割が Diamond 以下だった。
 
-律速はリージョナルホストのレート上限（開発キーで `100req/120s` = 50req/分）。**時間あたりの上限なので、総量は「走らせている時間」で決まる**。
+リーグ一覧はプラットフォームホスト（`kr.api` 等）、マッチ取得はリージョナルホスト（`asia.api` 等）で、**レート枠が別**。よって母集団の広さはマッチ取得の予算を食わない。
 
-そのため頻度ではなく**1ランの長さ**で稼ぐ設計にしている（`runBudgetMinutes: 120`、cron は6時間ごとのまま）。理由は3つ:
-
-1. 6時間ごと×35分では日あたりのレート利用率が **8%** しかなかった（1ホストあたり 72,000req/日 使えるところ約5,900）。
-2. 収集間隔が短いほど「プレイヤー1人あたりの新規試合」が減り、試合ID取得1回あたりの収穫が落ちる。実測で6時間窓のプレイヤーは平均0.5試合しかプレイしておらず、**リージョナルホストのリクエストの約2/3が試合ID取得に消えていた**（1,471req中 約1,000がID取得、マッチ詳細は約470）。間隔を空けるほどこの比率は改善する。
-3. ラン頻度を上げると stats.json のコミット＝Cloudflare Pages のビルドも増え、無料枠 500ビルド/月に当たる。6時間ごと（月120ビルド）なら安全。
-
-プールは `entrySamplePerDivision: 205`（1ページ全件）。プール構築のリクエスト数は抽選数に依らずティア×ディビジョン数（7×4=28/プラットフォーム）で一定なので、全件取るのが最も効率的。1ルート約23,000人になり、長時間ランでも枯れない。
-
-なお全ティアを対象にしているので、統計は「高レートの最適解」ではなく**その帯で実際に組まれた構成の分布**を表す。
+レコードには参加者のティアを持たないので、母集団を変えても過去のレコードを遡って絞ることはできない（保持窓から押し出されるまで残る）。
 
 ### 実装の分離
 
-- **`collector/aggregate-core.ts`**: 集計ロジック本体。`fs` / `fetch` / `process` / `console` に依存しない純関数群（`splitBoardUnits`, `classifyEmblems`, `pickTargetSet`, `buildStats` など）。テスト（`*.test.ts`）はここに対して書く。
+- **`collector/aggregate-core.ts`**: 集計ロジック本体。`fs` / `fetch` / `process` / `console` に依存しない純関数群（`splitBoardUnits`, `classifyEmblems`, `classifyRecord`, `pickTargetSetFromCounts`, `createStatsBuilder`, `buildStats` など）。テスト（`*.test.ts`）はここに対して書く。
 - **`collector/cdragon.ts`**: CDragon 取得の I/O 層。ただし紋章判定（`isEmblemItemLoose`, `resolveEmblemTraits`, `classifyBase`, `emblemIconRe`）はネットワーク非依存の純関数として export しており、`cdragon.test.ts` がここを直接テストする。
 - **`collector/collect.ts`**: 収集の I/O 層。末尾にエントリガード（`process.argv[1]` と `import.meta.url` の一致判定）があり、テストから `buildRecords` を import しても収集は走らない。
-- **`collector/patches.ts`**: パッチ比較（`compareVersions`）、既定パッチのヒステリシス選定（`pickTargetPatch`）、日時ベースのパッチ割り当て（`resolvePatch`）、出力ビュー選定（`planPatchViews`）。全て純関数で `patches.test.ts` が対象。
-- **`collector/aggregate.ts`**: I/O 層。`data/state/records/*.ndjson` の読み込み、CDragon 静的データの取得、パッチ割り当て、ビューごとの `aggregate-core.ts` 呼び出し、`public/data/stats.json` / `stats-{patch}.json` への書き出し（実質差分のないファイルは触らず、不要になった旧ファイルは削除）を担当。
+- **`collector/patches.ts`**: パッチ比較（`compareVersions`）、既定パッチのヒステリシス選定（`pickTargetPatch`）、日時ベースのパッチ割り当て（`resolvePatch`）、出力ビュー選定（`planPatchViews`）、保持下限パッチ（`retentionFloor`）。全て純関数で `patches.test.ts` / `retention.test.ts` が対象。
+- **`collector/retention.ts`**: 封印シャードの命名（`shardFileName` / `parseShardFile`）と保持計画（`planRetention`）。純関数。
+- **`collector/shards.ts`**: シャード I/O。一覧（`listRouteShards`）、ストリーム読み（`forEachRecord`）、封印（`sealActiveShard`）、保持適用（`sealAndPrune`）。`recordsDir` を引数に取り、`shards.test.ts` は一時ディレクトリで実行する。
+- **`collector/aggregate.ts`**: I/O 層。シャードのストリーミング読み、CDragon 静的データの取得、ビューごとの `createStatsBuilder` 呼び出し、`public/data/stats.json` / `stats-{patch}.json` への書き出し（実質差分のないファイルは触らず、不要になった旧ファイルは削除）を担当。
+- **`collector/seal.ts`**: `npm run data:seal`。収集せずに封印と保持適用だけを行う（ローカルの移行確認・手動封印用。Riot キー不要）。
 
 ## CI フローとキー失効 no-op 設計
 
@@ -168,7 +183,7 @@ collect（認証プリフライト）
   │     └─ 後続の aggregate / data ブランチ push / public/data コミットを全てスキップ
   │        （コミット0・デプロイ0。state にも一切触れない）
   ├─ 成功 → status=ok, new_records=<件数> を出力
-  │     └─ aggregate → data ブランチへ squash force-push → public/data に実質差分があれば main へコミット
+  │     └─ 封印/保持適用 → aggregate → data ブランチへ squash force-push → public/data に実質差分があれば main へコミット
   └─ 実エラー（ルート例外） → status を出さず exit 1 → ジョブが赤失敗
 ```
 
@@ -181,18 +196,21 @@ collect（認証プリフライト）
 収集状態（records・seen・meta）の正本は **orphan ブランチ `data`**。ルート直下に以下を持つ:
 
 ```
-records/{route}.ndjson   参加者1人=1レコード（追記）
-seen/{route}.ndjson      処理済みマッチID（重複取得防止）
-meta.json                収集メタ情報
+.gitattributes                    collect が書く（*.ndjson/*.json は LF、*.gz は binary）
+records/{route}.ndjson            アクティブシャード（参加者1人=1レコード、追記）
+records/{route}/*.ndjson.gz       封印シャード（不変。「保持ポリシー」参照）
+seen/{route}.ndjson               処理済みマッチID（重複取得防止。セット切替でリセット）
+meta.json                         収集メタ情報（routes, collectSince）
 ```
 
-CI は `actions/checkout@v4`（`ref: data`, `path: data/state`）で `data` ブランチを `data/state` に独立チェックアウトする。main 側の `.gitignore` は `/data/`（先頭 `/` でリポジトリ直下限定、`public/data` は対象外）を無視するため、この入れ子チェックアウトは main の git 操作に一切干渉しない。
+CI は `actions/checkout@v5`（`ref: data`, `path: data/state`）で `data` ブランチを `data/state` に独立チェックアウトする。main 側の `.gitignore` は `/data/`（先頭 `/` でリポジトリ直下限定、`public/data` は対象外）を無視するため、この入れ子チェックアウトは main の git 操作に一切干渉しない。
 
 収集が成功した回だけ、`data/state` 内で `git checkout --orphan snapshot` → `git add -A` → `git commit` → `git push --force origin snapshot:data` を行う。**履歴は常に1コミットのスナップショット**になる。
 
 ### なぜ orphan + squash force-push か
 
 - records/seen は追記専用の NDJSON で、6時間ごとに更新され続ける。通常のコミット履歴を積むと、パッチが変わるたびに肥大化した履歴がリポジトリに残り続ける。
+- 封印シャードは不変なので、force-push でも git は同一 blob を再送しない。1ランで転送されるのは変更のあったアクティブシャード（生 NDJSON、zlib 圧縮で約1/10）と seen だけ。
 - 復旧・再現に必要なのは「今の状態」だけで、収集データの変更履歴に価値は無い。squash force-push なら常に1コミットに保たれ、リポジトリサイズが線形に増えない。
 - main の履歴と分離することで、`git clone` 時に `main` だけを浅く取得すればアプリのソースは揃う（records の重量はビルド・デプロイに一切関係しない）。
 
@@ -212,6 +230,7 @@ git clone --depth 1 --branch data https://github.com/ia061028/tft-comp-analyzer.
 
 ```sh
 npm run data:pull   # data/state を origin/data の最新スナップショットに同期
+npm run data:seal   # 収集せずに封印と保持適用だけ行う（移行確認・手動封印。キー不要）
 ```
 
 `data:pull`（`collector/data-pull.ts`）は `data/state` が独立した git チェックアウトであることを検証してから `reset --hard` する。検証を省くと、`data/state` がただのディレクトリだった場合に git が親（main リポジトリ）の `.git` を辿ってしまい、main の作業ツリー全体を `origin/data` へ hard reset して壊す危険があるため。独立チェックアウトでない場合はエラーで停止し、初回セットアップの `git clone` を促す。
