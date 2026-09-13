@@ -1,7 +1,7 @@
 name: collect
 
 # 設計の要点（既定パスは「キー失効 = 完全 no-op」）:
-#   開発キーはほぼ常時失効している前提。collect は認証プリフライトで 401/403 を検出すると
+#   キーが失効・無効化されていても CI を赤失敗させない。collect は認証プリフライトで 401/403 を検出すると
 #   ::warning:: を出し status=auth_expired を書いて exit 0（state 不変）。その場合は後段の
 #   aggregate / data ブランチ push / stats.json コミットを全てスキップし、コミット0・デプロイ0。
 #   収集が成功した時（status=ok）だけ:

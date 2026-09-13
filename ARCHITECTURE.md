@@ -176,7 +176,7 @@ records/{route}/000001_s18_1787702400-1788867459.ndjson.gz   封印シャード:
 
 ## CI フローとキー失効 no-op 設計
 
-開発用 Riot API キーは短時間で失効することが常態のため、**「キー失効 = 完全 no-op」を既定パスとして設計**している（`.github/workflows/collect.yml`）。
+Riot API キーが失効・無効化された時に CI を赤失敗させず前回データを配信し続けるため、**「キー失効 = 完全 no-op」を既定パスとして設計**している（`.github/workflows/collect.yml`）。開発キー運用時は24時間ごとの失効が常態だったためこの形になった。2026-09-13 以降のパーソナルキーは失効しないが、再生成・無効化時の保険として維持している。
 
 ```
 collect（認証プリフライト）
@@ -243,6 +243,5 @@ npm run data:seal   # 収集せずに封印と保持適用だけ行う（移行�
   gh secret set RIOT_API_KEY --body "RGAPI-..."
   ```
   （パイプ流し込みは PowerShell 5.1 環境で BOM/改行混入の恐れがあるため `--body` を使う。）
-- 開発キーは24時間で失効する。失効時は上記の no-op パスに入り、スティッキー issue で可視化される。
-- Riot の Personal/Production キー承認は**ゲーム単位スコープ**。LoL 承認済みキーは TFT では 403 になるため、TFT 対応の開発キーか TFT 個別承認が必要。
-- 本番（TFT対応）APIキー承認後は `collector/config.ts` の `enableDiamond` を `true` にすると Diamond 帯の収集も有効化できる（現状は dev キーのレート上限回避のため false）。
+- 現在のキーは **TFT 承認済みパーソナルキー**（2026-09-13 承認）で、有効期限は無い。レート上限は開発キーと同じ `100:120,20:1`。再生成時や Riot による無効化時は上記の no-op パスに入り、スティッキー issue で可視化される。
+- Riot の Personal/Production キー承認は**ゲーム単位スコープ**。当キーは TFT 専用で、LoL のエンドポイント（例 `lol/status/v4`）は 403 になるのが正常。コレクタが使うのは `tft/league/v1/*` と `tft/match/v1/*` だけなので影響しない。

@@ -63,7 +63,7 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 
 - **CI 収集**: `.github/workflows/collect.yml` が6時間ごとに collect→aggregate→data ブランチへ squash force-push→（実質差分があれば）`public/data/` を main へコミット。Cloudflare Pages が push で自動再デプロイ。
 - **キー失効 = no-op**: collect は冒頭の認証プリフライトで 401/403 を検出すると `status=auth_expired` を出して exit 0（state 不変）。この場合 aggregate・data ブランチ push・stats.json コミットは全てスキップされ、コミット0・デプロイ0。スティッキー issue（ラベル `riot-key`）が起票され（初回のみ通知、以後は本文編集のみ）、キー復旧後の次回実行で自動クローズされる。実際のルート例外時のみジョブが赤失敗する。
-- **APIキー**: CI が使うのは **GitHubリポジトリ Secret `RIOT_API_KEY`**（ローカル `.env` ではない）。開発キーは**24時間で失効**するので、上記の no-op パスに入る。`gh secret set RIOT_API_KEY --body "RGAPI-..."`（パイプ流し込みは BOM/改行混入の恐れがあるため `--body`）または Settings→Secrets→Actions で更新。恒久対応は**本番APIキー**への切替。
+- **APIキー**: CI が使うのは **GitHubリポジトリ Secret `RIOT_API_KEY`**（ローカル `.env` ではない）。現在は **TFT 承認済みのパーソナルキー**（2026-09-13 承認・有効期限なし）。ポータルで再生成した時や Riot に無効化された時は上記の no-op パスに入るので、`gh secret set RIOT_API_KEY --body "RGAPI-..."`（パイプ流し込みは BOM/改行混入の恐れがあるため `--body`）または Settings→Secrets→Actions で更新する。
 - **ローカルでの収集状態同期**: 初回は `git clone --depth 1 --branch data https://github.com/ia061028/tft-comp-analyzer.git data/state`、以後は `npm run data:pull`。
 - **保持**: レコードは `records/{route}.ndjson`（追記中）と `records/{route}/*.ndjson.gz`（封印済み・不変）に分かれ、直近2パッチ・1ルート 64MB gz を上限に古いシャードから消える。新たに取りに行くのは最新パッチの試合だけ（`config.collectPatchesBack`）。母集団は Master 以上（薄い時だけ Diamond 以下で補充）。詳細は [ARCHITECTURE.md](ARCHITECTURE.md) の「保持ポリシー」「母集団」。
 - 手動収集: ローカルで有効な `.env` と `data/state` があれば `npm run collect && npm run aggregate` で更新可能（main へのコミットは別途）。
@@ -73,6 +73,6 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 - **チームコードの形式**: 現行は `02` + 各チャンピオン12bit(3桁hex, team_planner_code) + `TFTSet{n}`。実機での有効性は要再検証（クライアント生成コードとの突き合わせ）。
   セット18 では Lux の9変種（`DA_18_Lux_*` 等、Avatar 特性でトレイト別に姿が変わる5コスト）が Riot のチームプランナー定義に無く `team_planner_code` を持たないため、その枠は `000` になる。
 - **パッチ境界は日時で近似**: セット18 以降 `game_version` がプレースホルダのため、パッチは `config.patchSchedule` の配信日時（UTC 00:00 目安）で割り当てている。実際の配信はリージョンごとに数時間ずれるので境界付近の試合は数時間分ずれうる。Riot が `game_version` を直せば実パッチキーが優先される（その場合は `config.tftPatchLabels` に表記を追加）。
-- **本番APIキー**: 開発キーは24時間で失効する。レート上限も開発キーは 100req/120s（リージョナルホストごと）で、1ランあたり約5,000マッチ/ルートの天井を決めている。ただし母集団を Master 以上に絞った後は取得能力より母集団の新規試合数（1日5,000〜10,000試合）が上限になる。
+- **Production キー**: 現在のパーソナルキーのレート上限は開発キーと同じ 100req/120s（リージョナルホストごと）で、1ランあたり約5,000マッチ/ルートの天井を決めている。ただし母集団を Master 以上に絞った後は取得能力より母集団の新規試合数（1日5,000〜10,000試合）が上限なので、上限の高い Production キーに切り替える実益は現状ない。
 - **保持量の天井**: レコードは gzip 分割シャードで保持し、1ルート 64MB gz（約10万マッチ）＋直近2パッチが上限（`config.maxSealedBytesPerRoute` / `patchesToKeep`）。増やすなら前者を上げる（集計時間とメモリ、`stats-*.json` のサイズが比例して増える。構成数は `maxCompsPerView` で抑えている）。
 - **母集団変更の遡及不可**: レコードに参加者のティアを持たないため、母集団を変えても過去のレコードは絞れない（保持窓から押し出されるまで残る）。
