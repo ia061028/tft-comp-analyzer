@@ -6,7 +6,8 @@ name: collect
 #   aggregate / data ブランチ push / stats.json コミットを全てスキップし、コミット0・デプロイ0。
 #   収集が成功した時（status=ok）だけ:
 #     1) 集計し、data ブランチへ squash force-push（履歴は常に1コミット＝スナップショット）
-#     2) stats.json に実質差分がある時だけ main へコミット（generatedAt だけの変更ではデプロイしない）
+#     2) public/data/（stats.json ＋ パッチ別 stats-*.json）に実質差分がある時だけ main へコミット
+#        （generatedAt だけの変更ではデプロイしない）
 #   実エラー（ルート例外）は collect が exit 1 → ジョブ赤失敗で従来どおり失敗通知を維持する。
 
 on:
@@ -100,34 +101,37 @@ jobs:
           git commit -m "chore(data): snapshot $(date -u +%FT%TZ) (+${{ steps.collect.outputs.new_records }} matches)"
           git push --force origin snapshot:data
 
-      # stats.json は実質差分がある時だけ main にコミット（＝サイト再デプロイ）。
-      # aggregate 側で generatedAt のみの変更はスキップ済みなので、ここで差分があれば実変更。
-      - name: commit stats.json to main (only on substantive change)
+      # public/data/（stats.json ＋ パッチ別 stats-*.json）は実質差分がある時だけ main にコミット
+      # （＝サイト再デプロイ）。aggregate 側で generatedAt のみの変更はスキップ済みなので、
+      # ここで差分があれば実変更。パッチが窓から消えた時のファイル削除も同じコミットに乗る。
+      - name: commit public/data to main (only on substantive change)
         if: steps.collect.outputs.status == 'ok'
         run: |
-          if git diff --quiet -- public/data/stats.json; then
-            echo "stats.json 実質変更なし。コミット・デプロイをスキップ。"
+          if git diff --quiet -- public/data && [ -z "$(git ls-files --others --exclude-standard public/data)" ]; then
+            echo "public/data 実質変更なし。コミット・デプロイをスキップ。"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/data/stats.json
+          git add -A public/data
           git commit -m "chore: stats $(date -u +%FT%TZ)"
           for i in 1 2 3; do
             git push && exit 0
             echo "push 失敗（$i 回目）。origin/main に載せ直して再試行。"
-            # stats.json は生成物なので、競合したら常に今回の生成結果を採用する。
+            # public/data は生成物なので、競合したら常に今回の生成結果を採用する。
             # pull --rebase だと JSON 全体が競合してマージ不能になり、ジョブごと落ちる
             # （2026-08-29 の実例）。ours を退避して origin/main に載せ直す。
-            cp public/data/stats.json "$RUNNER_TEMP/stats.json"
+            rm -rf "$RUNNER_TEMP/public-data"
+            cp -r public/data "$RUNNER_TEMP/public-data"
             git fetch origin main
             git reset --hard origin/main
-            cp "$RUNNER_TEMP/stats.json" public/data/stats.json
-            if git diff --quiet -- public/data/stats.json; then
+            rm -rf public/data
+            cp -r "$RUNNER_TEMP/public-data" public/data
+            if git diff --quiet -- public/data && [ -z "$(git ls-files --others --exclude-standard public/data)" ]; then
               echo "取り込み後は実質差分なし。コミット不要。"
               exit 0
             fi
-            git add public/data/stats.json
+            git add -A public/data
             git commit -m "chore: stats $(date -u +%FT%TZ)"
           done
           exit 1

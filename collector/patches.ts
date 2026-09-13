@@ -56,3 +56,84 @@ export function pickTargetPatch(
   }
   return best[0]
 }
+
+// ---- 日時ベースのパッチ割り当て（Unreal 移行後の game_version プレースホルダ対策） ----
+
+export interface PatchScheduleEntry {
+  /** TFT パッチ表記（例 "18.2"）。そのまま表示ラベルになる。 */
+  patch: string
+  /** このパッチの配信開始（ISO 8601, UTC）。 */
+  since: string
+}
+
+/**
+ * collect が game_version から数値を取れず tft_set_number から合成した "{set}.0" 形式か。
+ * TFT の実パッチは x.1 始まりなので、minor=0 は合成キーと断定できる。
+ */
+export function isSynthesizedPatch(v: string): boolean {
+  return /^\d+\.0$/.test(v)
+}
+
+/**
+ * レコードのパッチキーを決める。
+ * - v が実パッチ（"18.2" 等）ならそのまま返す。
+ * - v が合成キー（"18.0"）なら、同じメジャー（=セット番号）のスケジュールから
+ *   `since <= ts` を満たす最新エントリの patch を返す。該当なし（スケジュール未登録、
+ *   または最初の配信より前の ts）なら v をそのまま返す。
+ *
+ * @param ts game_datetime（epoch 秒）
+ */
+export function resolvePatch(v: string, ts: number, schedule: PatchScheduleEntry[]): string {
+  if (!isSynthesizedPatch(v)) return v
+  const major = v.slice(0, v.indexOf('.'))
+  const tsMs = ts * 1000
+  let resolved = v
+  let resolvedSince = -Infinity
+  for (const entry of schedule) {
+    if (!entry.patch.startsWith(`${major}.`)) continue
+    const since = Date.parse(entry.since)
+    if (Number.isNaN(since) || since > tsMs) continue
+    if (since >= resolvedSince) {
+      resolved = entry.patch
+      resolvedSince = since
+    }
+  }
+  return resolved
+}
+
+/** 集計ビュー。key はファイル名と UI の選択キーに使う（"all" は全パッチ合算）。 */
+export interface PatchView {
+  key: string
+  /** このビューに含めるパッチキー群。 */
+  patches: string[]
+}
+
+export const ALL_PATCHES_KEY = 'all'
+
+/**
+ * 出力する集計ビューを決める。
+ * - ユニークマッチ数 >= threshold のパッチはそれぞれ単独ビューになる（バージョン昇順）。
+ * - 既定ビュー（pickTargetPatch のヒステリシス選定）は閾値未達でも必ず含める。
+ * - 単独ビューが2つ以上あるときだけ、先頭に全パッチ合算ビュー（"all"）を付ける。
+ *   1つしか無ければ合算と同じ内容になるので出さない。
+ * - 空 Map は views 空・defaultKey null。
+ */
+export function planPatchViews(
+  matchCountByPatch: Map<string, number>,
+  threshold: number,
+): { defaultKey: string | null; views: PatchView[] } {
+  const defaultKey = pickTargetPatch(matchCountByPatch, threshold)
+  if (defaultKey === null) return { defaultKey: null, views: [] }
+
+  const single = [...matchCountByPatch.entries()]
+    .filter(([patch, count]) => count >= threshold || patch === defaultKey)
+    .map(([patch]) => patch)
+    .sort(compareVersions)
+
+  const views: PatchView[] = single.map((patch) => ({ key: patch, patches: [patch] }))
+  if (single.length >= 2) {
+    const all = [...matchCountByPatch.keys()].sort(compareVersions)
+    views.unshift({ key: ALL_PATCHES_KEY, patches: all })
+  }
+  return { defaultKey, views }
+}

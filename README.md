@@ -11,6 +11,7 @@ TFT（Teamfight Tactics）のプレイ支援用Webアプリ。Riot API から高
 - **発動シナジー**: その構成で過半数発動している特性を、発動ユニット数つきで表示（例: ブロウラー2 / チャレンジャー4）。
 - **ユニット表示**: 代表ユニットを★（スター）・推奨完成アイテム・装備紋章つきで表示（metatft風）。
 - **ユニット数で絞り込み**: 全体 / 盤面ユニット数7〜10で構成を出し分け（プレイヤーレベルではなく実際の盤面ユニット数）。
+- **パッチで絞り込み**: 全体（現セットの全パッチ合算）/ パッチごと（例 18.1 / 18.2）で構成を出し分け。既定は十分なサンプルが集まった最新パッチ。パッチごとに集計ファイルを分けて配信しており、切替時にそのファイルを読む。
 - **日英切替**: 特性/ユニット/紋章/アイテム名を日↔英でトグル。
 - **チームコードのコピー**: クライアントのチームプランナーに貼れるコードを生成（※形式は検証中。下記「既知の課題」）。
 
@@ -19,11 +20,12 @@ TFT（Teamfight Tactics）のプレイ支援用Webアプリ。Riot API から高
 ```
 collector/ (GitHub Actions, 6時間ごと)
   collect.ts        Riot API → data ブランチの records/{route}.ndjson（参加者1人=1レコード）に追記
-  aggregate.ts       records → public/data/stats.json（集計I/O層）
+  aggregate.ts       records → public/data/stats.json ＋ パッチ別 stats-{patch}.json（集計I/O層）
+  patches.ts         パッチ比較・日時ベースのパッチ割り当て・出力ビュー選定（純関数、テスト付き）
   aggregate-core.ts  集計ロジック本体（純関数、テスト付き）
   cdragon.ts         Community Dragon から trait/unit/emblem/item 辞書（日英名・アイコン・プランナーcode）
 src/ (Vite + React, Cloudflare Pages配信)
-  stats.json を fetch して表示（クライアント側で再集計・絞り込み）
+  stats.json を fetch して表示（クライアント側で再集計・絞り込み）。パッチ切替時は stats-{patch}.json を追加 fetch
 shared/types.ts  収集側とフロントの共有型（ParticipantRecord, StatsFile, CompStats ...）
 ```
 
@@ -31,6 +33,7 @@ shared/types.ts  収集側とフロントの共有型（ParticipantRecord, Stats
 - 構成 = **盤面ユニット集合が完全一致するレコード群**（クラスタリングなし）。
 - 召喚・非ショップユニットは盤面から除外しつつ特性寄与は記録し、紋章の活用判定（盤面実効特性数がブレークポイントちょうど=活用度+1、超過=+0.5）に反映する。
 - 構成ごとに: 代表ユニット/★/推奨アイテム、紋章ごとの装備者(holders)、紋章活用シグネチャ(sigs) を集計。低nの構成は出力から枝刈り。
+- パッチはレコードの試合日時を `config.patchSchedule`（配信日時表）に当てて割り当てる（セット18 以降 Riot の `game_version` がプレースホルダでパッチ番号を返さないため）。**新パッチが配信されたら `collector/config.ts` の `patchSchedule` に1行追加する**。
 
 ## セットアップ
 
@@ -48,14 +51,14 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 | `npm run lint` | ESLint |
 | `npm test` | テスト（collector の aggregate-core/patches/state、src の multiset/format/i18n） |
 | `npm run collect` | Riot API からマッチ収集 → `data/state/` に追記（`.env` のキー使用） |
-| `npm run aggregate` | `data/state/` → `public/data/stats.json` 集計 |
+| `npm run aggregate` | `data/state/` → `public/data/stats.json`（既定パッチ）＋ `stats-{patch}.json` / `stats-all.json` 集計 |
 | `npm run data:pull` | `data/state` を orphan ブランチ `data` の最新スナップショットに同期 |
 
 ## データ運用
 
 収集状態（records/seen/meta）の正本は main とは別の **orphan ブランチ `data`**。main には一切コミットされない。詳細は [ARCHITECTURE.md](ARCHITECTURE.md) を参照。
 
-- **CI 収集**: `.github/workflows/collect.yml` が6時間ごとに collect→aggregate→data ブランチへ squash force-push→（実質差分があれば）stats.json を main へコミット。Cloudflare Pages が push で自動再デプロイ。
+- **CI 収集**: `.github/workflows/collect.yml` が6時間ごとに collect→aggregate→data ブランチへ squash force-push→（実質差分があれば）`public/data/` を main へコミット。Cloudflare Pages が push で自動再デプロイ。
 - **キー失効 = no-op**: collect は冒頭の認証プリフライトで 401/403 を検出すると `status=auth_expired` を出して exit 0（state 不変）。この場合 aggregate・data ブランチ push・stats.json コミットは全てスキップされ、コミット0・デプロイ0。スティッキー issue（ラベル `riot-key`）が起票され（初回のみ通知、以後は本文編集のみ）、キー復旧後の次回実行で自動クローズされる。実際のルート例外時のみジョブが赤失敗する。
 - **APIキー**: CI が使うのは **GitHubリポジトリ Secret `RIOT_API_KEY`**（ローカル `.env` ではない）。開発キーは**24時間で失効**するので、上記の no-op パスに入る。`gh secret set RIOT_API_KEY --body "RGAPI-..."`（パイプ流し込みは BOM/改行混入の恐れがあるため `--body`）または Settings→Secrets→Actions で更新。恒久対応は**本番APIキー**への切替。
 - **ローカルでの収集状態同期**: 初回は `git clone --depth 1 --branch data https://github.com/ia061028/tft-comp-analyzer.git data/state`、以後は `npm run data:pull`。
@@ -65,6 +68,6 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 
 - **チームコードの形式**: 現行は `02` + 各チャンピオン12bit(3桁hex, team_planner_code) + `TFTSet{n}`。実機での有効性は要再検証（クライアント生成コードとの突き合わせ）。
   セット18 では Lux の9変種（`DA_18_Lux_*` 等、Avatar 特性でトレイト別に姿が変わる5コスト）が Riot のチームプランナー定義に無く `team_planner_code` を持たないため、その枠は `000` になる。
-- **セット18 対応の残作業**: `config.tftPatchLabels` にセット18（TFT 18.1〜）の内部パッチキーが未登録。APIキー復旧後の最初の成功 collect のログ「パッチ×セット（新規分）」で実値を確認して追記する（`game_version` が既に TFT 表記なら追記不要）。
+- **パッチ境界は日時で近似**: セット18 以降 `game_version` がプレースホルダのため、パッチは `config.patchSchedule` の配信日時（UTC 00:00 目安）で割り当てている。実際の配信はリージョンごとに数時間ずれるので境界付近の試合は数時間分ずれうる。Riot が `game_version` を直せば実パッチキーが優先される（その場合は `config.tftPatchLabels` に表記を追加）。
 - **本番APIキー**: 開発キーは24時間で失効する。レート上限も開発キーは 100req/120s（リージョナルホストごと）で、これが1ランあたり約6,000マッチの天井を決めている。本番キーで上限が上がればサンプル数はストレージ（100MB/ファイル）側の天井まで伸ばせる。
 - **サンプル数をさらに増やすには**: 1レコード約900バイトのうち未使用の `tc` や `ui` を削るとレコードが縮み、同じ100MB枠で保持マッチ数を増やせる（レコードスキーマの破壊的変更を伴う）。

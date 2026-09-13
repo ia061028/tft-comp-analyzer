@@ -136,6 +136,21 @@ export interface WireComp {
   g: [number[], number, number, number, number][]
 }
 
+/**
+ * パッチ別集計ファイルの一覧（全ファイルに同じ内容で埋め込む）。
+ * フロントはこれをパッチ選択 UI に使い、選択に応じて file を fetch する。
+ */
+export interface PatchIndexEntry {
+  /** 選択キー。"all" は全パッチ合算、それ以外は TFT パッチ表記（例 "18.2"）。 */
+  key: string
+  /** 表示ラベル（"all" は "18.1–18.2" のような範囲表記。UI 側で「全体」に置き換える）。 */
+  label: string
+  /** public/data/ 直下のファイル名（既定ビューは "stats.json"）。 */
+  file: string
+  /** そのビューのユニークマッチ数。 */
+  matches: number
+}
+
 /** stats.json 全体のオンディスク圧縮形式。 */
 export interface WireStatsFile {
   schemaVersion: 4
@@ -154,15 +169,17 @@ export interface WireStatsFile {
   items: ItemInfo[]
   comps: WireComp[]
   baseItemIcons?: { spatula: string; fryingPan: string }
+  /** パッチ別ビューの一覧（旧ファイルは欠落＝単一ビュー）。 */
+  patches?: PatchIndexEntry[]
 }
 
 /** public/data/stats.json をデコードしたフロント内部の表現。 */
 export interface StatsFile {
   schemaVersion: number
   generatedAt: string
-  /** 内部パッチキー（game_version 由来、例 "16.12"） */
+  /** 内部パッチキー（game_version 由来、例 "16.12"。全パッチ合算ビューは "all"） */
   patch: string
-  /** 表示用 TFT バージョン（例 "17.5"。未マップ時は patch にフォールバック） */
+  /** 表示用 TFT バージョン（例 "17.5"。未マップ時は patch にフォールバック。合算ビューは範囲表記） */
   tftPatch: string
   setNumber: number
   totals: {
@@ -177,4 +194,6 @@ export interface StatsFile {
   comps: CompStats[]
   /** 合成素材アイコン（紋章グリッドのカテゴリヘッダ用） */
   baseItemIcons?: { spatula: string; fryingPan: string }
+  /** パッチ別ビューの一覧（このファイル自身も含む）。1件以下ならパッチ選択 UI は出さない。 */
+  patches: PatchIndexEntry[]
 }
