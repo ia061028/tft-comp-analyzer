@@ -7,7 +7,7 @@ TFT紋章構成アナライザーの実装アーキテクチャ。設計判断�
 - **スタック**: React 19 + Vite 8 + Tailwind v4 + TypeScript。ビルド成果物は純粋な静的SPA。
 - **配信**: Cloudflare Pages が `main` への push を検知して自動ビルド・配信（https://tft-comp-analyzer.pages.dev/）。サーバーサイドは一切持たない。
 - **データ収集**: GitHub Actions（`cron 17 */6 * * *` + `workflow_dispatch`）。Riot API から Challenger / GM / Master（設定で Diamond も追加可）の TFT ランクマッチを収集する。
-- **フロントの役割**: ビルド済みの `public/data/stats.json` を実行時 fetch し、クライアント側で紋章選択に応じた再集計・フィルタ・並べ替えを行う。バックエンドAPIは無い。
+- **フロントの役割**: ビルド済みの `public/data/stats.json` を実行時 fetch し、クライアント側で紋章選択に応じた再集計・フィルタ・並べ替えを行う。パッチを切り替えると同ディレクトリの `stats-{patch}.json` を追加 fetch する。バックエンドAPIは無い。
 
 ## データフロー
 
@@ -36,7 +36,7 @@ TFT紋章構成アナライザーの実装アーキテクチャ。設計判断�
                 └───────┬───────────┘
                          │ 実質差分がある時だけ
                          ▼
-          public/data/stats.json（main へコミット）
+          public/data/stats.json ＋ stats-{patch}.json（main へコミット）
                          │
                          ▼
                 ┌──────────────────┐
@@ -47,7 +47,7 @@ TFT紋章構成アナライザーの実装アーキテクチャ。設計判断�
               （src/lib/data.ts が実行時 fetch）
 ```
 
-collect と aggregate は同じ CI ジョブ内で直列に実行されるが、**状態の持ち先が違う**点が肝。records/seen は `data` ブランチ、集計結果の `stats.json` だけが `main` に乗る。
+collect と aggregate は同じ CI ジョブ内で直列に実行されるが、**状態の持ち先が違う**点が肝。records/seen は `data` ブランチ、集計結果の `public/data/`（`stats.json` とパッチ別ファイル）だけが `main` に乗る。
 
 ## データモデル v3
 
@@ -92,10 +92,30 @@ collect と aggregate は同じ CI ジョブ内で直列に実行されるが、
 
 セット境界の分離は2段構え:
 
-1. **パッチ（`v`）**: `pickTargetPatch` が「ユニークマッチ数 >= `patchSwitchThreshold` の最新パッチ」を選ぶ（ヒステリシス）。新セットが別パッチで始まる通常ケースはこれで足りる。
-2. **セット番号（`s` = `tft_set_number`）**: 対象パッチ内でさらに最頻セットに絞る（`pickTargetSet`）。`s` を持たない旧レコードは残す。同一 `game_version` 内でセットが切り替わる場合にパッチだけでは分離できないため、一次情報として記録している。
+1. **セット番号（`s` = `tft_set_number`）**: 最頻セットに絞る（`pickTargetSet`）。`s` を持たない旧レコードは残す。同一 `game_version` 内でセットが切り替わる場合にパッチだけでは分離できないため、一次情報として記録している。
+2. **パッチ（`v`）**: 対象セット内でパッチごとに集計ビューを作る（次節）。既定ビューは `pickTargetPatch` が「ユニークマッチ数 >= `patchSwitchThreshold` の最新パッチ」を選ぶ（ヒステリシス）。
 
-なお `config.tftPatchLabels`（内部パッチキー → TFT 表記）は計算で導けない手動マップ。未登録のときは内部パッチをそのまま表示し、aggregate が警告を出す。新パッチ・新セットでは collect ログの「パッチ×セット（新規分）」で実値を確認して1行追加する。
+なお `config.tftPatchLabels`（内部パッチキー → TFT 表記）は計算で導けない手動マップ。未登録のときは内部パッチをそのまま表示し、aggregate が警告を出す。`patchSchedule` 由来のキー（次節）は TFT 表記そのものなので登録不要。
+
+### パッチの割り当てとパッチ別ビュー
+
+**パッチは試合日時で割り当てる。** セット18（Unreal 移行）以降、Riot の `game_version` は `"TFT Unreal Version ?.?.?.?"` というプレースホルダでパッチ番号を返さない。collect は `tft_set_number` から `"{set}.0"` を合成して `v` に入れ、aggregate が各レコードの `ts`（game_datetime）を `config.patchSchedule`（`{ patch, since }` の配信日時表）に当てて実パッチ（`18.1` / `18.2` …）へ置き換える（`resolvePatch`）。
+
+- `v` が実パッチ（minor ≠ 0）ならスケジュールを見ずそのまま使う。Riot が `game_version` を直した時に自然に切り替わるため。
+- 境界は単一の UTC 時刻。実際の配信はリージョンごとに数時間ずれる（OCE→KR→EU→NA）が、配信前後はメンテナンスで試合がほぼ無いので実用上は足りる。
+- **運用**: 新パッチが配信されたら `config.patchSchedule` に1行追加する。忘れると新パッチの試合が最後のエントリ（旧パッチ）に混ざる。
+
+**出力はビューごとに1ファイル**（`planPatchViews`）:
+
+| ビュー | 条件 | ファイル |
+|---|---|---|
+| 既定パッチ | `pickTargetPatch` のヒステリシス選定 | `public/data/stats.json` |
+| 各パッチ | ユニークマッチ数 >= `patchSwitchThreshold` | `public/data/stats-{patch}.json` |
+| 全パッチ合算 `all` | 単独ビューが2つ以上あるときだけ | `public/data/stats-all.json` |
+
+全ファイルは同じスキーマ（`WireStatsFile`）で、`patches` に同一の一覧（`key` / `label` / `file` / `matches`）を埋め込む。フロントは最初に `stats.json` を読み、その `patches` からセグメントコントロールを作り、選択に応じて該当ファイルを fetch してメモリにキャッシュする。紋章の intern（`emblems` 配列）はファイルごとに「レコードに現れた紋章」だけなのでインデックスが変わりうる。切替時は選択中の紋章を apiName 経由で新ファイルのインデックスへ写す（`remapSelection`）。
+
+パッチがローリング窓から消えれば、そのビューは次回の aggregate で生成されず、aggregate が旧 `stats-*.json` を削除する（CI は `public/data` をディレクトリごと `git add -A` する）。
 
 ### ローリング窓（prune ポリシー）
 
@@ -135,7 +155,8 @@ Challenger / Grandmaster / Master に加え、`config.entryTiers`（DIAMOND〜IR
 - **`collector/aggregate-core.ts`**: 集計ロジック本体。`fs` / `fetch` / `process` / `console` に依存しない純関数群（`splitBoardUnits`, `classifyEmblems`, `pickTargetSet`, `buildStats` など）。テスト（`*.test.ts`）はここに対して書く。
 - **`collector/cdragon.ts`**: CDragon 取得の I/O 層。ただし紋章判定（`isEmblemItemLoose`, `resolveEmblemTraits`, `classifyBase`, `emblemIconRe`）はネットワーク非依存の純関数として export しており、`cdragon.test.ts` がここを直接テストする。
 - **`collector/collect.ts`**: 収集の I/O 層。末尾にエントリガード（`process.argv[1]` と `import.meta.url` の一致判定）があり、テストから `buildRecords` を import しても収集は走らない。
-- **`collector/aggregate.ts`**: I/O 層。`data/state/records/*.ndjson` の読み込み、CDragon 静的データの取得、`aggregate-core.ts` の呼び出し、`public/data/stats.json` への書き出しを担当。
+- **`collector/patches.ts`**: パッチ比較（`compareVersions`）、既定パッチのヒステリシス選定（`pickTargetPatch`）、日時ベースのパッチ割り当て（`resolvePatch`）、出力ビュー選定（`planPatchViews`）。全て純関数で `patches.test.ts` が対象。
+- **`collector/aggregate.ts`**: I/O 層。`data/state/records/*.ndjson` の読み込み、CDragon 静的データの取得、パッチ割り当て、ビューごとの `aggregate-core.ts` 呼び出し、`public/data/stats.json` / `stats-{patch}.json` への書き出し（実質差分のないファイルは触らず、不要になった旧ファイルは削除）を担当。
 
 ## CI フローとキー失効 no-op 設計
 
@@ -144,16 +165,16 @@ Challenger / Grandmaster / Master に加え、`config.entryTiers`（DIAMOND〜IR
 ```
 collect（認証プリフライト）
   ├─ 401/403 検出 → status=auth_expired を出力して exit 0
-  │     └─ 後続の aggregate / data ブランチ push / stats.json コミットを全てスキップ
+  │     └─ 後続の aggregate / data ブランチ push / public/data コミットを全てスキップ
   │        （コミット0・デプロイ0。state にも一切触れない）
   ├─ 成功 → status=ok, new_records=<件数> を出力
-  │     └─ aggregate → data ブランチへ squash force-push → stats.json に実質差分があれば main へコミット
+  │     └─ aggregate → data ブランチへ squash force-push → public/data に実質差分があれば main へコミット
   └─ 実エラー（ルート例外） → status を出さず exit 1 → ジョブが赤失敗
 ```
 
 - **通知**: キー失効時はスティッキー issue（ラベル `riot-key`）を使う。既に open な issue があれば本文を編集するだけ（通知なし）、無ければ新規作成（初回のみ通知）。これにより「6時間ごとに失効通知が飛び続ける」事態を避けつつ、失効状態は issue の存在で可視化される。
 - **復旧**: キー更新後の次回実行で `status=ok` になったら、open な `riot-key` issue を自動クローズする。
-- **stats.json のコミット判定**: `aggregate.ts` は決定的な出力を生成するため、`generatedAt` 以外の実質差分が無ければ `stats.json` を書き換えない。CI 側は `git diff --quiet` で確認し、差分が無ければコミット・pushをスキップする（＝Cloudflare Pages の無駄な再デプロイを防ぐ）。
+- **public/data のコミット判定**: `aggregate.ts` は決定的な出力を生成するため、`generatedAt` 以外の実質差分が無いファイルは書き換えない。CI 側は `public/data` ディレクトリの `git diff --quiet` と未追跡ファイルの有無で確認し、差分が無ければコミット・pushをスキップする（＝Cloudflare Pages の無駄な再デプロイを防ぐ）。ファイルの追加・削除（パッチの出現・窓からの退出）も同じ判定に乗る。
 
 ## data ブランチ運用
 

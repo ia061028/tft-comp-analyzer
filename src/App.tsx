@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { StatsFile } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
-import { loadStats } from './lib/data'
+import { loadStats, remapSelection, DEFAULT_STATS_FILE, ALL_PATCHES_KEY } from './lib/data'
 import { maxEmblemMultiplicity } from './lib/multiset'
 import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
@@ -20,6 +20,15 @@ const LANG_STORAGE_KEY = 'tft-lang'
 function App() {
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
   const [reloadKey, setReloadKey] = useState(0)
+  // 表示中（または読み込み中）のパッチビューのファイル名。既定は stats.json（集計側の既定パッチ）。
+  const [patchFile, setPatchFile] = useState<string>(DEFAULT_STATS_FILE)
+  // 既に表示中のデータがある状態で別パッチへ切り替えている間 true（旧データは出したまま）。
+  const [switching, setSwitching] = useState(false)
+  const [switchError, setSwitchError] = useState<string | null>(null)
+  // ファイルごとの復元済みデータ。パッチを行き来しても再 fetch しない。
+  const cacheRef = useRef(new Map<string, StatsFile>())
+  // 表示中の stats への参照。切替時に紋章選択を新ファイルのインデックスへ写すのに使う。
+  const shownRef = useRef<StatsFile | null>(null)
 
   const [selection, setSelection] = useState<number[]>([])
   // 既定は平均順位。同点は 1位率 → Top4率 の順で決まる（CompList の PRIORITY）。
@@ -34,20 +43,47 @@ function App() {
 
   useEffect(() => {
     let cancelled = false
-    loadStats()
+    const apply = (stats: StatsFile) => {
+      const prev = shownRef.current
+      // 紋章 intern はファイルごとに異なるので、選択を apiName 経由で写す。
+      if (prev && prev !== stats) setSelection((s) => remapSelection(s, prev.emblems, stats.emblems))
+      shownRef.current = stats
+      setLoad({ status: 'ready', stats })
+      setSwitching(false)
+      // switchError はここでは消さない。切替失敗時は元ファイル（キャッシュ済み）へ戻す際に
+      // この apply が走るので、消すとエラー表示が一瞬で消えてしまう。クリック時に消す。
+    }
+    const cached = cacheRef.current.get(patchFile)
+    if (cached) {
+      apply(cached)
+      return
+    }
+    const initial = shownRef.current === null
+    if (initial) setLoad({ status: 'loading' })
+    else setSwitching(true)
+    loadStats(patchFile)
       .then((stats) => {
         if (cancelled) return
-        setLoad({ status: 'ready', stats })
+        cacheRef.current.set(patchFile, stats)
+        apply(stats)
       })
       .catch((err: unknown) => {
         if (cancelled) return
         const message = err instanceof Error ? err.message : String(err)
-        setLoad({ status: 'error', message })
+        if (shownRef.current === null) {
+          setLoad({ status: 'error', message })
+        } else {
+          // 切替失敗: 表示中のデータを保持し、選択もそのファイルへ戻す。
+          setSwitching(false)
+          setSwitchError(message)
+          const back = shownRef.current
+          setPatchFile(back.patches.find((p) => p.key === back.patch)?.file ?? DEFAULT_STATS_FILE)
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [reloadKey])
+  }, [patchFile, reloadKey])
 
   // 表示言語を localStorage に同期し、<html lang> も更新する。
   useEffect(() => {
@@ -142,6 +178,13 @@ function App() {
 
   const selectedCount = selection.length
 
+  // パッチ選択肢。集計側が全ファイルに同じ一覧を埋め込んでいる。1件以下なら選択 UI は出さない。
+  const patchOptions = stats.patches.map((p) => ({
+    key: p.file,
+    label: p.key === ALL_PATCHES_KEY ? t(lang, 'all') : p.label,
+  }))
+  const currentPatchFile = stats.patches.find((p) => p.key === stats.patch)?.file ?? patchFile
+
   return (
     <div className="mx-auto flex h-screen w-full max-w-[1480px] flex-col">
       {/* タイトル＆情報ヘッダー */}
@@ -179,6 +222,38 @@ function App() {
       {/* スティッキー・フィルタツールバー */}
       <div className="sticky top-0 z-10 border-b border-line bg-base/85 px-5 py-2.5 backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5">
+          {patchOptions.length > 1 && (
+            <div className="flex items-center gap-2.5 text-sm">
+              <span
+                className="cursor-help text-xs font-semibold uppercase tracking-wide text-faint"
+                title={t(lang, 'patchTitle')}
+              >
+                {t(lang, 'patch')}
+              </span>
+              <SegmentedControl<string>
+                ariaLabel={t(lang, 'patch')}
+                value={switching ? patchFile : currentPatchFile}
+                onChange={(file) => {
+                  setSwitchError(null)
+                  setPatchFile(file)
+                }}
+                options={patchOptions}
+              />
+              {switching && (
+                <span
+                  className="h-4 w-4 animate-spin rounded-full border-2 border-line-strong border-t-gold"
+                  aria-label={t(lang, 'loading')}
+                  role="status"
+                />
+              )}
+              {switchError && !switching && (
+                <span className="text-xs text-red-400/80" role="alert" title={switchError}>
+                  {t(lang, 'patchLoadFailed')}
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-2.5 text-sm">
             <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t(lang, 'boardSize')}</span>
             <SegmentedControl<SizeKey>
