@@ -1,16 +1,18 @@
 // data/state/ 配下の NDJSON 状態管理。追記専用でクラッシュ安全に運用する。
+// records の封印・保持は shards.ts / retention.ts が担当する。
 
-import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ParticipantRecord } from '../shared/types.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 // collector/ の一つ上がリポジトリルート。
-const STATE_DIR = join(here, '..', 'data', 'state')
-const SEEN_DIR = join(STATE_DIR, 'seen')
-const RECORDS_DIR = join(STATE_DIR, 'records')
+export const STATE_DIR = join(here, '..', 'data', 'state')
+export const SEEN_DIR = join(STATE_DIR, 'seen')
+export const RECORDS_DIR = join(STATE_DIR, 'records')
 const META_PATH = join(STATE_DIR, 'meta.json')
+const GITATTRIBUTES_PATH = join(STATE_DIR, '.gitattributes')
 
 export interface RouteMeta {
   /** 前回実行の開始時刻（epoch秒） */
@@ -20,6 +22,11 @@ export interface RouteMeta {
 export interface Meta {
   schemaVersion: 1
   routes: Record<string, RouteMeta>
+  /**
+   * seen を溜め始めた基準時刻（config.collectSinceEpoch の値）。
+   * これが設定値と異なれば「セットが替わった」とみなして seen をリセットする。
+   */
+  collectSince?: number
 }
 
 function ensureDirs(): void {
@@ -71,133 +78,50 @@ export function appendSeen(route: string, ids: string[]): void {
   appendFileSync(seenPath(route), ids.map((id) => id + '\n').join(''))
 }
 
-/** 参加者レコードを1行1件のJSONで追記する（追記専用）。 */
+/** 参加者レコードを1行1件のJSONでアクティブシャードへ追記する（追記専用）。 */
 export function appendRecords(route: string, records: ParticipantRecord[]): void {
   if (records.length === 0) return
   ensureDirs()
   appendFileSync(recordsPath(route), records.map((r) => JSON.stringify(r) + '\n').join(''))
 }
-/** prune の1行分の解析結果。 */
-interface PruneLine {
-  line: string
-  /** JSON として読めなかった行（常に保持する安全側の扱い）。 */
-  unparsable: boolean
-  s?: number
-  m?: string
-  ts: number
+
+/**
+ * seen をリセットすべきか。
+ * - meta に collectSince が無い（旧レイアウト）: リセットせず現値を採用するだけ（初回の再取得嵐を避ける）。
+ * - 同値: しない。
+ * - 異なる: する（セットが替わった＝旧セットの ID は API から取れないので seen に残す意味が無い）。
+ */
+export function shouldResetSeen(metaValue: number | undefined, configValue: number): boolean {
+  if (metaValue === undefined) return false
+  return metaValue !== configValue
 }
 
 /**
- * NDJSON 内容をローリング窓ポリシーでフィルタする純関数。
- *
- * 1. **旧セットの切り捨て**: `s`(tft_set_number) を持つ行が1件でもあれば、最大の `s` 以外を落とす。
- *    `s` を持たない旧形式レコードもここで落ちる。`s` を持つ行が皆無なら何もしない（全消し防止）。
- * 2. **窓あふれの切り捨て**: 残った行の合計バイト数が maxBytes を超える場合、マッチ単位（`m`）で
- *    新しい順に保持し、はみ出したマッチを丸ごと落とす。マッチを分断しないのは、1マッチ8参加者が
- *    揃っていないと totals.matches が実態とずれるため。
- *    件数ではなくバイト数で切るのは GitHub の 100MB/ファイル上限に当てないため。
- *
- * パース不能行は常に保持し、窓の予算からも除外する（安全側）。
- * 出力は元の行順を維持する（append-only に近い形を保ち、git のデルタ圧縮を効かせるため）。
+ * config.collectSinceEpoch が変わっていれば seen/*.ndjson を空にする。meta.collectSince を現値に更新する
+ * （呼び出し側が saveMeta する）。戻り値はリセットしたか。
  */
-export function filterNdjsonForWindow(
-  content: string,
-  maxBytes: number,
-): { out: string; kept: number; droppedOldSet: number; droppedOverflow: number; targetSet: number | null } {
-  const parsed: PruneLine[] = []
-  for (const line of content.split('\n')) {
-    if (line.trim() === '') continue
-    try {
-      const rec = JSON.parse(line) as { s?: unknown; m?: unknown; ts?: unknown }
-      parsed.push({
-        line,
-        unparsable: false,
-        s: typeof rec.s === 'number' ? rec.s : undefined,
-        m: typeof rec.m === 'string' ? rec.m : undefined,
-        ts: typeof rec.ts === 'number' ? rec.ts : 0,
-      })
-    } catch {
-      parsed.push({ line, unparsable: true, ts: 0 })
+export function resetSeenIfSetChanged(meta: Meta, configValue: number): boolean {
+  const reset = shouldResetSeen(meta.collectSince, configValue)
+  if (reset && existsSync(SEEN_DIR)) {
+    for (const f of readdirSync(SEEN_DIR)) {
+      if (f.endsWith('.ndjson')) writeFileSync(join(SEEN_DIR, f), '')
     }
   }
-
-  // 1. 旧セットの切り捨て。
-  let targetSet: number | null = null
-  for (const p of parsed) {
-    if (p.s !== undefined && (targetSet === null || p.s > targetSet)) targetSet = p.s
-  }
-  let droppedOldSet = 0
-  const afterSet = parsed.filter((p) => {
-    if (p.unparsable) return true
-    if (targetSet === null) return true
-    if (p.s === targetSet) return true
-    droppedOldSet++
-    return false
-  })
-
-  // 2. 窓あふれの切り捨て（マッチ単位・新しい順・バイト予算）。
-  // 件数ではなくバイト数で切るのは、GitHub のハード上限が 100MB/ファイルであり、
-  // レコードの実サイズが変わっても上限に当たらないようにするため。
-  // 件数で切っていた頃は「1レコード約705バイト」という実測を前提に 120,000件としていたが、
-  // レコードが少し大きくなるだけで push が弾かれ、収集が完全停止するリスクがあった。
-  let droppedOverflow = 0
-  let survivors = afterSet
-  const budgeted = afterSet.filter((p) => !p.unparsable)
-  const bytesOf = (line: string): number => Buffer.byteLength(line, 'utf8') + 1 // +1 は改行
-  const totalBytes = budgeted.reduce((s, p) => s + bytesOf(p.line), 0)
-  if (maxBytes > 0 && totalBytes > maxBytes) {
-    // マッチごとの代表 ts（最大値）とバイト数を集計。
-    const byMatch = new Map<string, { ts: number; bytes: number }>()
-    for (const p of budgeted) {
-      const key = p.m ?? ''
-      const b = bytesOf(p.line)
-      const cur = byMatch.get(key)
-      if (cur === undefined) byMatch.set(key, { ts: p.ts, bytes: b })
-      else {
-        cur.bytes += b
-        if (p.ts > cur.ts) cur.ts = p.ts
-      }
-    }
-    // 新しい順。同 ts はマッチID昇順で決定的に。
-    const order = [...byMatch.entries()].sort((a, b) =>
-      b[1].ts !== a[1].ts ? b[1].ts - a[1].ts : a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
-    )
-    const keepMatches = new Set<string>()
-    let budget = maxBytes
-    for (const [m, info] of order) {
-      if (info.bytes > budget) break
-      keepMatches.add(m)
-      budget -= info.bytes
-    }
-    survivors = afterSet.filter((p) => {
-      if (p.unparsable) return true
-      if (keepMatches.has(p.m ?? '')) return true
-      droppedOverflow++
-      return false
-    })
-  }
-
-  const keptLines = survivors.map((p) => p.line)
-  const out = keptLines.length > 0 ? keptLines.join('\n') + '\n' : ''
-  return { out, kept: keptLines.length, droppedOldSet, droppedOverflow, targetSet }
+  meta.collectSince = configValue
+  return reset
 }
 
+/** data ブランチ用 .gitattributes の内容。gz を binary にしないと Windows で CRLF 変換されて壊れる。 */
+export const DATA_GITATTRIBUTES = '*.ndjson text eol=lf\n*.json text eol=lf\n*.gz binary\n'
+
 /**
- * records/{route}.ndjson をローリング窓ポリシーで書き換える。
- * 1行も落ちなければファイルに触らない（append-only を維持し git delta を保つ）。
- * ファイルが存在しなければ何もしない。
+ * data/state/.gitattributes を（内容が違う時だけ）書く。CI の push ステップは `git add -A` なので
+ * 次回の成功ランで data ブランチに乗る。戻り値は書き換えたか。
  */
-export function pruneRecords(
-  route: string,
-  maxBytes: number,
-): { kept: number; droppedOldSet: number; droppedOverflow: number; targetSet: number | null } {
-  const path = recordsPath(route)
-  if (!existsSync(path)) return { kept: 0, droppedOldSet: 0, droppedOverflow: 0, targetSet: null }
-  const content = readFileSync(path, 'utf8')
-  const { out, kept, droppedOldSet, droppedOverflow, targetSet } = filterNdjsonForWindow(
-    content,
-    maxBytes,
-  )
-  if (droppedOldSet + droppedOverflow > 0) writeFileSync(path, out)
-  return { kept, droppedOldSet, droppedOverflow, targetSet }
+export function ensureDataGitattributes(path: string = GITATTRIBUTES_PATH): boolean {
+  const current = existsSync(path) ? readFileSync(path, 'utf8') : null
+  if (current === DATA_GITATTRIBUTES) return false
+  ensureDirs()
+  writeFileSync(path, DATA_GITATTRIBUTES)
+  return true
 }

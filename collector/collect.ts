@@ -12,8 +12,13 @@ import {
   loadSeen,
   appendSeen,
   appendRecords,
-  pruneRecords,
+  resetSeenIfSetChanged,
+  ensureDataGitattributes,
+  RECORDS_DIR,
 } from './state.ts'
+import { sealAndPrune } from './shards.ts'
+import { logSealAndPrune } from './seal-log.ts'
+import { retentionFloor } from './patches.ts'
 import { appendFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import type { ParticipantRecord } from '../shared/types.ts'
@@ -109,7 +114,7 @@ function shuffle<T>(arr: T[]): T[] {
   return arr
 }
 
-/** master 帯から count 人をランダムに重複なしで抽選（Fisher-Yates 部分シャッフル）。 */
+/** count 人をランダムに重複なしで抽選（Fisher-Yates 部分シャッフル）。 */
 function sample<T>(arr: T[], count: number): T[] {
   if (arr.length <= count) return arr.slice()
   const copy = arr.slice()
@@ -122,8 +127,28 @@ function sample<T>(arr: T[], count: number): T[] {
 
 // ---- パイプライン ----
 
+export type PoolMode = 'highTier' | 'fallback'
+
+/**
+ * 母集団モード。ルート内の Master 以上が minHighTierPool 人以上なら高ランク帯のみ（highTier）、
+ * 未満なら Diamond 以下の entries で補充する（fallback。セット開始直後・小規模ルート対策）。
+ */
+export function decidePoolMode(highTierCount: number, minHighTierPool: number): PoolMode {
+  return highTierCount >= minHighTierPool ? 'highTier' : 'fallback'
+}
+
+/** プールが上限を超えたときだけランダムに間引く。上限以下ならそのまま（順序も保持）。 */
+export function samplePool<T>(pool: T[], maxPool: number): T[] {
+  return pool.length > maxPool ? sample(pool, maxPool) : pool
+}
+
 /**
  * ルートの puuid プールを構築。
+ * 1. 全プラットフォームの Challenger / Grandmaster / Master を全員入れる（抽選しない）。
+ * 2. ルート合計が config.minHighTierPoolPerRoute 未満なら、entries（Diamond 以下）で補充する。
+ * 3. config.maxPoolPerRoute を超えたら間引く。
+ * リーグ一覧はプラットフォームホスト＝マッチ取得のリージョナルホストとは別のレート枠なので、
+ * 母集団の広さはマッチ取得の予算を食わない。
  * challenger は事前取得済み（認証プリフライト結果の再利用）の場合があるため引数で受ける。
  */
 async function buildPuuidPool(
@@ -132,62 +157,83 @@ async function buildPuuidPool(
 ): Promise<string[]> {
   const platforms = platformsForRoute(route)
   const puuids = new Set<string>()
+  const addAll = (entries: LeagueEntry[]): number => {
+    let added = 0
+    for (const e of entries) {
+      if (!e.puuid) continue
+      if (!puuids.has(e.puuid)) {
+        puuids.add(e.puuid)
+        added++
+      }
+    }
+    return added
+  }
 
   for (const platform of platforms) {
     const host = platformHost(platform)
-
     const challenger =
       preloadedChallenger.get(platform) ??
       (await client.get<LeagueList>(`${host}/tft/league/v1/challenger`))
     const grandmaster = await client.get<LeagueList>(`${host}/tft/league/v1/grandmaster`)
     const master = await client.get<LeagueList>(`${host}/tft/league/v1/master`)
-
     const chalEntries = challenger?.entries ?? []
     const gmEntries = grandmaster?.entries ?? []
     const masterEntries = master?.entries ?? []
-
-    let added = 0
-    const addAll = (entries: LeagueEntry[]) => {
-      for (const e of entries) {
-        if (!e.puuid) continue
-        if (!puuids.has(e.puuid)) {
-          puuids.add(e.puuid)
-          added++
-        }
-      }
-    }
-    addAll(chalEntries)
-    addAll(gmEntries)
-
-    const masterValid = masterEntries.filter((e) => e.puuid)
-    const masterSampled = sample(masterValid, config.masterSamplePerPlatform)
-    addAll(masterSampled)
-
-    // DIAMOND 以下は entries エンドポイント（LeagueEntry[] を直接返す。page=1 のみ取得）。
-    // リーグ一覧はプラットフォームホスト＝マッチ取得のリージョナルホストとは別のレート枠なので、
-    // 母集団を広げるコストはマッチ取得の予算を食わない。
-    let entrySampled = 0
-    for (const tier of config.entryTiers) {
-      for (const div of ['I', 'II', 'III', 'IV'] as const) {
-        const entries = await client.get<LeagueEntry[]>(
-          `${host}/tft/league/v1/entries/${tier}/${div}?page=1`,
-        )
-        const valid = (entries ?? []).filter((e) => e.puuid)
-        const sampled = sample(valid, config.entrySamplePerDivision)
-        addAll(sampled)
-        entrySampled += sampled.length
-      }
-    }
-
+    const added = addAll(chalEntries) + addAll(gmEntries) + addAll(masterEntries)
     console.log(
       `  [${platform}] challenger=${chalEntries.length} grandmaster=${gmEntries.length} ` +
-        `master=${masterEntries.length}(抽選${masterSampled.length}) entries(抽選${entrySampled}) → 新規puuid+${added}`,
+        `master=${masterEntries.length} → 新規puuid+${added}`,
     )
   }
 
-  const pool = shuffle([...puuids])
-  console.log(`  [${route}] プールサイズ（重複排除後・シャッフル済み）: ${pool.length}`)
+  const highTierCount = puuids.size
+  const mode = decidePoolMode(highTierCount, config.minHighTierPoolPerRoute)
+  if (mode === 'fallback') {
+    // Diamond 以下は entries エンドポイント（LeagueEntry[] を直接返す。page=1 のみ取得）。
+    console.log(
+      `  [${route}] Master 以上が ${highTierCount} 人（閾値 ${config.minHighTierPoolPerRoute} 未満）→ ` +
+        `Diamond 以下で補充（フォールバック）`,
+    )
+    for (const platform of platforms) {
+      const host = platformHost(platform)
+      let entrySampled = 0
+      for (const tier of config.entryTiers) {
+        for (const div of ['I', 'II', 'III', 'IV'] as const) {
+          const entries = await client.get<LeagueEntry[]>(
+            `${host}/tft/league/v1/entries/${tier}/${div}?page=1`,
+          )
+          const valid = (entries ?? []).filter((e) => e.puuid)
+          const sampled = sample(valid, config.entrySamplePerDivision)
+          addAll(sampled)
+          entrySampled += sampled.length
+        }
+      }
+      console.log(`  [${platform}] entries(抽選${entrySampled})`)
+    }
+  }
+
+  const pool = samplePool(shuffle([...puuids]), config.maxPoolPerRoute)
+  console.log(
+    `  [${route}] プールサイズ: ${pool.length}（モード=${mode}, Master以上=${highTierCount}, 重複排除後・シャッフル済み）`,
+  )
   return pool
+}
+
+/**
+ * マッチ ID 取得の下限時刻（epoch 秒）。
+ * セット開始（config.collectSinceEpoch）と、保持下限パッチ（patchesToKeep）の配信開始の遅い方。
+ * 集計で捨てるパッチのマッチにリクエスト予算を使わず、旧パッチの取りこぼしが新シャードに
+ * 入り続けるのも防ぐ。スケジュールが無ければセット開始。
+ */
+export function collectStartTime(nowMs: number = Date.now()): number {
+  const sets = config.patchSchedule
+    .map((e) => Number(e.patch.split('.')[0]))
+    .filter((n) => Number.isFinite(n))
+  const set = sets.length ? Math.max(...sets) : null
+  const floor = set === null ? null : retentionFloor(config.patchSchedule, set, config.patchesToKeep, nowMs)
+  const entry = floor === null ? undefined : config.patchSchedule.find((e) => e.patch === floor)
+  const floorSince = entry ? Math.floor(Date.parse(entry.since) / 1000) : -Infinity
+  return Math.max(config.collectSinceEpoch, Number.isFinite(floorSince) ? floorSince : -Infinity)
 }
 
 interface RouteResult {
@@ -295,11 +341,11 @@ async function collectRoute(
   const seen = loadSeen(route)
   // 今回実行内で処理済み（seen に追記済みでもメモリ上で再確認するため別管理は不要だが、
   // appendSeen の前にメモリで弾けるよう seen 自体に都度追加する）。
-  // 取得窓は前回実行時刻ではなく、セット開始で固定する（config.collectSinceEpoch）。
+  // 取得窓は前回実行時刻ではなく、保持窓の下限（セット開始 or 保持下限パッチの配信開始）で固定する。
   // 前回実行基準だと窓が数時間しかなく、1人あたりの新規試合が0.5件程度にしかならず
   // ID 取得1回ぶんのコストを回収できない。全期間を対象にしても、取得済みのマッチは
   // seen がリクエスト前に弾くので消費は増えない。
-  const startTime = config.collectSinceEpoch
+  const startTime = collectStartTime()
 
   const pool = await buildPuuidPool(route, preloadedChallenger)
   const rHost = regionalHost(route)
@@ -429,6 +475,12 @@ async function main(): Promise<void> {
   )
 
   const meta = loadMeta()
+  // セットが替わって collectSinceEpoch が更新されていたら seen を空にする（旧セットの ID は
+  // API から取れないので残す意味が無い）。meta に値が無い旧レイアウトではリセットしない。
+  if (resetSeenIfSetChanged(meta, config.collectSinceEpoch)) {
+    console.log('collectSinceEpoch が変わったため seen をリセットしました。')
+  }
+  console.log(`マッチ ID 取得の下限時刻: ${new Date(collectStartTime() * 1000).toISOString()}`)
 
   // ルート並列実行。RiotClient はホスト別リミッタを持つため1インスタンス共有で安全。
   // 1ルートが例外で落ちても他ルートの結果を失わないよう allSettled を使う。
@@ -460,19 +512,20 @@ async function main(): Promise<void> {
   }
   saveMeta(meta)
 
-  // prune: ローリング窓（最新セットのみ保持 ＋ 最大レコード数でマッチ単位に切り詰め）。
-  // パッチ単位の prune は Unreal 移行後に機能しない（game_version が使えず全レコードが
-  // 単一パッチキーに潰れるため、旧セットが永久に残る）。セットと新しさで切る。
-  console.log('\n=== prune（ローリング窓） ===')
+  // 封印と保持: アクティブシャードが閾値を超えていれば gzip して封印し、封印シャードに
+  // 保持規則（現セットのみ／直近 patchesToKeep パッチ／gz 予算）を適用して古いものを消す。
+  // レコード単位の書き換えはしない（アクティブは追記専用、封印シャードは不変）。
+  console.log('\n=== 封印 / 保持 ===')
+  if (ensureDataGitattributes()) console.log('  .gitattributes を更新（*.gz binary）')
   for (const route of config.enabledRoutes) {
-    const { kept, droppedOldSet, droppedOverflow, targetSet } = pruneRecords(
-      route,
-      config.maxBytesPerRoute,
-    )
-    console.log(
-      `  [${route}] 保持セット=${targetSet ?? '-'} kept=${kept} ` +
-        `旧セット削除=${droppedOldSet} 窓あふれ削除=${droppedOverflow}`,
-    )
+    const r = await sealAndPrune(RECORDS_DIR, route, {
+      sealThresholdBytes: config.sealThresholdBytes,
+      schedule: config.patchSchedule,
+      patchesToKeep: config.patchesToKeep,
+      maxGzBytes: config.maxSealedBytesPerRoute,
+      nowMs: Date.now(),
+    })
+    logSealAndPrune(route, r)
   }
 
   // 最終サマリ（全ルート分まとめ）。

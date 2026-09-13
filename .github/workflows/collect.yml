@@ -84,9 +84,17 @@ jobs:
           num=$(gh issue list --label riot-key --state open --json number --jq '.[0].number')
           if [ -n "$num" ]; then gh issue close "$num" -c "キー更新を確認。収集を再開しました。"; fi
 
+      # 収集状態のサイズ（封印シャード・seen）の推移を見えるようにしておく。
+      - name: state size
+        if: steps.collect.outputs.status == 'ok'
+        run: du -sh data/state/records data/state/seen
+
+      # ストリーミング集計だが、盤面アキュムレータは保持レコード数に比例して増えるのでヒープを広げておく。
       - name: aggregate
         if: steps.collect.outputs.status == 'ok'
         run: npm run aggregate
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
       # data ブランチへ squash force-push。orphan ブランチを作り直して常に1コミットに保つ。
       # data/state は独立チェックアウト（浅い clone）だが、orphan の force-push には影響しない。

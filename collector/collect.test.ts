@@ -5,7 +5,8 @@ import type { EmblemContext } from './cdragon.ts'
 // collect.ts はモジュール読み込み時に RIOT_API_KEY を要求して未設定なら exit する。
 // テストでは収集を一切行わない（エントリガードにより main は走らない）ので、ダミー値を入れてから import する。
 process.env.RIOT_API_KEY ??= 'RGAPI-test-key-not-used'
-const { buildRecords } = await import('./collect.ts')
+const { buildRecords, decidePoolMode, samplePool, collectStartTime } = await import('./collect.ts')
+const { config } = await import('./config.ts')
 
 /** セット18 相当の紋章コンテキスト（getEmblemContext の出力を手で組んだもの）。 */
 function makeEmblemCtx(): EmblemContext {
@@ -144,4 +145,33 @@ test('buildRecords: CDragon が知らないアイテムは紋章候補として�
   assert.ok(recs !== null)
   assert.deepEqual(recs[0].e, ['DA_18_EmblemVanguard', 'DA_18_EmblemUnknownBrandNew'])
   assert.deepEqual(recs[0].eh, ['DA_Gromp18_AP', 'DA_Murkwolf18'])
+})
+
+// ---- 母集団モード ----
+
+test('decidePoolMode: Master 以上が閾値以上なら highTier、未満なら fallback（境界含む）', () => {
+  assert.equal(decidePoolMode(500, 500), 'highTier')
+  assert.equal(decidePoolMode(499, 500), 'fallback')
+  assert.equal(decidePoolMode(0, 500), 'fallback')
+})
+
+test('samplePool: 上限以下はそのまま（順序保持）、超えたら上限件数に間引く', () => {
+  const small = ['a', 'b', 'c']
+  assert.deepEqual(samplePool(small, 3), ['a', 'b', 'c'])
+  const big = Array.from({ length: 100 }, (_, i) => i)
+  const sampled = samplePool(big, 10)
+  assert.equal(sampled.length, 10)
+  assert.equal(new Set(sampled).size, 10)
+})
+
+test('collectStartTime: セット開始と保持下限パッチの配信開始の遅い方', () => {
+  const firstSince = Math.floor(Date.parse(config.patchSchedule[0].since) / 1000)
+  // 2パッチ目の途中: floor は最初のパッチ → セット開始と同じ。
+  const mid = Date.parse(config.patchSchedule[1].since) + 86400_000
+  assert.equal(collectStartTime(mid), Math.max(config.collectSinceEpoch, firstSince))
+  // 遠い未来（全エントリ配信済み）: floor は末尾から2番目 → その since 以上。
+  const far = Date.parse('2099-01-01T00:00:00Z')
+  const idx = Math.max(0, config.patchSchedule.length - config.patchesToKeep)
+  const expected = Math.max(config.collectSinceEpoch, Math.floor(Date.parse(config.patchSchedule[idx].since) / 1000))
+  assert.equal(collectStartTime(far), expected)
 })
