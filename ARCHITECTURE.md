@@ -144,7 +144,7 @@ records/{route}/000001_s18_1787702400-1788867459.ndjson.gz   封印シャード:
   1. 現行セット（最大の `s`）以外は落とす（`old-set`）。
   2. 最新レコード（maxTs）のパッチが保持下限パッチ（floor）より古いシャードは落とす（`old-patch`）。floor は `retentionFloor`: `config.patchSchedule` のうち配信済みエントリの末尾 `config.patchesToKeep`（2）件の先頭。境界をまたぐシャードは最新レコードが窓外になるまで残す（その間の旧パッチレコードは aggregate 側の同じ規則で出力から除外する）。
   3. 残りの gz 合計が `config.maxSealedBytesPerRoute`（64MB ≒ 約10万マッチ/ルート ≒ パッチ約2本分）を超えたら古い seq から落とす（`byte-cap`）。**定常時に実際に効くのはこの規則**で、現パッチが増えるにつれ前パッチのシャードが古い順に押し出される。アクティブは予算に数えない。
-- **取得窓との整合**: collect のマッチ ID 取得の下限時刻（`collectStartTime`）は「セット開始」と「floor の配信開始」の遅い方。集計で捨てるパッチにリクエスト予算を使わない。
+- **取得窓**: collect のマッチ ID 取得の下限時刻（`collectStartTime`）は「セット開始」と「配信済みの直近 `config.collectPatchesBack`（1）パッチの配信開始」の遅い方。つまり**最新パッチの試合しか新たに取りに行かない**（前パッチのレコードは保持窓の中に残るが、バックフィルはしない）。新パッチ配信後に `patchSchedule` へ追加するまでは前パッチの配信開始が下限なので、新パッチの試合を取りこぼすことはない。
 - **seen**（処理済みマッチID）はセット1本分だけ持つ。`meta.collectSince` が `config.collectSinceEpoch` と異なれば（＝セット切替）空にする。旧レイアウト（`collectSince` 無し）では現値を採用するだけでリセットしない。
 - **`.gitattributes`**: collect が `data/state/.gitattributes` に `*.gz binary` を含む内容を書く（CI の push は `git add -A`）。gz を text 扱いにすると Windows で CRLF 変換されて壊れる。
 
