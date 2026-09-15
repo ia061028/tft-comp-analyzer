@@ -164,14 +164,17 @@ test('samplePool: 上限以下はそのまま（順序保持）、超えたら�
   assert.equal(new Set(sampled).size, 10)
 })
 
-test('collectStartTime: セット開始と保持下限パッチの配信開始の遅い方', () => {
-  const firstSince = Math.floor(Date.parse(config.patchSchedule[0].since) / 1000)
-  // 2パッチ目の途中: floor は最初のパッチ → セット開始と同じ。
+test('collectStartTime: 配信済みの直近 collectPatchesBack パッチの配信開始（既定は最新パッチのみ）', () => {
+  const since = (i: number) => Math.floor(Date.parse(config.patchSchedule[i].since) / 1000)
+  // 1パッチ目の途中: 最新の配信済みは1つ目 → セット開始と同じ。
+  const early = Date.parse(config.patchSchedule[0].since) + 86400_000
+  assert.equal(collectStartTime(early), Math.max(config.collectSinceEpoch, since(0)))
+  // 2パッチ目の途中: 2つ目の配信開始が下限（1つ目の試合は取りに行かない）。
   const mid = Date.parse(config.patchSchedule[1].since) + 86400_000
-  assert.equal(collectStartTime(mid), Math.max(config.collectSinceEpoch, firstSince))
-  // 遠い未来（全エントリ配信済み）: floor は末尾から2番目 → その since 以上。
+  const idxMid = Math.max(0, 2 - config.collectPatchesBack)
+  assert.equal(collectStartTime(mid), Math.max(config.collectSinceEpoch, since(idxMid)))
+  // 遠い未来（全エントリ配信済み）: 末尾から collectPatchesBack 番目の since。
   const far = Date.parse('2099-01-01T00:00:00Z')
-  const idx = Math.max(0, config.patchSchedule.length - config.patchesToKeep)
-  const expected = Math.max(config.collectSinceEpoch, Math.floor(Date.parse(config.patchSchedule[idx].since) / 1000))
-  assert.equal(collectStartTime(far), expected)
+  const idx = Math.max(0, config.patchSchedule.length - config.collectPatchesBack)
+  assert.equal(collectStartTime(far), Math.max(config.collectSinceEpoch, since(idx)))
 })

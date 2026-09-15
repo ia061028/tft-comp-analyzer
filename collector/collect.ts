@@ -221,16 +221,16 @@ async function buildPuuidPool(
 
 /**
  * マッチ ID 取得の下限時刻（epoch 秒）。
- * セット開始（config.collectSinceEpoch）と、保持下限パッチ（patchesToKeep）の配信開始の遅い方。
- * 集計で捨てるパッチのマッチにリクエスト予算を使わず、旧パッチの取りこぼしが新シャードに
- * 入り続けるのも防ぐ。スケジュールが無ければセット開始。
+ * セット開始（config.collectSinceEpoch）と、配信済みの直近 config.collectPatchesBack パッチの
+ * 先頭（既定 1 = 最新パッチ）の配信開始の遅い方。前パッチの試合を新たに取りに行かず、
+ * リクエスト予算を最新パッチに使う。スケジュールが無ければセット開始。
  */
 export function collectStartTime(nowMs: number = Date.now()): number {
   const sets = config.patchSchedule
     .map((e) => Number(e.patch.split('.')[0]))
     .filter((n) => Number.isFinite(n))
   const set = sets.length ? Math.max(...sets) : null
-  const floor = set === null ? null : retentionFloor(config.patchSchedule, set, config.patchesToKeep, nowMs)
+  const floor = set === null ? null : retentionFloor(config.patchSchedule, set, config.collectPatchesBack, nowMs)
   const entry = floor === null ? undefined : config.patchSchedule.find((e) => e.patch === floor)
   const floorSince = entry ? Math.floor(Date.parse(entry.since) / 1000) : -Infinity
   return Math.max(config.collectSinceEpoch, Number.isFinite(floorSince) ? floorSince : -Infinity)

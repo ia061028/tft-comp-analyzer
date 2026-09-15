@@ -65,7 +65,7 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 - **キー失効 = no-op**: collect は冒頭の認証プリフライトで 401/403 を検出すると `status=auth_expired` を出して exit 0（state 不変）。この場合 aggregate・data ブランチ push・stats.json コミットは全てスキップされ、コミット0・デプロイ0。スティッキー issue（ラベル `riot-key`）が起票され（初回のみ通知、以後は本文編集のみ）、キー復旧後の次回実行で自動クローズされる。実際のルート例外時のみジョブが赤失敗する。
 - **APIキー**: CI が使うのは **GitHubリポジトリ Secret `RIOT_API_KEY`**（ローカル `.env` ではない）。開発キーは**24時間で失効**するので、上記の no-op パスに入る。`gh secret set RIOT_API_KEY --body "RGAPI-..."`（パイプ流し込みは BOM/改行混入の恐れがあるため `--body`）または Settings→Secrets→Actions で更新。恒久対応は**本番APIキー**への切替。
 - **ローカルでの収集状態同期**: 初回は `git clone --depth 1 --branch data https://github.com/ia061028/tft-comp-analyzer.git data/state`、以後は `npm run data:pull`。
-- **保持**: レコードは `records/{route}.ndjson`（追記中）と `records/{route}/*.ndjson.gz`（封印済み・不変）に分かれ、直近2パッチ・1ルート 64MB gz を上限に古いシャードから消える。母集団は Master 以上（薄い時だけ Diamond 以下で補充）。詳細は [ARCHITECTURE.md](ARCHITECTURE.md) の「保持ポリシー」「母集団」。
+- **保持**: レコードは `records/{route}.ndjson`（追記中）と `records/{route}/*.ndjson.gz`（封印済み・不変）に分かれ、直近2パッチ・1ルート 64MB gz を上限に古いシャードから消える。新たに取りに行くのは最新パッチの試合だけ（`config.collectPatchesBack`）。母集団は Master 以上（薄い時だけ Diamond 以下で補充）。詳細は [ARCHITECTURE.md](ARCHITECTURE.md) の「保持ポリシー」「母集団」。
 - 手動収集: ローカルで有効な `.env` と `data/state` があれば `npm run collect && npm run aggregate` で更新可能（main へのコミットは別途）。
 
 ## 既知の課題 / TODO
