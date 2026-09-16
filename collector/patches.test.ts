@@ -22,6 +22,17 @@ test('compareVersions: メジャー差を優先', () => {
   assert.ok(compareVersions('17.1', '16.99') > 0)
 })
 
+test('compareVersions: B パッチのサフィックスは同じ minor の中で無印より後', () => {
+  assert.ok(compareVersions('18.2', '18.2b') < 0)
+  assert.ok(compareVersions('18.2b', '18.2') > 0)
+  assert.ok(compareVersions('18.2b', '18.3') < 0)
+  assert.ok(compareVersions('18.2b', '18.2c') < 0)
+  assert.equal(compareVersions('18.2b', '18.2b'), 0)
+  // minor の数値比較はサフィックス有無に関わらず優先される。
+  assert.ok(compareVersions('18.10', '18.9b') > 0)
+  assert.ok(compareVersions('18.10b', '18.10') > 0)
+})
+
 test('compareVersions: パース不能は最小扱い', () => {
   assert.ok(compareVersions('garbage', '16.1') < 0)
   assert.ok(compareVersions('16.1', 'garbage') > 0)

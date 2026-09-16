@@ -2,8 +2,11 @@
 // 副作用なし・I/O なしでテスト可能に保つ。
 
 /**
- * "16.12" 形式のパッチを数値ペアで比較する。
- * "16.9" < "16.10" を文字列比較ではなく数値で正しく扱う。
+ * "16.12" / "18.2b"（ミッドパッチ＝B パッチ）形式のパッチを比較する。
+ * "16.9" < "16.10" を文字列比較ではなく数値で正しく扱い、
+ * 末尾の英字サフィックスは同じ minor の中で無印より後ろに並べる（"18.2" < "18.2b" < "18.3"）。
+ * サフィックスを見ないと B パッチが元のパッチと等値になり、取得窓（collectStartTime）や
+ * 既定ビュー選定（pickTargetPatch）が「新しい方」を選べなくなる。
  * パース不能（数値ペアにならない）は最小として扱う。
  * 戻り値: a<b で負、a>b で正、等値で 0。
  */
@@ -11,18 +14,23 @@ export function compareVersions(a: string, b: string): number {
   const pa = parseVersion(a)
   const pb = parseVersion(b)
   if (pa[0] !== pb[0]) return pa[0] - pb[0]
-  return pa[1] - pb[1]
+  if (pa[1] !== pb[1]) return pa[1] - pb[1]
+  return pa[2] - pb[2]
 }
 
 // パース不能パッチを表す最小センチネル。Infinity を使うと両方不能時に
 // Infinity - Infinity = NaN となり比較が不安定になるため有限値を使う。
 const MIN_SENTINEL = Number.MIN_SAFE_INTEGER
 
-/** "16.12" → [16, 12]。パース不能は最小扱い（センチネル）。 */
-function parseVersion(v: string): [number, number] {
-  const m = v.match(/^(\d+)\.(\d+)/)
-  if (!m) return [MIN_SENTINEL, MIN_SENTINEL]
-  return [Number(m[1]), Number(m[2])]
+/**
+ * "16.12" → [16, 12, 0]、"18.2b" → [18, 2, 2]（a=1, b=2 …、無印は 0）。
+ * パース不能は最小扱い（センチネル）。
+ */
+function parseVersion(v: string): [number, number, number] {
+  const m = v.match(/^(\d+)\.(\d+)([a-z]?)/)
+  if (!m) return [MIN_SENTINEL, MIN_SENTINEL, MIN_SENTINEL]
+  const suffix = m[3] ? m[3].charCodeAt(0) - 'a'.charCodeAt(0) + 1 : 0
+  return [Number(m[1]), Number(m[2]), suffix]
 }
 
 /**
