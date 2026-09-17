@@ -141,7 +141,18 @@ export class RiotClient {
       stats.byStatus[res.status] = (stats.byStatus[res.status] ?? 0) + 1
 
       if (res.ok) {
-        return (await res.json()) as T
+        // ボディ受信中の切断（undici の "TypeError: terminated"）は fetch() ではなくここで投げられる。
+        // 大きな master リーグ（vn2 等）で起きやすく、2026-09-17 に asia/sea ルートがこれで全滅した。
+        // ネットワークエラーと同じ扱いで指数バックオフ再試行する。
+        try {
+          return (await res.json()) as T
+        } catch (err) {
+          if (attempts5xx >= MAX_5XX_RETRIES) throw err
+          const backoff = 2000 * 2 ** attempts5xx
+          attempts5xx++
+          await sleep(backoff)
+          continue
+        }
       }
 
       if (res.status === 404) {
