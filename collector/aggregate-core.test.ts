@@ -273,10 +273,12 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
     baseItemIcons: { spatula: 'spat.png', fryingPan: 'pan.png' },
   })
 
-  // 診断: 盤面グループは2つ（うち1つは出力除外）。
+  // 診断: 盤面グループは2つ（うち1つは n<MIN_OUTPUT_N で出力除外）。
   assert.equal(diag.boardGroupCount, 2)
   assert.equal(diag.noBoard, 0)
   assert.equal(diag.excludedUnresolvedTrait, 0)
+  // 構成2は n 不足で先に落ちるので、紋章なし除外には数えない。
+  assert.equal(diag.noSigBoards, 0)
 })
 
 // ---- classifyRecord ----
@@ -300,7 +302,11 @@ test('classifyRecord: 未解決トレイト / 盤面なし / ok（構成キー�
 
 // ---- createStatsBuilder（buildStats との等価性・boardFilter・maxComps） ----
 
-/** 3構成（n=5/4/3）のフィクスチャ。 */
+/**
+ * 3構成（n=5/4/3）のフィクスチャ。全レコードが EmblemA を活用しているので
+ * 「紋章活用レコード数 = 総レコード数」になり、並べ替え順は 5/4/3 のまま。
+ * 紋章を持たない盤面は出力されないので、順序・上限のテストには紋章が要る。
+ */
 function threeComps(): LoadedRecord[] {
   const mk = (m: string, p: number, u: string[], extra: Partial<ParticipantRecord> = {}): LoadedRecord => ({
     route: 'asia',
@@ -308,8 +314,8 @@ function threeComps(): LoadedRecord[] {
   })
   const out: LoadedRecord[] = []
   for (let i = 0; i < 5; i++) out.push(mk(`A${i}`, 1 + i, ['TFT_UnitA', 'TFT_UnitB'], { e: ['TFT_Item_EmblemA'], eh: ['TFT_UnitB'], ui: [[], ['TFT_Item_ItemX']] }))
-  for (let i = 0; i < 4; i++) out.push(mk(`B${i}`, 1 + i, ['TFT_UnitA', 'TFT_UnitC']))
-  for (let i = 0; i < 3; i++) out.push(mk(`C${i}`, 1 + i, ['TFT_UnitB', 'TFT_UnitD'], { ui: [['TFT_Item_ItemY'], []] }))
+  for (let i = 0; i < 4; i++) out.push(mk(`B${i}`, 1 + i, ['TFT_UnitA', 'TFT_UnitC'], { e: ['TFT_Item_EmblemA'], eh: ['TFT_UnitA'] }))
+  for (let i = 0; i < 3; i++) out.push(mk(`C${i}`, 1 + i, ['TFT_UnitB', 'TFT_UnitD'], { e: ['TFT_Item_EmblemA'], eh: ['TFT_UnitD'], ui: [['TFT_Item_ItemY'], []] }))
   return out
 }
 
@@ -322,7 +328,7 @@ test('createStatsBuilder: 1件ずつ add した結果は buildStats と一致す
   assert.deepStrictEqual(b.finish(), buildStats(target, sd, opts))
 })
 
-test('buildStats: comps は n 降順・同数は盤面キー昇順', () => {
+test('buildStats: comps は紋章活用レコード数の降順（全件活用なら n 降順と同じ）', () => {
   const sd = makeStaticData()
   const { out } = buildStats(threeComps(), sd, { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T' })
   assert.deepEqual(out.comps.map((c) => c.n), [5, 4, 3])
@@ -345,7 +351,7 @@ test('buildStats: boardFilter で除外した盤面は accumulate されない�
   assert.deepStrictEqual(filtered.out.comps[0], full.out.comps[0])
 })
 
-test('buildStats: maxComps で n 上位だけ残り、辞書も残った構成の分だけになる', () => {
+test('buildStats: maxComps で上位だけ残り、辞書も残った構成の分だけになる', () => {
   const sd = makeStaticData()
   const target = threeComps()
   const { out } = buildStats(target, sd, { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T', maxComps: 1 })
@@ -360,10 +366,108 @@ test('buildStats: maxComps で n 上位だけ残り、辞書も残った構成�
 
 test('buildStats: 代表スターは最頻値（同数なら大きい方）を件数から求める', () => {
   const sd = makeStaticData()
+  // 紋章を持たない盤面は出力されないので、スターの検証用でも紋章を1つ載せる。
   const mk = (m: string, star: number): LoadedRecord => ({
     route: 'asia',
-    rec: rec({ m, p: 1, t: { TraitA: 3 }, u: ['TFT_UnitA', 'TFT_UnitB'], us: [star, 2] }),
+    rec: rec({
+      m,
+      p: 1,
+      t: { TraitA: 3 },
+      u: ['TFT_UnitA', 'TFT_UnitB'],
+      us: [star, 2],
+      e: ['TFT_Item_EmblemA'],
+      eh: ['TFT_UnitB'],
+    }),
   })
   const { out } = buildStats([mk('1', 1), mk('2', 3), mk('3', 3), mk('4', 1)], sd, { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T' })
   assert.deepEqual(out.comps[0].k, [3, 2])
+})
+
+// ---- 出力選定（無sig盤面の除外・紋章活用レコード数での切り方） ----
+
+/**
+ * 紋章を使わない人気盤面（n=8）と、紋章を使う小さい盤面（n=3）のフィクスチャ。
+ * 総レコード数で切ると前者が残り、紋章活用レコード数で切ると後者が残る。
+ */
+function popularVsEmblem(): LoadedRecord[] {
+  const mk = (m: string, u: string[], extra: Partial<ParticipantRecord> = {}): LoadedRecord => ({
+    route: 'asia',
+    rec: rec({ m, p: 4, t: { TraitA: 3 }, u, us: u.map(() => 2), ...extra }),
+  })
+  const out: LoadedRecord[] = []
+  // 人気だが紋章ゼロ: 盤面 {UnitA, UnitC} を8レコード。
+  for (let i = 0; i < 8; i++) out.push(mk(`P${i}`, ['TFT_UnitA', 'TFT_UnitC']))
+  // 小さいが全件紋章あり: 盤面 {UnitB, UnitD} を3レコード。
+  for (let i = 0; i < 3; i++) out.push(mk(`E${i}`, ['TFT_UnitB', 'TFT_UnitD'], { e: ['TFT_Item_EmblemA'], eh: ['TFT_UnitD'] }))
+  return out
+}
+
+test('buildStats: 紋章シグネチャが無い盤面は、n が足りていても出力しない', () => {
+  const sd = makeStaticData()
+  const { out, diag } = buildStats(popularVsEmblem(), sd, {
+    targetPatch: 'x',
+    tftPatch: 'x',
+    generatedAt: 'T',
+  })
+  // 残るのは紋章を使う n=3 の盤面だけ。n=8 の盤面は画面に出せないので落とす。
+  assert.equal(out.comps.length, 1)
+  assert.equal(out.comps[0].n, 3)
+  assert.equal(diag.noSigBoards, 1)
+  // 除外しても totals は全レコードを数えたまま。
+  assert.equal(out.totals.participants, 11)
+  // 辞書も残った構成の分だけ（UnitA/UnitC は消える）。
+  assert.deepEqual(out.units.map((u) => u.api), ['TFT_UnitB', 'TFT_UnitD'])
+})
+
+test('buildStats: 上限は紋章活用レコード数で切る（総レコード数の多い盤面が優先されない）', () => {
+  const sd = makeStaticData()
+  // 人気盤面にも紋章を1件だけ足し、両方が出力候補になるようにする。
+  const target = popularVsEmblem()
+  target.push({
+    route: 'asia',
+    rec: rec({
+      m: 'P8',
+      p: 4,
+      t: { TraitA: 3 },
+      u: ['TFT_UnitA', 'TFT_UnitC'],
+      us: [2, 2],
+      e: ['TFT_Item_EmblemA'],
+      eh: ['TFT_UnitA'],
+    }),
+  })
+  const opts = { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T' }
+
+  // 上限なし: 両方出る。総レコード数は 9 対 3 だが、紋章活用は 1 対 3。
+  const all = buildStats(target, sd, opts)
+  assert.deepEqual(all.out.comps.map((c) => c.n), [3, 9])
+
+  // 上限1: 紋章活用レコードが多い方（n=3 の盤面）が残る。
+  const { out } = buildStats(target, sd, { ...opts, maxComps: 1 })
+  assert.equal(out.comps.length, 1)
+  assert.equal(out.comps[0].n, 3)
+})
+
+test('buildStats: 紋章活用レコード数が同数なら総レコード数の多い方が先', () => {
+  const sd = makeStaticData()
+  const mk = (m: string, u: string[], withEmblem: boolean): LoadedRecord => ({
+    route: 'asia',
+    rec: rec({
+      m,
+      p: 4,
+      t: { TraitA: 3 },
+      u,
+      us: u.map(() => 2),
+      ...(withEmblem ? { e: ['TFT_Item_EmblemA'], eh: [u[0]] } : {}),
+    }),
+  })
+  const target: LoadedRecord[] = []
+  // 盤面X: 5レコード中3件が紋章あり。
+  for (let i = 0; i < 3; i++) target.push(mk(`X${i}`, ['TFT_UnitA', 'TFT_UnitB'], true))
+  for (let i = 3; i < 5; i++) target.push(mk(`X${i}`, ['TFT_UnitA', 'TFT_UnitB'], false))
+  // 盤面Y: 3レコード全件が紋章あり。
+  for (let i = 0; i < 3; i++) target.push(mk(`Y${i}`, ['TFT_UnitC', 'TFT_UnitD'], true))
+
+  const { out } = buildStats(target, sd, { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T' })
+  // 紋章活用はどちらも3。総レコード数で X(5) が先。
+  assert.deepEqual(out.comps.map((c) => c.n), [5, 3])
 })
