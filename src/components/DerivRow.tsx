@@ -9,10 +9,10 @@ import {
   starColor,
   styleClasses,
   tierOfEdge,
-  LOW_SAMPLE,
 } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { RecipeLabel } from './RecipeLabel'
+import { SampleMeter } from './SampleMeter'
 import { Tip } from './Tip'
 
 interface DerivRowProps {
@@ -25,6 +25,8 @@ interface DerivRowProps {
    * 差分（追加・欠落）が同じでも紋章の使い方が違えば別の構成なので、出さないと見分けがつかない。
    */
   showEmblems: boolean
+  /** 採用数が薄い行を淡く描く（「少数を薄く」ON のとき）。消さずに弱めるだけ。 */
+  dim?: boolean
   lang: Lang
 }
 
@@ -37,7 +39,7 @@ interface DerivRowProps {
  * 平均順位の色は**同じ体数のコホートからの差**で切る（`tierOfEdge`）。絶対値だと 10体グループが
  * 全部 S（同じ赤）になり、色が情報を運ばなくなるため。差の数値は画面に出さない。
  */
-export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowProps) {
+export function DerivRow({ stats, deriv, cohort, showEmblems, dim, lang }: DerivRowProps) {
   const { traits, units, emblems, items } = stats
   const { comp, row, adds, synergy } = deriv
   // コアに無いユニット（＝この派生で足す駒）。全ユニットを出すので枠で示すためだけに使う。
@@ -53,7 +55,6 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
 
   const top4Rate = row.n > 0 ? (row.top4 / row.n) * 100 : 0
   const winRate = row.n > 0 ? (row.win / row.n) * 100 : 0
-  const lowSample = row.n < LOW_SAMPLE
 
   const holders = holderMap(comp, row.used)
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
@@ -88,7 +89,11 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line px-4 py-2.5 transition-colors hover:bg-surface-2/40">
+    <div
+      className={`flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line px-4 py-2.5 transition-all hover:bg-surface-2/40 ${
+        dim ? 'opacity-55 hover:opacity-100' : ''
+      }`}
+    >
       {/* 盤面のユニットを全部出す。コアからの追加分だけは枠で示す。 */}
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {/* 1段目: 盤面のユニットと、この行が活用している紋章 */}
@@ -196,7 +201,7 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
               const name = trait ? pickName(lang, trait) : `#${traitIdx}`
               // 伸びた特性が1つも無い行（＝コアのまま）は全部を等しく出す。落とす相手がいないのに
               // 全チップを淡くすると、ただ読みにくいだけになる。
-              const dim = anyGained && !gained
+              const dimChip = anyGained && !gained
               return (
                 <Tip key={traitIdx} label={gained ? `${name} ${count} — ${t(lang, 'synergyGain')}` : `${name} ${count}`}>
                   <span
@@ -205,7 +210,7 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
                     )} ${
                       gained
                         ? 'h-[22px] font-bold ring-1 ring-ink/25'
-                        : `h-[19px] font-semibold ${dim ? 'opacity-55' : ''}`
+                        : `h-[19px] font-semibold ${dimChip ? 'opacity-55' : ''}`
                     }`}
                   >
                     {trait?.icon && (
@@ -242,16 +247,9 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, lang }: DerivRowPr
         <div className="text-faint">
           {t(lang, 'metricWin')} <b className="text-ink tabular-nums">{winRate.toFixed(1)}%</b>
         </div>
-        {/* 採用数が少ないことは色だけで示す（銅色＝この率は信じるな）。文字は足さない。 */}
-        <div className="text-faint">
-          {t(lang, 'metricSample')}{' '}
-          {lowSample ? (
-            <Tip label={t(lang, 'lowSampleTitle', { n: LOW_SAMPLE })}>
-              <b className="cursor-help text-bronze tabular-nums">{row.n}</b>
-            </Tip>
-          ) : (
-            <b className="text-ink tabular-nums">{row.n}</b>
-          )}
+        {/* 採用数は数字＋4段階の目盛り。下限フィルタで消す代わりに常に見せる。 */}
+        <div className="flex items-center gap-1 text-faint">
+          {t(lang, 'metricSample')} <SampleMeter n={row.n} lang={lang} />
         </div>
       </div>
 

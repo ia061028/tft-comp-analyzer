@@ -9,10 +9,10 @@ import {
   starColor,
   styleClasses,
   tierOf,
-  LOW_SAMPLE,
 } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { RecipeLabel } from './RecipeLabel'
+import { SampleMeter } from './SampleMeter'
 import { Tip } from './Tip'
 
 export type SortKey = 'place' | 'top4' | 'win' | 'adopt'
@@ -32,6 +32,8 @@ interface CompCardProps {
   bronzeMode?: boolean
   /** 「活用紋章 n/k」を出すか。「すべて使う」ON のときは全行 k/k になるので出さない。 */
   showUtilization: boolean
+  /** 採用数が薄い行を淡く描く（「少数を薄く」ON のとき）。消さずに弱めるだけ。 */
+  dim?: boolean
 }
 
 /**
@@ -57,6 +59,7 @@ export function CompCard({
   lang,
   bronzeMode,
   showUtilization,
+  dim,
 }: CompCardProps) {
   const { traits, units, emblems, items } = stats
   const [copied, setCopied] = useState(false)
@@ -73,8 +76,6 @@ export function CompCard({
 
   const winRate = row.n > 0 ? (row.win / row.n) * 100 : 0
   const top4Rate = row.n > 0 ? (row.top4 / row.n) * 100 : 0
-  // サンプルが薄い行は成績が大きくブレる（採用6件の Top4率 100% は珍しくない）。
-  const lowSample = row.n < LOW_SAMPLE
 
   // 選択紋章が付与する特性。これがこの構成を選ぶ理由なので、他の特性と区別して先頭に出す。
   const emblemTraits = new Set(
@@ -125,7 +126,11 @@ export function CompCard({
   )
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface transition-all duration-150 hover:border-line-strong hover:shadow-lg hover:shadow-black/30 sm:flex-row">
+    <div
+      className={`flex flex-col overflow-hidden rounded-xl border border-line bg-surface transition-all duration-150 hover:border-line-strong hover:shadow-lg hover:shadow-black/30 sm:flex-row ${
+        dim ? 'opacity-55 hover:opacity-100' : ''
+      }`}
+    >
       {/* ───── 左レール: 強さ（ティア + 平均順位）。読み出し開始点に判断材料を置く ───── */}
       <div
         className="flex shrink-0 items-center gap-3 border-b border-line bg-black/20 px-4 py-3 sm:w-[132px] sm:flex-col sm:justify-center sm:gap-2 sm:border-b-0 sm:border-r sm:py-4"
@@ -153,19 +158,11 @@ export function CompCard({
         <div className="flex items-center gap-6">
           {stat(sortKey === 'top4', t(lang, 'metricTop4'), `${top4Rate.toFixed(1)}%`)}
           {stat(sortKey === 'win', t(lang, 'metricWin'), `${winRate.toFixed(1)}%`)}
-          {/* 採用数が少ないことは色だけで示す（銅色＝この率は信じるな）。文字は足さない。 */}
-          {lowSample ? (
-            <Tip label={t(lang, 'lowSampleTitle', { n: LOW_SAMPLE })}>
-              <div className="flex cursor-help flex-col">
-                <span className="text-[11px] leading-tight text-faint">{t(lang, 'metricSample')}</span>
-                <span className="text-[17px] font-bold leading-tight text-bronze tabular-nums">
-                  {row.n}
-                </span>
-              </div>
-            </Tip>
-          ) : (
-            stat(sortKey === 'adopt', t(lang, 'metricSample'), `${row.n}`)
-          )}
+          {/* 採用数は数字＋4段階の目盛りで出す。下限フィルタで消す代わりに常に見せる。 */}
+          <div className="flex flex-col">
+            <span className="text-[11px] leading-tight text-faint">{t(lang, 'metricSample')}</span>
+            <SampleMeter n={row.n} lang={lang} size="lg" active={sortKey === 'adopt'} />
+          </div>
           {showUtilization && (
             <div className="flex flex-col">
               <span className="text-[11px] leading-tight text-faint">{t(lang, 'utilizationLabel')}</span>

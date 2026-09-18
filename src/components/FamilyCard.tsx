@@ -1,6 +1,6 @@
 import type { StatsFile } from '../../shared/types'
 import type { Family, Span } from '../lib/backbone'
-import { activeTier, costBorder, starColor, styleClasses } from '../lib/format'
+import { activeTier, costBorder, starColor, styleClasses, DIM_SAMPLE_MAX } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { DerivRow } from './DerivRow'
 import { RecipeLabel } from './RecipeLabel'
@@ -10,6 +10,8 @@ interface FamilyCardProps {
   stats: StatsFile
   family: Family
   cohort: Map<number, number>
+  /** 採用数が薄い派生行を淡く描く（「少数を薄く」ON のとき）。消さずに弱めるだけ。 */
+  dimLowSample: boolean
   lang: Lang
 }
 
@@ -21,7 +23,7 @@ interface FamilyCardProps {
  * 親→子の関係として見せると最も誤解を招く。グループは互いに独立した選択肢として並べる。
  * 比較が正当なのは**同じ体数の兄弟の間だけ**。
  */
-export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
+export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: FamilyCardProps) {
   const { traits, units, emblems, items } = stats
   const { backbone, holders, traitCount, used, groups } = family
   // コアユニットのスター・アイテムは系統の最良行のものを代表値として使う。
@@ -206,6 +208,7 @@ export function FamilyCard({ stats, family, cohort, lang }: FamilyCardProps) {
               deriv={d}
               cohort={cohort}
               showEmblems={family.mixedEmblems}
+              dim={dimLowSample && d.row.n <= DIM_SAMPLE_MAX}
               lang={lang}
             />
           ))}

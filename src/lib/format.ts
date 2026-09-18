@@ -105,13 +105,42 @@ export function shrunk(successes: number, n: number, prior: number, weight = PRI
 }
 
 /**
- * 低サンプル警告の閾値（採用数がこれ未満なら「率を信じるな」の印を出す）。
+ * 採用数が「十分」と言える下限（＝採用数メーターが満タンになる境界）。
  *
- * 現データの採用数は中央値 9・大半が1桁で、閾値を上げるとほぼ全行に警告が付いて無意味になる
- * （n<40 なら 92% の行が該当）。10 なら約 56% が該当し、かつ縮約ソートの上位カードには
- * 滅多に出ない（上位＝サンプルが十分な行）ので、警告が「例外」として機能する。
+ * 現データの採用数は中央値 9・大半が1桁で、閾値を上げるとほぼ全行が「少ない」側に倒れて
+ * 区別が消える（n<40 なら 92% の行が該当）。10 なら約 56% が該当し、かつ縮約ソートの
+ * 上位カードには滅多に出ない（上位＝サンプルが十分な行）ので、印が「例外」として機能する。
  */
 export const LOW_SAMPLE = 10
+
+/**
+ * 採用数の段階（0=ごく少数 … 3=十分）。境界は 2 / 5 / LOW_SAMPLE。
+ *
+ * 以前は「採用数下限」フィルタで薄い行を一覧から丸ごと消していたが、それだと紋章を2枚以上
+ * 使う構成がほぼ全滅していた（実データで2枚使う行 14,121 件のうち 76% が採用数1、既定の
+ * 下限5を超えるのは 4.8% だけ）。行を消す代わりに、その行が何試合に裏付けられているかを
+ * この段階で常に見せる。並び順は縮約値（shrunk）なので、採用数1の極端な率は上位に来ない。
+ */
+export function sampleLevel(n: number): 0 | 1 | 2 | 3 {
+  if (n < 2) return 0
+  if (n < 5) return 1
+  if (n < LOW_SAMPLE) return 2
+  return 3
+}
+
+/** 「少数を薄く」ON のときに淡く描く採用数の上限。隠さず弱めるだけ。 */
+export const DIM_SAMPLE_MAX = 2
+
+/**
+ * 採用数の段階 → メーターの塗り色と数字の色。
+ * 銅＝この率は信じるな、ニュートラル＝そのまま読んでよい。金は紋章の色なので使わない。
+ */
+export const SAMPLE_TONE: { fill: string; text: string }[] = [
+  { fill: 'bg-bronze', text: 'text-bronze' },
+  { fill: 'bg-bronze/70', text: 'text-bronze' },
+  { fill: 'bg-muted', text: 'text-muted' },
+  { fill: 'bg-ink', text: 'text-ink' },
+]
 
 /** スターレベル → ★の配色（3=金,2=銀,1=銅） */
 export function starColor(star: number): string {
