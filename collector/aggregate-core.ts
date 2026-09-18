@@ -143,6 +143,8 @@ export interface AggregateDiag {
   excludedUnresolvedTrait: number
   /** accumulate した盤面グループ（構成キー）数。boardFilter で除外した盤面は含まない。 */
   boardGroupCount: number
+  /** n は足りていたが紋章シグネチャが1つも無く、出力から外した盤面数。 */
+  noSigBoards: number
   /** 未解決トレイト apiName 集合（該当レコード除外）。 */
   unresolvedTraitNames: Set<string>
   /** 未解決ユニット apiName 集合（該当ユニットのみ無視）。 */
@@ -323,10 +325,42 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
   }
 
   function finish(): { out: WireStatsFile; diag: AggregateDiag } {
-    // 出力対象（総レコード n>=MIN_OUTPUT_N）。n 降順・同数は盤面キー昇順で決定的に並べ、maxComps で切る。
-    const selected = [...map.entries()]
-      .filter(([, acc]) => acc.n >= MIN_OUTPUT_N)
-      .sort((a, b) => b[1].n - a[1].n || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    /** この盤面で「紋章を活用した」レコード数（＝フロントで行になりうるレコード数）。 */
+    const sigRecordsOf = (acc: CompAcc): number => {
+      let total = 0
+      for (const sig of acc.sigs.values()) total += sig.n
+      return total
+    }
+
+    // 出力対象は「総レコード n>=MIN_OUTPUT_N」かつ「紋章シグネチャを1つ以上持つ」盤面。
+    //
+    // sigs が空の盤面はフロントに出しても**絶対に画面に現れない**: 構成一覧の行は
+    // compRows が sigs から作るので0行になり、ティアの基準（cohortPlace）も sigs しか
+    // 見ないため寄与0。実データでは出力構成の 8〜17% がこれで、上限枠とファイルサイズを
+    // そのぶん無駄にしていた。
+    //
+    // 並べ替えのキーは盤面の総レコード数ではなく**紋章を活用したレコード数**。総レコード数で
+    // 切ると、紋章を使わない人気構成が上限枠を埋め、紋章を2枚以上使う構成が集まる小さい盤面から
+    // 先に落ちる（実データでは n=3〜4 の構成は 18.4% が紋章2枚以上、n>=200 では 5.5%）。
+    // このツールが見せたいものと逆順に切っていたことになる。stats.json を上限 12,000 で切る
+    // 実測で、紋章2枚以上の行の残存率は 86.7% → 96.8%、最小 n は 4 → 3 になる。
+    // 同数は総レコード数降順 → 盤面キー昇順で決定的に決める。
+    let noSigBoards = 0
+    const selected: { key: string; acc: CompAcc; sigRecords: number }[] = []
+    for (const [key, acc] of map) {
+      if (acc.n < MIN_OUTPUT_N) continue
+      if (acc.sigs.size === 0) {
+        noSigBoards++
+        continue
+      }
+      selected.push({ key, acc, sigRecords: sigRecordsOf(acc) })
+    }
+    selected.sort(
+      (a, b) =>
+        b.sigRecords - a.sigRecords ||
+        b.acc.n - a.acc.n ||
+        (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
+    )
     const capped = opts.maxComps && opts.maxComps > 0 ? selected.slice(0, opts.maxComps) : selected
 
     const usedTraitApis = new Set<string>()
@@ -344,7 +378,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
     }
 
     const preComps: PreComp[] = []
-    for (const [, acc] of capped) {
+    for (const { acc } of capped) {
       // 盤面ユニットと、その所持トレイトを used に追加（フロントの発動数算出に使う）。
       for (const u of acc.unitApis) {
         usedUnitApis.add(u)
@@ -521,7 +555,8 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       return wire
     }
 
-    // preComps は既に n 降順・盤面キー昇順。
+    // preComps は既に紋章活用レコード数の降順（同数は総レコード数 → 盤面キー）。
+    // フロントは一覧を自前で並べ替えるので、この順序は決定性のためだけのもの。
     const comps: WireComp[] = preComps.map(toWire)
 
     const out: WireStatsFile = {
@@ -547,6 +582,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       noBoard,
       excludedUnresolvedTrait,
       boardGroupCount: map.size,
+      noSigBoards,
       unresolvedTraitNames,
       unresolvedUnitNames,
       unresolvedEmblemNames,
