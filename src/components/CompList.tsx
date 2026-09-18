@@ -92,7 +92,8 @@ export function CompList({
   //
   // 'place'（＝Tier）は**同体数コホートからの差**で測る。素の平均順位で並べると体数の多い順に
   // なるだけで（実測 7体=5.28 … 10体=1.76）、「10体まで揃えろ」以上のことを言わない一覧になる。
-  // カードの Tier バッジも同じ基準（tierOfEdge）なので、これで表示と並び順が一致する。
+  // カード（CompCard）も派生行（DerivRow）も Tier バッジは同じ基準（tierOfEdge）で描くので、
+  // これで表示と並び順が一致する。cohort はその両方に渡す。
   //
   // 率は縮約値で比較する（生の率だと採用5件の 80% が採用500件の 62% より上に来る）。
   // 表示する数字は生の率のまま。詳細は format.ts の shrunk を参照。
@@ -256,6 +257,7 @@ export function CompList({
                     total={sel.length}
                     traitCount={traitCount}
                     bronze={bronze}
+                    cohort={cohort}
                     sortKey={sortKey}
                     lang={lang}
                     bronzeMode={bronzeMode}

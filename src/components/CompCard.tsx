@@ -8,7 +8,7 @@ import {
   holderMap,
   starColor,
   styleClasses,
-  tierOf,
+  tierOfEdge,
 } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { RecipeLabel } from './RecipeLabel'
@@ -27,6 +27,11 @@ interface CompCardProps {
   traitCount: Map<number, number>
   /** 生涯ブロンズ数（CompList で算出済み）。 */
   bronze: number
+  /**
+   * 同ユニット数コホートの平均順位（CompList で算出済み）。Tier バッジと平均順位の**色**の
+   * 根拠にだけ使う（差の数値は画面に出さない）。DerivRow と同じ基準に揃えるためのもの。
+   */
+  cohort: Map<number, number>
   sortKey: SortKey
   lang: Lang
   bronzeMode?: boolean
@@ -55,6 +60,7 @@ export function CompCard({
   total,
   traitCount,
   bronze,
+  cohort,
   sortKey,
   lang,
   bronzeMode,
@@ -69,8 +75,12 @@ export function CompCard({
 
   const avgPlace = row.n > 0 ? row.p / row.n : NaN
   const hasPlace = Number.isFinite(avgPlace)
+  // ティアは**同体数コホートからの差**で切る（`tierOfEdge`）。平均順位の絶対値は構成の強さでは
+  // なく盤面ユニット数をほぼ測っているので（実測 7体=5.28 … 10体=1.76）、絶対値で切ると
+  // 10体構成が全部 S になり色が情報を運ばなくなる。派生行（DerivRow）と一覧の並び順
+  // （CompList の 'place'）が既にこの基準なので、カードだけ絶対値だと表示と順序が食い違う。
   const tier = hasPlace
-    ? tierOf(avgPlace)
+    ? tierOfEdge(avgPlace, comp.units.length, cohort)
     : { label: '?', color: '#707682', classes: 'bg-line-strong text-muted' }
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
 
