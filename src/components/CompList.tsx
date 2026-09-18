@@ -129,16 +129,30 @@ export function CompList({
     })
   }, [rows, sortKey, bronzeMode, cohort])
 
-  // 紋章を2枚以上選んでいるときは「選択を全部使う構成」と「一部だけ使う構成」に分ける。
-  // 全部使う組み合わせは実データでは稀（8,483マッチ時点で採用数5以上は11件）だが、
-  // 稀だからこそ探せる形にしておく必要がある。並び順に混ぜると49件のリストに埋もれる。
-  // 各セクションの中は選択中の指標で素直に並ぶので、ランキングの軸も壊れない。
+  // 紋章を2枚以上選んでいるときは「何枚を使う構成か」でセクションを分ける。
+  // 3枚選んだら「3枚すべて使う」「2枚だけ使う」「1枚だけ使う」の3段になる。
+  //
+  // 以前は「すべて使う」と「一部だけ使う」の2段しかなく、中間の枚数が1枚使う行に埋もれていた。
+  // 18.2b の実データで人気上位3枚を選ぶと、1枚だけ使う行 6,722 に対し2枚使う行は 469 しか
+  // なく、しかも1枚組のほうが採用数が多いので並び順でも上に来る。既定の Tier 順だと最初の
+  // 2枚組は22位で、系統カードになる上位 TOP_N 行には1つも入らない。「3枚は無理でも2枚なら
+  // 組める構成を探す」という普通の使い方が、行は存在するのに事実上できなかった。
+  //
+  // 「すべて使う」を別セクションに切り出した理由（並び順に混ぜると埋もれる）が中間の枚数にも
+  // そのまま当てはまるので、同じ考え方を枚数ごとに広げる。各セクションの中は選択中の指標で
+  // 素直に並ぶので、ランキングの軸は壊れない。
   const sections = useMemo(() => {
-    if (sel.length <= 1) return [{ key: 'all' as const, rows: sorted }]
-    return [
-      { key: 'full' as const, rows: sorted.filter((r) => r.row.match >= sel.length) },
-      { key: 'partial' as const, rows: sorted.filter((r) => r.row.match < sel.length) },
-    ]
+    if (sel.length <= 1) return [{ key: 'all', match: sel.length, rows: sorted }]
+    const out: { key: string; match: number; rows: Row[] }[] = []
+    // used は sel の部分多重集合なので match は 1..sel.length に収まる。多い順に並べる。
+    for (let m = sel.length; m >= 1; m--) {
+      out.push({
+        key: m === sel.length ? 'full' : `use${m}`,
+        match: m,
+        rows: sorted.filter((r) => r.row.match === m),
+      })
+    }
+    return out
   }, [sorted, sel.length])
 
   // 上位を「コア ＋ 派生」の系統に畳む。コアが取れない行は flat に落ちて従来カードで描かれる。
@@ -194,10 +208,10 @@ export function CompList({
         {t(lang, 'resultCount', { n: sorted.length })}
       </div>
 
-      {trees.map(({ key, rows: sectionRows, tree }) => {
+      {trees.map(({ key, match, rows: sectionRows, tree }) => {
         // 「すべて使う構成」は稀少なので刻まずに全部出す（そこを探しに来ているセクションで
         // 「もっと見る」を挟むと、いちばん見たいものが隠れる）。長くなるのは単一選択の一覧と
-        // 「一部だけ使う構成」の方なので、そちらだけ PAGE_SIZE ずつ伸ばす。
+        // 使う枚数が少ないセクションの方なので、そちらだけ PAGE_SIZE ずつ伸ばす。
         const paged = key !== 'full'
         const limit = paged ? (shown[key] ?? PAGE_SIZE) : tree.flat.length
         const visible = tree.flat.slice(0, limit)
@@ -210,16 +224,19 @@ export function CompList({
                 <span className="text-xs font-bold uppercase tracking-wide text-muted">
                   {key === 'full'
                     ? t(lang, 'sectionFullUse', { n: sel.length })
-                    : t(lang, 'sectionPartialUse')}
+                    : t(lang, 'sectionUseCount', { n: match })}
                 </span>
                 <span className="text-xs text-faint">{sectionRows.length}</span>
               </div>
             )}
 
-            {/* 全部使う構成が1件も無いときは、空欄にせず理由を1行だけ出す。 */}
-            {key === 'full' && sectionRows.length === 0 && (
+            {/* 該当が1件も無いセクションは、見出しだけ残して理由を1行出す。畳んで消すと
+                「出てこない」のか「無い」のか区別がつかず、今回の報告と同じ状態に戻る。 */}
+            {key !== 'all' && sectionRows.length === 0 && (
               <div className="rounded-lg border border-dashed border-line bg-surface/40 px-3 py-3 text-xs text-muted">
-                {t(lang, 'noFullUse', { n: sel.length })}
+                {key === 'full'
+                  ? t(lang, 'noFullUse', { n: sel.length })
+                  : t(lang, 'noUseCount', { n: match })}
               </div>
             )}
 
