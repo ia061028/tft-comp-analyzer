@@ -3,9 +3,10 @@ import type { StatsFile } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
 import { loadStats, remapSelection, DEFAULT_STATS_FILE, ALL_PATCHES_KEY } from './lib/data'
 import { maxEmblemMultiplicity } from './lib/multiset'
+import { DIM_SAMPLE_MAX } from './lib/format'
 import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
-import { CompList, MIN_SAMPLE } from './components/CompList'
+import { CompList } from './components/CompList'
 import { SegmentedControl } from './components/SegmentedControl'
 import type { SortKey } from './components/CompCard'
 
@@ -33,7 +34,9 @@ function App() {
   const [selection, setSelection] = useState<number[]>([])
   // 既定は平均順位。同点は 1位率 → Top4率 の順で決まる（CompList の PRIORITY）。
   const [sortKey, setSortKey] = useState<SortKey>('place')
-  const [minAdopt, setMinAdopt] = useState(5)
+  // 採用数の下限フィルタは廃止した（紋章を2枚以上使う構成がほぼ全部そこで消えていた）。
+  // 代わりに薄い行を「淡く描くだけ」のトグル。既定 ON で見た目は従来に近く、OFF で全部が等価に出る。
+  const [dimLowSample, setDimLowSample] = useState(true)
   const [lang, setLang] = useState<Lang>(() => {
     const saved = localStorage.getItem(LANG_STORAGE_KEY)
     return saved === 'ja' || saved === 'en' ? saved : 'ja'
@@ -308,17 +311,27 @@ function App() {
             {t(lang, 'bronzeMode')}
           </button>
 
-          <div className="ml-auto flex items-center gap-2.5 text-sm">
-            <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t(lang, 'adoptionRate')}</span>
-            <input
-              type="number"
-              min={MIN_SAMPLE}
-              value={minAdopt}
-              onChange={(e) => setMinAdopt(Math.max(MIN_SAMPLE, Number(e.target.value)))}
-              aria-label={t(lang, 'adoptionRate')}
-              className="w-16 rounded-md border border-line bg-surface-2 px-2 py-1 text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+          {/*
+           * 「少数を薄く」。以前はここが「採用数下限」の入力欄で、既定の 5 が複数紋章の構成を
+           * ほぼ全部消していた。行は常に全部出し、薄いものを淡くするかどうかだけを選ばせる。
+           */}
+          <button
+            type="button"
+            aria-pressed={dimLowSample}
+            onClick={() => setDimLowSample((d) => !d)}
+            title={t(lang, 'dimLowSampleTitle', { n: DIM_SAMPLE_MAX })}
+            className={`ml-auto inline-flex items-center gap-1.5 rounded-md border bg-surface-2 px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+              dimLowSample
+                ? 'border-line-strong text-ink'
+                : 'border-line text-faint hover:border-line-strong hover:text-muted'
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${dimLowSample ? 'bg-ink' : 'bg-faint'}`}
+              aria-hidden
             />
-          </div>
+            {t(lang, 'dimLowSample')}
+          </button>
         </div>
       </div>
 
@@ -363,7 +376,7 @@ function App() {
             comps={selectedComps}
             sel={selection}
             sortKey={sortKey}
-            minAdopt={minAdopt}
+            dimLowSample={dimLowSample}
             lang={lang}
             bronzeMode={bronzeMode}
           />

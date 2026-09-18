@@ -4,7 +4,11 @@ import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/ty
 import {
   activeTraitCounts,
   bronzeTraitCount,
+  sampleLevel,
   shrunk,
+  DIM_SAMPLE_MAX,
+  LOW_SAMPLE,
+  SAMPLE_TONE,
   PRIOR_TOP4,
   PRIOR_PLACE,
   PRIOR_WEIGHT,
@@ -119,4 +123,27 @@ test('shrunk: weight を大きくするほど事前平均に寄る', () => {
   const w10 = shrunk(4, 5, PRIOR_TOP4, PRIOR_WEIGHT)
   const w100 = shrunk(4, 5, PRIOR_TOP4, 100)
   assert.ok(Math.abs(w100 - PRIOR_TOP4) < Math.abs(w10 - PRIOR_TOP4))
+})
+
+test('sampleLevel: 採用数 1 / 2-4 / 5-9 / 10+ の4段階に切る', () => {
+  assert.equal(sampleLevel(1), 0)
+  assert.equal(sampleLevel(2), 1)
+  assert.equal(sampleLevel(4), 1)
+  assert.equal(sampleLevel(5), 2)
+  assert.equal(sampleLevel(LOW_SAMPLE - 1), 2)
+  assert.equal(sampleLevel(LOW_SAMPLE), 3)
+  assert.equal(sampleLevel(9999), 3)
+})
+
+test('sampleLevel: 段は単調（採用数が増えて段が下がることはない）', () => {
+  for (let n = 1; n < 40; n++) assert.ok(sampleLevel(n) >= sampleLevel(n - 1 || 1))
+})
+
+test('SAMPLE_TONE: 全ての段に配色がある', () => {
+  for (const n of [1, 2, 5, LOW_SAMPLE]) assert.ok(SAMPLE_TONE[sampleLevel(n)])
+})
+
+test('薄く描く上限は最下段に収まる（淡い行が「十分」段に混ざらない）', () => {
+  assert.equal(sampleLevel(DIM_SAMPLE_MAX), 1)
+  assert.ok(sampleLevel(DIM_SAMPLE_MAX) < sampleLevel(LOW_SAMPLE))
 })
