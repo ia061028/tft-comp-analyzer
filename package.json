@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "design:sync": "tailwindcss -i design/entry.css -o design/ds/styles.css --minify",
     "collect": "tsx collector/collect.ts",
     "aggregate": "tsx collector/aggregate.ts",
     "data:pull": "tsx collector/data-pull.ts",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tailwindcss/cli": "^4.3.3",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

@@ -1,0 +1,16 @@
+/*! 自動生成 — 編集しない。真実は src/styles/{tokens,ui}.css。再生成: npm run design:sync */
+/*
+ * design/ds/styles.css の生成元（`npm run design:sync`）。
+ *
+ * 真実は src/styles/{tokens,ui}.css。このファイルは Claude Design 側のプレビューを
+ * 成立させるための足場でしかない: 参照HTML（design/ds/components/**）が使う Tailwind
+ * ユーティリティを拾い、Inter を読み込む。アプリ本体は src/index.css を使う。
+ */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+@import "tailwindcss" source(none);
+@source "../src";
+@source "./ds/components";
+
+@import "../src/styles/tokens.css";
+@import "../src/styles/ui.css";
