@@ -507,7 +507,10 @@ async function main(): Promise<void> {
       meta.routes[route] = { lastRunStartedAt: runStartedAt }
     } else {
       anyRouteFailed = true
-      console.error(`[${route}] 収集中に例外: ${s.reason}`)
+      // "TypeError: terminated" のような要約だけでは原因が分からないので stack と cause も出す。
+      const reason = s.reason as { stack?: string; cause?: unknown } | undefined
+      console.error(`[${route}] 収集中に例外: ${reason?.stack ?? s.reason}`)
+      if (reason?.cause) console.error(`[${route}]   cause: ${String(reason.cause)}`)
     }
   }
   saveMeta(meta)
