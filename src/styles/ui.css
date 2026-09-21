@@ -997,4 +997,77 @@
   .empty__action:focus-visible {
     box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-hand) 50%, transparent);
   }
+
+  /* ===== 構成の列そろえ ===== */
+  /*
+   * 1列＝1ユニット。系統のどの体数グループでも同じ横位置に来るので、共通駒は縦にそろい、
+   * 目が動くのは「選ぶ枠」の列だけになる。列数 --lane-n は呼び出し側が渡す。
+   */
+  /*
+   * 列は --lane-w で頭打ちにし、幅が足りなければそこまで縮める。列をそろえる以上
+   * ユニット数ぶんの幅が要るので、折り返す（＝そろわなくなる）よりマスを縮めるほうを取る。
+   */
+  .lanes {
+    display: grid;
+    grid-template-columns: repeat(var(--lane-n), minmax(0, var(--lane-w)));
+    justify-content: start;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+  }
+  /*
+   * 列のマス本体。デスクトップは --unit-size で頭打ち、狭い画面では列幅いっぱいまで縮む。
+   * max-height と overflow は画像が読めなかったとき用: alt が伸びてマスが縦に膨らむと
+   * 列そのものがずれるので、必ず正方形に収める。
+   */
+  .lane__box {
+    width: 100%;
+    max-width: var(--unit-size);
+    max-height: var(--unit-size);
+    aspect-ratio: 1;
+    overflow: hidden;
+  }
+  /* 列見出しの顔。行のマスより一回り小さくして、見出しだと分かるようにする。 */
+  .lane__head {
+    width: 100%;
+    max-width: var(--lane-head);
+    max-height: var(--lane-head);
+    aspect-ratio: 1;
+    overflow: hidden;
+  }
+  /* 派生ごとに中身が変わる列。ここだけ帯を敷いて、目が行く場所を固定する。 */
+  .lane--pick {
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklab, var(--color-hand) 12%, transparent);
+  }
+  /*
+   * その列を「この派生では取らなかった」枠。**破線は使わない**（破線はサンプル不足の
+   * 意味で予約済み）。沈んだ面として置き、列そのものは残す。
+   */
+  .lane__hole {
+    border-radius: var(--radius-sm);
+    background: var(--color-g-2);
+  }
+  /* その体数グループにそもそも居ないユニットの列。場所だけ取って何も描かない。 */
+  .lane__hole--none {
+    background: transparent;
+  }
+  /* 列ごとの印。灰＝そのグループの共通駒 / 灯＝選ぶ枠 / 無色＝この体数では使わない。 */
+  .lane__mark {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--color-g-4);
+  }
+  .lane__mark--pick {
+    background: var(--color-hand);
+  }
+  .lane__mark--none {
+    background: transparent;
+  }
+  /* アイテムは必ず3個ぶんが1列に収まる幅にする（欄が広いときだけ --lane-item で頭打ち）。 */
+  .lane__item {
+    width: calc((100% - 2px) / 3);
+    max-width: var(--lane-item);
+    aspect-ratio: 1;
+  }
 }

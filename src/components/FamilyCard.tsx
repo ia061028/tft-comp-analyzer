@@ -1,6 +1,7 @@
+import type { CSSProperties } from 'react'
 import type { StatsFile } from '../../shared/types'
 import type { Family, Span } from '../lib/backbone'
-import { activeTier, costBorder, starColor, styleClasses, DIM_SAMPLE_MAX } from '../lib/format'
+import { costBorder, DIM_SAMPLE_MAX } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { DerivRow } from './DerivRow'
 import { RecipeLabel } from './RecipeLabel'
@@ -16,49 +17,32 @@ interface FamilyCardProps {
 }
 
 /**
- * 1系統 ＝ 背骨パネル（1回だけ）＋ 体数グループのアコーディオン。
+ * 1系統 ＝ 列見出し（1回だけ）＋ 体数グループ。
+ *
+ * 列は系統ぜんぶで共通で、1列＝1ユニット。どの派生も同じ横位置に同じ駒が来るので、
+ * 共通駒は縦にそろい、目が動くのは「選ぶ枠」の列だけになる。ユニットの名前はこの見出しが
+ * 1回だけ名乗り、各行は駒そのものに集中する。
+ *
+ * **見出しはアイテムも紋章の装備者も主張しない。** 同じ系統でも派生によって装備者そのものが
+ * 変わる（実データで確認済み）ので、代表値を置くと嘘になる。それらは行ごとに描く。
  *
  * **体数グループをまたいで線や矢印を引かない。** 8体 → 9体 は「駒を1つ足した改善」ではなく
  * 「9体まで生き残れた人の成績」なので（平均順位は実質ユニット数を測っている）、
- * 親→子の関係として見せると最も誤解を招く。グループは互いに独立した選択肢として並べる。
- * 比較が正当なのは**同じ体数の兄弟の間だけ**。
+ * 親→子の関係として見せると最も誤解を招く。比較が正当なのは**同じ体数の兄弟の間だけ**。
  */
 export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: FamilyCardProps) {
-  const { traits, units, emblems, items } = stats
-  const { backbone, holders, traitCount, used, groups } = family
-  // コアユニットのスター・アイテムは系統の最良行のものを代表値として使う。
-  const bestComp = groups.flatMap((g) => g.derivs).reduce((a, b) => (a.rank <= b.rank ? a : b)).comp
-
-  // 紋章由来の特性は、この系統を選ぶ理由そのものなので先頭に出して金リングで区別する。
-  const emblemTraits = new Set(
-    used.map((ei) => emblems[ei]?.trait).filter((x): x is number => x != null),
-  )
-  const chips: [number, number, number][] = []
-  for (const [ti, count] of traitCount) {
-    const tr = traits[ti]
-    if (!tr) continue
-    const at = activeTier(count, tr.tiers)
-    if (!at) continue
-    chips.push([ti, at.style, at.min])
-  }
-  chips.sort(
-    (a, b) =>
-      Number(emblemTraits.has(b[0])) - Number(emblemTraits.has(a[0])) ||
-      b[1] - a[1] ||
-      (traits[a[0]].name < traits[b[0]].name ? -1 : 1),
-  )
+  const { units, emblems } = stats
+  const { used, groups, lanes } = family
+  const laneVars = { '--lane-n': lanes.length } as CSSProperties
 
   // overflow-hidden は使わない。角丸のためにクリップすると、ユニット上のツールチップが
-  // カードの縁で切られて読めなくなる（背骨パネルの1行目が特に潰れる）。角丸は子側で処理する。
+  // カードの縁で切られて読めなくなる。角丸は子側で処理する。
   return (
     <div className="rounded-xl border border-line bg-surface">
-      {/* ───── コアパネル: この系統に共通するユニット・装備者・アイテム・特性を1回だけ ───── */}
+      {/* ───── 列見出し: 1列＝1ユニット。この系統のどの行でもこの並びで駒が立つ ───── */}
       <div className="rounded-t-xl border-b-2 border-line bg-gradient-to-b from-gold/[0.06] to-black/20 px-4 py-3">
-        <div className="mb-2.5 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-extrabold tracking-wide text-gold">
-            {t(lang, 'backbone', { n: backbone.length })}
-          </span>
-          <div className="ml-auto flex items-center gap-1.5">
+        {used.length > 0 && (
+          <div className="mb-2 flex items-center justify-end gap-1.5">
             {used.map((ei, i) => {
               const e = emblems[ei]
               if (!e) return null
@@ -77,99 +61,27 @@ export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: Family
               )
             })}
           </div>
-        </div>
+        )}
 
-        <div className="mb-2.5 flex flex-wrap gap-x-2 gap-y-2">
-          {backbone.map((unitIdx) => {
-            const unit = units[unitIdx]
-            if (!unit) return null
+        <div className="lanes" style={laneVars}>
+          {lanes.map((lane) => {
+            const unit = units[lane.unitIdx]
+            if (!unit) return <div key={lane.unitIdx} />
             const unitName = pickName(lang, unit)
-            const pos = bestComp.units.indexOf(unitIdx)
-            const star = pos >= 0 ? (bestComp.unitStars?.[pos] ?? 0) : 0
-            const unitItems = bestComp.unitItems
-              .filter((ui) => ui[0] === unitIdx)
-              .map((ui) => items?.[ui[1]])
-              .filter(Boolean)
-            const held = (holders.get(unitIdx) ?? []).map((ei) => emblems[ei]).filter(Boolean)
-
             return (
-              <div key={unitIdx} className="flex w-[50px] flex-col items-center gap-0.5">
-                <div className={`h-3 text-[10px] leading-none tracking-[1px] ${starColor(star)}`}>
-                  {star > 0 ? '★'.repeat(star) : ''}
-                </div>
-                <div className="relative">
-                  <Tip label={star > 0 ? `${unitName} ★${star}` : unitName}>
-                    <img
-                      src={unit.icon}
-                      alt={unitName}
-                      loading="lazy"
-                      className={`h-[46px] w-[46px] shrink-0 rounded-lg border-2 object-cover ${costBorder(unit.cost)}`}
-                      style={
-                        held.length > 0
-                          ? { boxShadow: '0 0 0 2px var(--color-gold), 0 0 12px rgba(232,183,92,.45)' }
-                          : undefined
-                      }
-                    />
-                  </Tip>
-                  {held.length > 0 && (
-                    <div className="absolute -right-1.5 -top-1.5 z-10 flex gap-0.5">
-                      {held.map((e, j) => (
-                        <Tip key={j} label={<RecipeLabel label={pickName(lang, e!)} recipe={e!.recipe} />}>
-                          <img
-                            src={e!.icon}
-                            alt=""
-                            loading="lazy"
-                            className="h-[19px] w-[19px] shrink-0 rounded bg-base object-contain ring-2 ring-gold"
-                          />
-                        </Tip>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="flex h-[15px] justify-center gap-[1px]">
-                  {unitItems.slice(0, 3).map((it) => (
-                    <Tip key={it!.api} label={<RecipeLabel label={pickName(lang, it!)} recipe={it!.recipe} />}>
-                      <img
-                        src={it!.icon}
-                        alt=""
-                        loading="lazy"
-                        className="h-[15px] w-[15px] shrink-0 rounded border border-base bg-base object-cover"
-                      />
-                    </Tip>
-                  ))}
-                </div>
-                <span className="max-w-[50px] truncate text-[9px] leading-none text-muted">{unitName}</span>
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          {chips.map(([traitIdx, style, count]) => {
-            const trait = traits[traitIdx]
-            const fromEmblem = emblemTraits.has(traitIdx)
-            return (
-              <Tip key={traitIdx} label={trait ? pickName(lang, trait) : `#${traitIdx}`}>
-                <span
-                  className={`inline-flex items-center gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${styleClasses(
-                    style,
-                  )} ${
-                    fromEmblem
-                      ? 'h-[22px] font-bold ring-1 ring-gold/60'
-                      : 'h-[19px] font-semibold opacity-80'
-                  }`}
-                >
-                  {trait?.icon && (
-                    <img
-                      src={trait.icon}
-                      alt=""
-                      loading="lazy"
-                      className={fromEmblem ? 'h-4 w-4 object-contain' : 'h-3.5 w-3.5 object-contain'}
-                    />
-                  )}
-                  {count ? <span>{count}</span> : null}
+              <div key={lane.unitIdx} className="flex flex-col items-center gap-1">
+                <Tip label={unitName}>
+                  <img
+                    src={unit.icon}
+                    alt={unitName}
+                    loading="lazy"
+                    className={`lane__head rounded-md border object-cover ${costBorder(unit.cost)}`}
+                  />
+                </Tip>
+                <span className="w-full truncate text-center text-[9px] leading-none text-muted">
+                  {unitName}
                 </span>
-              </Tip>
+              </div>
             )
           })}
         </div>
@@ -180,7 +92,7 @@ export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: Family
         <div key={g.units}>
           <div
             title={t(lang, 'compareWithin')}
-            className="flex w-full items-center gap-x-3 gap-y-1 border-t border-line bg-black/20 px-4 py-2.5 text-left"
+            className="flex w-full items-center gap-x-3 gap-y-1 border-t border-line bg-black/20 px-4 pb-1.5 pt-2.5 text-left"
           >
             <span className="w-[52px] shrink-0 text-[15px] font-extrabold text-ink">
               {t(lang, 'unitsGroup', { n: g.units })}
@@ -201,11 +113,27 @@ export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: Family
               {t(lang, 'derivCount', { n: g.derivs.length })}
             </span>
           </div>
+
+          {/*
+           * 列ごとの印。この体数では「どの列がどの派生にも出る共通駒か」「どの列が選ぶ枠か」が
+           * 体数ごとに変わるので、グループの頭で一度だけ示す。文字では言わない。
+           */}
+          <div className="lanes bg-black/20 px-4 pb-2" style={laneVars}>
+            {g.lanes.map((u, i) => (
+              <div
+                key={lanes[i].unitIdx}
+                className={`lane__mark ${u.absent ? 'lane__mark--none' : u.fixed ? '' : 'lane__mark--pick'}`}
+              />
+            ))}
+          </div>
+
           {g.derivs.map((d) => (
             <DerivRow
               key={`${d.comp.units.join(',')}|${d.row.used.join(',')}`}
               stats={stats}
               deriv={d}
+              lanes={lanes}
+              laneUse={g.lanes}
               cohort={cohort}
               showEmblems={family.mixedEmblems}
               dim={dimLowSample && d.row.n <= DIM_SAMPLE_MAX}

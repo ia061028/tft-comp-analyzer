@@ -13,8 +13,15 @@ import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/ty
 import type { CompRow } from './multiset'
 import { activeTier, activeTraitCounts, bronzeTraitCount, holderMap } from './format'
 
-/** ツリー化の対象は上位N行だけ。全行だと系統が40個に割れ、クラスタリングも 600ms 超で実用外。 */
-export const TOP_N = 20
+/**
+ * ツリー化の対象は上位N行だけ。全行だと系統が40個に割れ、クラスタリングも 600ms 超で実用外。
+ *
+ * 20 では紋章1枚の一覧 962 行のうち系統に入るのが 15 行しかなく、残り 947 行はフラットカードに
+ * 落ちていた。実測（人気上位5紋章）でツリー化率は N を広げても 88〜90% で一定、クラスタリングは
+ * N=60 で最悪 7.8ms（N=120 で 35ms、160 で 75ms）。3倍の行を系統に載せても一覧が長くなりすぎない
+ * ところとして 60 を取る。
+ */
+export const TOP_N = 60
 /** 完全連結クラスタリングのカット高さ（Jaccard 距離）。実測でツリー化率が最大になる値。 */
 export const CUT = 0.4
 /** 背骨がこれ未満の系統は、差分表示がフル盤面より読みにくくなるのでフラット縮退。 */
@@ -71,6 +78,31 @@ export interface UnitGroup {
   top4: Span
   /** 1位率 %。 */
   win: Span
+  /** `Family.lanes` と同じ並びで、このグループから見た各列の状態。 */
+  lanes: LaneUse[]
+}
+
+/**
+ * 系統の「列」。1列＝1ユニットで、系統のどの体数グループでも同じ横位置に来る。
+ *
+ * 派生ごとに盤面を素直に並べると、同じ駒が行ごとに違う位置に出る。読み手は毎行アイコンを
+ * 見比べて共通部分を組み直すことになり、それがゲーム中の瞬間判断をいちばん妨げる。
+ * 列を固定すれば共通駒は縦にそろい、目が動くのは「選ぶ枠」だけになる。
+ */
+export interface Lane {
+  unitIdx: number
+  /** このユニットが固定枠（＝その体数グループの全派生に出る）になっているグループ数。 */
+  fixedIn: number
+  /** このユニットが現れる体数グループ数。 */
+  inGroups: number
+}
+
+/** 体数グループから見た1レーンの状態。`Family.lanes` と同じ並び・同じ長さ。 */
+export interface LaneUse {
+  /** このグループの全派生に出る＝共通駒。 */
+  fixed: boolean
+  /** このグループのどの派生にも出ない＝この体数では使わない駒。 */
+  absent: boolean
 }
 
 export interface Family {
@@ -92,6 +124,8 @@ export interface Family {
   mixedEmblems: boolean
   /** 盤面ユニット数の降順。 */
   groups: UnitGroup[]
+  /** 系統ぜんぶで共通の列。共通駒が左、選ぶ枠が右に寄る。 */
+  lanes: Lane[]
   /** この系統の派生総数。 */
   total: number
   /** 最良の派生の順位（0 が最良）。系統の並び順に使う。 */
@@ -225,6 +259,48 @@ function synergyGain(
 }
 
 /**
+ * 系統の列（レーン）を1本ずつ決める。
+ *
+ * 並びは「どの体数グループでも固定の駒 → 出てくるグループが多い駒 → 高コスト」。
+ * 結果として左から共通駒が詰まり、右端に選ぶ枠が寄る。同時に各グループから見た
+ * 列の状態（共通駒か／この体数では使わない駒か）も返す。
+ */
+function buildLanes(groups: UnitGroup[], units: UnitInfo[]): { lanes: Lane[]; use: LaneUse[][] } {
+  // グループごとに「そのユニットが何派生に出るか」を数える。
+  const counts = groups.map((g) => {
+    const m = new Map<number, number>()
+    for (const d of g.derivs) for (const u of new Set(d.comp.units)) m.set(u, (m.get(u) ?? 0) + 1)
+    return m
+  })
+
+  const byUnit = new Map<number, Lane>()
+  groups.forEach((g, gi) => {
+    for (const [u, c] of counts[gi]) {
+      const lane = byUnit.get(u) ?? { unitIdx: u, fixedIn: 0, inGroups: 0 }
+      lane.inGroups += 1
+      if (c === g.derivs.length) lane.fixedIn += 1
+      byUnit.set(u, lane)
+    }
+  })
+
+  const lanes = [...byUnit.values()].sort(
+    (a, b) =>
+      b.fixedIn - a.fixedIn ||
+      b.inGroups - a.inGroups ||
+      (units[b.unitIdx]?.cost ?? 0) - (units[a.unitIdx]?.cost ?? 0) ||
+      a.unitIdx - b.unitIdx,
+  )
+
+  const use = groups.map((g, gi) =>
+    lanes.map((lane) => {
+      const c = counts[gi].get(lane.unitIdx) ?? 0
+      return { fixed: c === g.derivs.length, absent: c === 0 }
+    }),
+  )
+  return { lanes, use }
+}
+
+/**
  * 上位 TOP_N 行を系統に分け、系統ごとにコアと派生（体数グループ）を作る。
  * コアが取れない系統・差分が大きすぎる行・1行だけの系統は flat に落とす（ツリーを強制しない）。
  *
@@ -235,8 +311,9 @@ export function buildTree(
   units: UnitInfo[] = [],
   emblems: EmblemInfo[] = [],
   traits: TraitInfo[] = [],
+  topN: number = TOP_N,
 ): Tree {
-  const head = sorted.slice(0, TOP_N)
+  const head = sorted.slice(0, topN)
   if (head.length < MIN_FAMILY) return { families: [], flat: sorted }
 
   const families: Family[] = []
@@ -303,7 +380,13 @@ export function buildTree(
         place: spanOf(ds.map((d) => d.row.p / d.row.n)),
         top4: spanOf(ds.map((d) => (d.row.top4 / d.row.n) * 100)),
         win: spanOf(ds.map((d) => (d.row.win / d.row.n) * 100)),
+        lanes: [],
       }))
+
+    const { lanes, use } = buildLanes(groups, units)
+    groups.forEach((g, gi) => {
+      g.lanes = use[gi]
+    })
 
     // コアの装備者は系統の最良行のものを使う（derivs は rank 昇順なので先頭が最良）。
     const best = derivs[0]
@@ -315,6 +398,7 @@ export function buildTree(
       used: best.row.used,
       mixedEmblems: derivs.some((d) => d.row.used.join(',') !== bestKey),
       groups,
+      lanes,
       total: derivs.length,
       rank: best.rank,
     })
@@ -326,7 +410,7 @@ export function buildTree(
 
   return {
     families,
-    flat: [...flatRanks.map((i) => head[i]), ...sorted.slice(TOP_N)],
+    flat: [...flatRanks.map((i) => head[i]), ...sorted.slice(topN)],
   }
 }
 

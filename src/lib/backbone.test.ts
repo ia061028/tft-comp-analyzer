@@ -277,3 +277,37 @@ test('シナジー: コアから発動段が上がる／新たに発動する特
   )
   assert.deepEqual(byAdd.get(11), [], '+u11 は何も伸びない')
 })
+
+test('レーンは共通駒が左、選ぶ枠が右にそろう', () => {
+  const sorted = [
+    row([...CORE, 9]),
+    row([...CORE, 10]),
+    row([...CORE, 11]),
+    row([...CORE, 9, 10]),
+  ]
+  const f = buildTree(sorted).families[0]
+
+  // 固定されているグループ数 → 出てくるグループ数 → unitIdx。9/10 は10体グループでだけ固定、
+  // 11 はどのグループでも固定されないので最後に来る。
+  assert.deepEqual(
+    f.lanes.map((l) => l.unitIdx),
+    [...CORE, 9, 10, 11],
+  )
+  assert.equal(f.lanes.length, new Set(f.lanes.map((l) => l.unitIdx)).size, '1ユニット1列')
+
+  const nine = f.groups.find((g) => g.units === 9)!
+  assert.equal(nine.lanes.length, f.lanes.length, 'グループの列は系統の列と同じ並び・同じ長さ')
+  assert.ok(
+    nine.lanes.slice(0, CORE.length).every((u) => u.fixed && !u.absent),
+    '9体グループでは背骨の8体が共通駒',
+  )
+  assert.ok(
+    nine.lanes.slice(CORE.length).every((u) => !u.fixed && !u.absent),
+    '9/10/11 は9体グループの「選ぶ枠」',
+  )
+
+  const ten = f.groups.find((g) => g.units === 10)!
+  // 10体グループは派生1件なので、その盤面にある駒はすべて固定扱いになる。
+  assert.ok(ten.lanes.slice(0, CORE.length + 2).every((u) => u.fixed))
+  assert.ok(ten.lanes[CORE.length + 2].absent, '11 は10体グループには居ない')
+})
