@@ -77,7 +77,7 @@
   /* 構成の列そろえ。1列の幅はユニット＋左右の余白ぶん（モバイルの --unit-size にも追従する）。 */
   --lane-w: calc(var(--unit-size) + 4px);
   --lane-item: 46%; /* アイテム1個の幅（列幅に対する割合）。3個のときは重ねて収める */
-  --lane-badge: 17px; /* 駒の角に付くバッジ（紋章の装備者・上乗せ特性） */
+  --lane-badge: 19px; /* 駒の角に付く紋章の装備者バッジ */
   --lane-star: 10px; /* 列に収まる星（3つで1列に収まる大きさ） */
   --ember-rail: 3px; /* 灯バーの幅 */
   --radius: 10px;
@@ -110,7 +110,7 @@
      * 30px でも 2x ディスプレイでは 60 device px あり、スプラッシュアートは十分見分けられる。
      */
     --unit-size: 30px;
-    --lane-badge: 13px;
+    --lane-badge: 14px;
     --unit-holder: 36px;
     --lane-star: 8px;
     --ember-rail: 4px;

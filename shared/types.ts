@@ -172,13 +172,21 @@ export interface WireComp {
 }
 
 /**
- * 特性を上乗せするユニットの推定 [unitIdx, traitIdx]。
+ * 特性を上乗せするユニットの推定 [unitIdx, traitIdx, delta]。
  *
  * 「この上乗せは誰のものか」をユニット名で決め打ちしないための実測ベースの対応表。
- * 集計時に「トレイト t の上乗せが観測されたレコードのうち、ユニット u が盤面に居た割合」が
+ * 集計時に「トレイト t が delta だけ上乗せされたレコードのうち、ユニット u が盤面に居た割合」が
  * ほぼ 1 のものだけを採用する（GRANTER_MIN_COVERAGE）。
+ *
+ * **上乗せ数ごとに分けて数える**。同じトレイトでも由来ごとに上乗せ数が違い、
+ * 混ぜるとユニットの同席率が薄まって誰も閾値に届かなくなる。実測では
+ * フェイの +2 はラックス同席率 100% なのに、+1 を混ぜると 80.7% まで落ちていた。
+ * +1 側のようなユニット由来でない上乗せ（セット18 ではウィスプ等の一時効果と見られる）は
+ * どのユニットにも寄らないので、閾値に届かず自然に落ちる。
+ *
+ * delta が欠けている旧ファイル（schemaVersion 5）はトレイトだけで照合する。
  */
-export type TraitGranter = [number, number]
+export type TraitGranter = [number, number, number] | [number, number]
 
 /**
  * パッチ別集計ファイルの一覧（全ファイルに同じ内容で埋め込む）。
@@ -197,7 +205,7 @@ export interface PatchIndexEntry {
 
 /** stats.json 全体のオンディスク圧縮形式。 */
 export interface WireStatsFile {
-  schemaVersion: 5
+  schemaVersion: 6
   generatedAt: string
   patch: string
   tftPatch: string

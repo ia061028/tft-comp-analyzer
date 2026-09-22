@@ -5,12 +5,14 @@ import {
   activeTier,
   buildPlannerCode,
   effectiveUnits,
-  grantsByUnit,
+  granterOfTrait,
+  granterTip,
   holderMap,
   styleClasses,
   tierOfEdge,
 } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
+import { GranterFace } from './GranterFace'
 import { LaneUnit } from './LaneUnit'
 import { RecipeLabel } from './RecipeLabel'
 import { SampleMeter } from './SampleMeter'
@@ -68,8 +70,8 @@ export function DerivRow({
   const winRate = row.n > 0 ? (row.win / row.n) * 100 : 0
 
   const holders = holderMap(comp, row.used)
-  // 静的データに出ない上乗せ特性の付与元（unitIdx → その駒が持ち込む特性）。
-  const unitGrants = grantsByUnit(comp, stats.granters)
+  // 静的データに出ない上乗せ特性の付与元（traitIdx → 伸ばした駒）。チップ側に出す。
+  const traitGranters = granterOfTrait(comp, stats.granters)
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
 
   // この盤面の全発動特性。[traitIdx, style, 発動段, この派生で伸びたか]
@@ -89,7 +91,6 @@ export function DerivRow({
       b[1] - a[1] ||
       (traits[a[0]].name < traits[b[0]].name ? -1 : 1),
   )
-  const anyGained = chips.some((c) => c[3])
 
   const copy = async () => {
     try {
@@ -124,7 +125,6 @@ export function DerivRow({
                 pick={lane.fixed === null}
                 comp={comp}
                 holders={holders}
-                grants={unitGrants}
                 lang={lang}
               />
             ))}
@@ -165,20 +165,18 @@ export function DerivRow({
             {chips.map(([traitIdx, style, count, gained]) => {
               const trait = traits[traitIdx]
               const name = trait ? pickName(lang, trait) : `#${traitIdx}`
-              // 伸びた特性が1つも無い行（＝コアのまま）は全部を等しく出す。落とす相手がいないのに
-              // 全チップを淡くすると、ただ読みにくいだけになる。
-              const dimChip = anyGained && !gained
+              const src = traitGranters.get(traitIdx)
+              const tip = `${name} ${count}${granterTip(src, units, lang)}`
               return (
-                <Tip key={traitIdx} label={gained ? `${name} ${count} — ${t(lang, 'synergyGain')}` : `${name} ${count}`}>
+                <Tip key={traitIdx} label={gained ? `${tip} — ${t(lang, 'synergyGain')}` : tip}>
                   <span
                     className={`inline-flex h-[20px] items-center gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${styleClasses(
                       style,
                     )} ${
-                      gained
-                        ? 'font-bold ring-1 ring-ink/25'
-                        : `font-semibold ${dimChip ? 'opacity-55' : ''}`
+                      gained ? 'font-bold ring-1 ring-ink/25' : 'font-semibold'
                     }`}
                   >
+                    <GranterFace source={src} units={units} lang={lang} />
                     {trait?.icon && (
                       <img
                         src={trait.icon}

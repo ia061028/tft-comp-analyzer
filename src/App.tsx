@@ -424,7 +424,7 @@ function App() {
 
       <div className="flex min-h-0 flex-1">
         {/* デスクトップのレール。モバイルは下の EmblemDock（ドック＋シート）に置き換わる。 */}
-        <aside className="hidden w-[360px] shrink-0 overflow-y-auto border-r border-line bg-surface/40 p-4 md:block">
+        <aside className="hidden w-[300px] shrink-0 overflow-y-auto border-r border-line bg-surface/40 p-4 md:block">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase tracking-wide text-faint">
               {t(lang, 'emblems')}

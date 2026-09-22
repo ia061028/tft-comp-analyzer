@@ -9,6 +9,7 @@ import type {
   TraitInfo,
   UnitInfo,
 } from '../../shared/types'
+import { pickName, type Lang } from './i18n'
 
 /**
  * 上乗せ特性を発動数に足す最小シェア。
@@ -82,17 +83,62 @@ export function appliedGrants(comp: CompStats): TraitGrant[] {
  * その場合でも発動数の合計（activeTraitCounts）は正しいままで、
  * 「誰の分か」の表示だけが落ちる。
  */
+/** 上乗せ特性1件と、その付与元ユニット。 */
+export interface GrantSource {
+  /** units 配列インデックス。 */
+  unit: number
+  grant: TraitGrant
+}
+
+/**
+ * 上乗せ特性を「伸ばされた特性」から引く（traitIdx → 付与元ユニットと上乗せ）。
+ *
+ * 発動特性チップに「この数はこの駒のおかげ」を出すためのもの。付与元を推定できなかった
+ * 上乗せは入らない（発動数は正しいまま、付与元の表示だけが落ちる）。
+ */
+export function granterOfTrait(
+  comp: CompStats,
+  granters: TraitGranter[],
+): Map<number, GrantSource> {
+  const out = new Map<number, GrantSource>()
+  for (const [unit, list] of grantsByUnit(comp, granters)) {
+    for (const grant of list) out.set(grant.trait, { unit, grant })
+  }
+  return out
+}
+
+/** チップの吹き出しに足す「誰が何体分ぶん伸ばしたか」。付与元が無ければ空文字。 */
+export function granterTip(
+  source: GrantSource | undefined,
+  units: UnitInfo[],
+  lang: Lang,
+): string {
+  if (!source) return ''
+  const unit = units[source.unit]
+  if (!unit) return ''
+  const pct = Math.round(source.grant.share * 100)
+  return ` · ${pickName(lang, unit)} +${source.grant.delta}${pct < 100 ? ` (${pct}%)` : ''}`
+}
+
 export function grantsByUnit(
   comp: CompStats,
   granters: TraitGranter[],
 ): Map<number, TraitGrant[]> {
   const out = new Map<number, TraitGrant[]>()
   if (!comp.grants?.length || !granters.length) return out
+  // 照合はトレイトと上乗せ数の組。同じトレイトでも由来ごとに上乗せ数が違うため
+  // （セット18 ではラックスが +2、別経路が +1）、数まで一致したものだけを付与元とする。
+  // delta を持たない旧ファイル（schemaVersion 5）はトレイトだけで引けるよう別に持つ。
+  const unitOfTraitDelta = new Map<string, number>()
   const unitOfTrait = new Map<number, number>()
-  for (const [ui, ti] of granters) unitOfTrait.set(ti, ui)
+  for (const g of granters) {
+    const [ui, ti, delta] = g
+    if (delta === undefined) unitOfTrait.set(ti, ui)
+    else unitOfTraitDelta.set(`${ti}|${delta}`, ui)
+  }
   const board = new Set(comp.units)
   for (const g of comp.grants) {
-    const ui = unitOfTrait.get(g.trait)
+    const ui = unitOfTraitDelta.get(`${g.trait}|${g.delta}`) ?? unitOfTrait.get(g.trait)
     if (ui === undefined || !board.has(ui)) continue
     const list = out.get(ui)
     if (list) list.push(g)

@@ -36,11 +36,22 @@ export const GRANT_MIN_SHARE = 0.15
 export const GRANTS_PER_COMP = 8
 /**
  * 付与元ユニットと認めるカバレッジ下限。
- * 「トレイト t の上乗せが観測されたレコードのうち、ユニット u が盤面に居た割合」。
- * 1トレイトを複数ユニットが付与するセットではどのユニットも閾値に届かず、
- * 付与元なし（＝数は正しいが誰の分か出さない）に自然に縮退する。
+ * 「トレイト t が delta だけ上乗せされたレコードのうち、ユニット u が盤面に居た割合」。
+ * 同じ上乗せ数を複数の経路が作るセット（ユニット以外の由来を含む）では
+ * どのユニットも閾値に届かず、付与元なし（＝数は正しいが誰の分か出さない）に自然に縮退する。
+ * 実データ（セット18）では魔女とソーラーの +2 がこれに当たり、ラックス以外の経路が混じる。
  */
 export const GRANTER_MIN_COVERAGE = 0.9
+/**
+ * 付与元を推定するのに必要なレコード数の下限。
+ *
+ * 上乗せ数ごとに分けて数えると、たまたま数件しか出ない組（同時に2経路が乗った等）ができる。
+ * 件数が少ないと、単に人気なだけのユニットが偶然カバレッジ100%になり、
+ * そのユニットの仕業だと誤って表示してしまう。実データ（asia 1シャード）では
+ * 本物の付与元は 279 件以上、偶然の一致は 13 件以下で、その間に大きな隙間がある。
+ * 届かない組は付与元なし（＝数は正しいが誰の分か出さない）に縮退する。
+ */
+export const GRANTER_MIN_RECORDS = 100
 /** 追加盤面枠の上限（レベルとユニット数のズレはノイズも含むのでクランプする）。 */
 export const MAX_SLOT_EXTRA = 2
 
@@ -214,6 +225,23 @@ export function slotExtraOf(rec: ParticipantRecord, boardCount: number): number 
   return Math.min(extra, MAX_SLOT_EXTRA)
 }
 
+/**
+ * 付与元推定の集計キー。トレイト apiName と上乗せ数の組。
+ * トレイト apiName に区切り文字は現れないので単純連結で衝突しない。
+ */
+export function granterKey(traitApi: string, delta: number): string {
+  return `${traitApi}|${delta}`
+}
+
+/** granterKey の逆変換。壊れたキーは null。 */
+export function parseGranterKey(key: string): { traitApi: string; delta: number } | null {
+  const i = key.lastIndexOf('|')
+  if (i <= 0) return null
+  const delta = Number(key.slice(i + 1))
+  if (!Number.isFinite(delta)) return null
+  return { traitApi: key.slice(0, i), delta }
+}
+
 export interface AggregateDiag {
   /** 盤面ユニットが1体も無く除外したレコード数。 */
   noBoard: number
@@ -309,9 +337,9 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
   }
 
   const map = new Map<string, CompAcc>()
-  // 付与元ユニットの推定用。トレイト apiName → ユニット apiName → 同時出現数。
+  // 付与元ユニットの推定用。granterKey(トレイト, 上乗せ数) → ユニット apiName → 同時出現数。
   const granterCo = new Map<string, Map<string, number>>()
-  // トレイト apiName → 上乗せが観測されたレコード数（granterCo の分母）。
+  // granterKey → その上乗せが観測されたレコード数（granterCo の分母）。
   const granterTotal = new Map<string, number>()
   let noBoard = 0
   let excludedUnresolvedTrait = 0
@@ -371,11 +399,14 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
         dc.set(delta, (dc.get(delta) ?? 0) + 1)
 
         // 付与元の推定材料: この上乗せと同時に盤面に居たユニット。
-        granterTotal.set(tApi, (granterTotal.get(tApi) ?? 0) + 1)
-        let co = granterCo.get(tApi)
+        // キーは「トレイト＋上乗せ数」。同じトレイトでも由来ごとに上乗せ数が違うので、
+        // 混ぜると本来の付与元の同席率が薄まる（granterKey のコメント参照）。
+        const gKey = granterKey(tApi, delta)
+        granterTotal.set(gKey, (granterTotal.get(gKey) ?? 0) + 1)
+        let co = granterCo.get(gKey)
         if (!co) {
           co = new Map()
-          granterCo.set(tApi, co)
+          granterCo.set(gKey, co)
         }
         for (const uApi of boardSet) co.set(uApi, (co.get(uApi) ?? 0) + 1)
       }
@@ -707,15 +738,17 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
     // フロントは一覧を自前で並べ替えるので、この順序は決定性のためだけのもの。
     const comps: WireComp[] = preComps.map(toWire)
 
-    // 付与元ユニットの推定。トレイトごとにカバレッジ最大のユニットを1体だけ採る。
+    // 付与元ユニットの推定。「トレイト＋上乗せ数」ごとにカバレッジ最大のユニットを1体だけ採る。
     // 実データ（セット18）ではカ＝ジックス・ラックス・エルダードラゴンがそれぞれ
     // 別のトレイトを付与するので1対1に決まる。決まらないセットでは閾値に届かず空になる。
     const granters: TraitGranter[] = []
-    for (const [tApi, co] of granterCo) {
-      const ti = traitIndex.get(tApi)
+    for (const [gKey, co] of granterCo) {
+      const parsed = parseGranterKey(gKey)
+      if (!parsed) continue
+      const ti = traitIndex.get(parsed.traitApi)
       if (ti === undefined) continue
-      const total = granterTotal.get(tApi) ?? 0
-      if (total === 0) continue
+      const total = granterTotal.get(gKey) ?? 0
+      if (total < GRANTER_MIN_RECORDS) continue
       let bestApi: string | undefined
       let bestCo = -1
       for (const [uApi, c] of co) {
@@ -727,12 +760,12 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       if (bestApi === undefined || bestCo / total < GRANTER_MIN_COVERAGE) continue
       const ui = unitIndex.get(bestApi)
       if (ui === undefined) continue
-      granters.push([ui, ti])
+      granters.push([ui, ti, parsed.delta])
     }
-    granters.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    granters.sort((a, b) => a[0] - b[0] || a[1] - b[1] || (a[2] ?? 0) - (b[2] ?? 0))
 
     const out: WireStatsFile = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       generatedAt: opts.generatedAt,
       patch: opts.targetPatch,
       tftPatch: opts.tftPatch,

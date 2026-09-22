@@ -261,3 +261,23 @@ test('cohortPlace: コホートは実効盤面サイズで切る', () => {
   assert.equal(cohort.get(2), 5)
   assert.equal(cohort.get(3), 2)
 })
+
+test('grantsByUnit: 付与元は上乗せ数まで一致したものだけ引く', () => {
+  const grants = [
+    { trait: 0, delta: 2, n: 8, share: 0.8 },
+    { trait: 0, delta: 1, n: 6, share: 0.6 },
+  ]
+  // trait0 の +2 は u0、+1 は別ユニット（u9・盤面に居ない）。
+  const byUnit = grantsByUnit(withGrants(grants), [
+    [0, 0, 2],
+    [9, 0, 1],
+  ])
+  assert.deepEqual([...byUnit.keys()], [0])
+  assert.deepEqual(byUnit.get(0)!.map((g) => g.delta), [2])
+})
+
+test('grantsByUnit: delta を持たない旧ファイルはトレイトだけで引く', () => {
+  const grants = [{ trait: 0, delta: 2, n: 8, share: 0.8 }]
+  const byUnit = grantsByUnit(withGrants(grants), [[0, 0]])
+  assert.deepEqual(byUnit.get(0)!.map((g) => g.trait), [0])
+})
