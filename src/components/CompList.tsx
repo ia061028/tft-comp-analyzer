@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import type { CompStats, StatsFile } from '../../shared/types'
 import { compRows, type CompRow } from '../lib/multiset'
 import {
-  DIM_SAMPLE_MAX,
   PRIOR_PLACE,
   PRIOR_TOP4,
   PRIOR_WIN,
@@ -26,8 +25,6 @@ interface CompListProps {
   comps: CompStats[]
   sel: number[]
   sortKey: SortKey
-  /** 採用数の薄い行を淡く描く（一覧からは消さない）。 */
-  dimLowSample: boolean
   lang: Lang
   /** 生涯ブロンズモード: ブロンズ特性数の多い順に並べる。 */
   bronzeMode: boolean
@@ -41,6 +38,12 @@ interface CompListProps {
    * 絞りたい人が自分で上げられるようにするための下限。
    */
   minN: number
+  /** 平均順位の上限（これより悪い＝大きい行を外す）。null なら絞らない。 */
+  maxPlace: number | null
+  /** Top4率の下限 %（これに満たない行を外す）。null なら絞らない。 */
+  minTop4: number | null
+  /** 1位率の下限 %（これに満たない行を外す）。null なら絞らない。 */
+  minWin: number | null
 }
 
 /**
@@ -57,11 +60,13 @@ export function CompList({
   comps,
   sel,
   sortKey,
-  dimLowSample,
   lang,
   bronzeMode,
   ladderMode,
   minN,
+  maxPlace,
+  minTop4,
+  minWin,
 }: CompListProps) {
   const { units, emblems, traits, granters } = stats
 
@@ -69,9 +74,8 @@ export function CompList({
   //
   // **採用数による足切りはしない。** 下限で消していた頃は、紋章を2枚以上使う構成がほぼ全滅して
   // いた（18.2b の実データで2枚使う行 14,121 件のうち 76% が採用数1、既定の下限5を超えるのは
-  // 4.8% だけ）。薄い行は消さず、SampleMeter で「何試合ぶんの話か」を各カードに出し、
-  // 邪魔なら dimLowSample で淡くするに留める。極端な率が上位に来る件は並び順側の縮約
-  // （format.ts の shrunk）が抑えているので、下限は二重の防御でしかなかった。
+  // 4.8% だけ）。既定では消さず、SampleMeter で「何試合ぶんの話か」を各行に出す。
+  // 極端な率が上位に来る件は並び順側の縮約（format.ts の shrunk）が抑えている。
   //
   // compRows / activeTraitCounts / bronzeTraitCount は構成数×選択紋章に比例して重いため、
   // comps・sel・stats の該当サブフィールドが変わらない限り再計算しない。
@@ -79,15 +83,21 @@ export function CompList({
     const out: Row[] = []
     for (const comp of comps) {
       for (const row of compRows(comp, sel)) {
-        // 下限は特性やブロンズを数える前に効かせる（外す行の計算をしない）。
+        // 絞り込みは特性やブロンズを数える前に効かせる（外す行の計算をしない）。
+        //
+        // 出す数字そのものを閾値にする（並べ替えで使う縮約値ではない）。画面の数字で
+        // 切れないと「2.50 以下にしたのに 2.80 が残っている」という見え方になる。
         if (row.n < minN) continue
+        if (maxPlace !== null && row.p / row.n > maxPlace) continue
+        if (minTop4 !== null && (row.top4 / row.n) * 100 < minTop4) continue
+        if (minWin !== null && (row.win / row.n) * 100 < minWin) continue
         const traitCount = activeTraitCounts(comp, row.used, units, emblems, granters)
         const bronze = bronzeTraitCount(traitCount, traits)
         out.push({ comp, row, traitCount, bronze, active: activeTraitTotal(traitCount, traits) })
       }
     }
     return out
-  }, [comps, sel, units, emblems, traits, granters, minN])
+  }, [comps, sel, units, emblems, traits, granters, minN, maxPlace, minTop4, minWin])
 
   // 同体数コホートの平均順位。Tier バッジの色と、Tier順ソートの両方の基準にする。
   // 絶対値で切ると 10体グループが全部 S になり、色も順位も情報を運ばなくなる。
@@ -186,7 +196,7 @@ export function CompList({
   // セクションごとのフルカード表示件数。選択・並び順・対象構成が変わったら先頭に戻す。
   // リセット用の useEffect を置くと1フレームだけ古い件数で描いてしまうので、
   // 基準キーを state に同梱して読み出し時に比較する。
-  const pageKey = `${sel.join(',')}|${sortKey}|${bronzeMode}|${ladderMode}|${minN}|${comps.length}`
+  const pageKey = `${sel.join(',')}|${sortKey}|${bronzeMode}|${ladderMode}|${minN}|${maxPlace}|${minTop4}|${minWin}|${comps.length}`
   const [page, setPage] = useState<{ key: string; shown: Record<string, number> }>({
     key: pageKey,
     shown: {},
@@ -215,7 +225,7 @@ export function CompList({
   }
 
   if (sorted.length === 0) {
-    // 既定（下限 1）で来るのは、選択紋章を活用した試合が1件も無いときだけ。
+    // 既定（絞り込みなし）で来るのは、選択紋章を活用した試合が1件も無いときだけ。
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-line bg-surface/40 px-4 py-10 text-center text-sm text-muted">
         {t(lang, 'noComps')}
@@ -270,7 +280,6 @@ export function CompList({
                     stats={stats}
                     family={family}
                     cohort={cohort}
-                    dimLowSample={dimLowSample}
                     showUtilization={sel.length > 1}
                     total={sel.length}
                     bronzeMode={bronzeMode}
@@ -307,7 +316,6 @@ export function CompList({
                       lanes={soloLanes(r)}
                       cohort={cohort}
                       showEmblems={sel.length > 1}
-                      dim={dimLowSample && r.row.n <= DIM_SAMPLE_MAX}
                       showUtilization={sel.length > 1}
                       total={sel.length}
                       bronzeMode={bronzeMode}
@@ -348,5 +356,5 @@ function soloDeriv(r: Row): Deriv {
 }
 
 function soloLanes(r: Row): GroupLane[] {
-  return r.comp.units.map((unitIdx) => ({ fixed: unitIdx }))
+  return r.comp.units.map((unitIdx) => ({ fixed: unitIdx, hint: unitIdx }))
 }

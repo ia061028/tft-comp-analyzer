@@ -3,7 +3,7 @@ import type { StatsFile } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
 import { loadStats, remapSelection, DEFAULT_STATS_FILE, ALL_PATCHES_KEY } from './lib/data'
 import { maxEmblemMultiplicity } from './lib/multiset'
-import { DIM_SAMPLE_MAX, effectiveUnits } from './lib/format'
+import { effectiveUnits } from './lib/format'
 import { EmblemDock } from './components/EmblemDock'
 import { EmblemGrid } from './components/EmblemGrid'
 import { CompList } from './components/CompList'
@@ -36,7 +36,6 @@ function App() {
   const [sortKey, setSortKey] = useState<SortKey>('place')
   // 採用数の下限フィルタは廃止した（紋章を2枚以上使う構成がほぼ全部そこで消えていた）。
   // 代わりに薄い行を「淡く描くだけ」のトグル。既定 ON で見た目は従来に近く、OFF で全部が等価に出る。
-  const [dimLowSample, setDimLowSample] = useState(true)
   const [lang, setLang] = useState<Lang>(() => {
     const saved = localStorage.getItem(LANG_STORAGE_KEY)
     return saved === 'ja' || saved === 'en' ? saved : 'ja'
@@ -51,8 +50,12 @@ function App() {
   // 特性ラダー（ゲーム内機構）用: 発動している特性の種類数でまとめる。生涯ブロンズとは
   // 数える対象が違うだけの近い軸なので、同時に ON にしても意味がない。片方を押すと他方は切る。
   const [ladderMode, setLadderMode] = useState(false)
-  // 採用数の下限。既定は 1 ＝ 何も外れない。絞りたいときだけ自分で上げる。
+  // 絞り込み。既定はどれも「絞らない」（採用数だけは下限 1 ＝ 全行が通る）。
+  // 閾値は**画面に出ている数字**に対して効かせる（並べ替えの縮約値ではない）。
   const [minN, setMinN] = useState(1)
+  const [maxPlace, setMaxPlace] = useState<number | null>(null)
+  const [minTop4, setMinTop4] = useState<number | null>(null)
+  const [minWin, setMinWin] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -209,8 +212,11 @@ function App() {
     patchOptions.find((o) => o.key === shownPatchFile)?.label,
     size === 'all' ? t(lang, 'all') : t(lang, 'unitsGroup', { n: Number(size) }),
     { place: t(lang, 'sortTier'), win: t(lang, 'sortWin'), top4: t(lang, 'sortTop4'), adopt: t(lang, 'sortAdopt') }[sortKey],
-    // 下限は既定の 1 なら何も外していないので、畳んだ帯には出さない。
+    // 絞り込みは効いているものだけ出す（既定では何も外していないので1つも出ない）。
     minN > 1 ? `${t(lang, 'minSample')} ${minN}` : null,
+    maxPlace !== null ? `${t(lang, 'avgPlace')} ≤ ${maxPlace}` : null,
+    minTop4 !== null ? `${t(lang, 'metricTop4')} ≥ ${minTop4}%` : null,
+    minWin !== null ? `${t(lang, 'metricWin')} ≥ ${minWin}%` : null,
   ].filter(Boolean) as string[]
 
   return (
@@ -273,7 +279,6 @@ function App() {
           ))}
           {ladderMode && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden />}
           {bronzeMode && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bronze" aria-hidden />}
-          {dimLowSample && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink" aria-hidden />}
           <svg
             viewBox="0 0 12 12"
             aria-hidden
@@ -406,49 +411,15 @@ function App() {
            * 2枚以上使う構成をほぼ全部消していた（それが撤廃の理由）。既定で隠さないまま、
            * 絞りたい人だけが自分で上げられる形に戻す。
            */}
-          <div className="ml-auto flex items-center gap-2 text-sm">
-            <label
-              htmlFor="min-n"
-              title={t(lang, 'minSampleTitle')}
-              className="cursor-help text-xs font-semibold uppercase tracking-wide text-faint"
-            >
-              {t(lang, 'minSample')}
-            </label>
-            <input
-              id="min-n"
-              type="number"
-              min={1}
-              step={1}
-              value={minN}
-              onChange={(e) => {
-                const v = Math.floor(Number(e.target.value))
-                setMinN(Number.isFinite(v) && v >= 1 ? v : 1)
-              }}
-              className="w-16 rounded-md border border-line bg-surface-2 px-2 py-1 text-sm font-semibold text-ink tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
-            />
+          <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-2">
+            {numField('min-n', t(lang, 'minSample'), t(lang, 'minSampleTitle'), minN, (v) =>
+              setMinN(v === null || v < 1 ? 1 : v),
+            )}
+            {numField('max-place', t(lang, 'avgPlace'), t(lang, 'maxPlaceTitle'), maxPlace, setMaxPlace, 0.01)}
+            {numField('min-top4', t(lang, 'metricTop4'), t(lang, 'minTop4Title'), minTop4, setMinTop4, 0.1)}
+            {numField('min-win', t(lang, 'metricWin'), t(lang, 'minWinTitle'), minWin, setMinWin, 0.1)}
           </div>
 
-          {/*
-           * 「少数を薄く」。下限で消す代わりに、薄い行を淡くするだけの弱い手段。
-           * 下限とは役割が違うので両方置く（下限は外す、こちらは残して弱める）。
-           */}
-          <button
-            type="button"
-            aria-pressed={dimLowSample}
-            onClick={() => setDimLowSample((d) => !d)}
-            title={t(lang, 'dimLowSampleTitle', { n: DIM_SAMPLE_MAX })}
-            className={`inline-flex items-center gap-1.5 rounded-md border bg-surface-2 px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
-              dimLowSample
-                ? 'border-line-strong text-ink'
-                : 'border-line text-faint hover:border-line-strong hover:text-muted'
-            }`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${dimLowSample ? 'bg-ink' : 'bg-faint'}`}
-              aria-hidden
-            />
-            {t(lang, 'dimLowSample')}
-          </button>
         </div>
       </div>
 
@@ -487,11 +458,13 @@ function App() {
             comps={selectedComps}
             sel={selection}
             sortKey={sortKey}
-            dimLowSample={dimLowSample}
             lang={lang}
             bronzeMode={bronzeMode}
             ladderMode={ladderMode}
             minN={minN}
+            maxPlace={maxPlace}
+            minTop4={minTop4}
+            minWin={minWin}
           />
         </main>
       </div>
@@ -514,6 +487,51 @@ function App() {
       <footer className="shrink-0 border-t border-line bg-surface px-4 py-1.5 sm:px-5 sm:py-2">
         <p className="text-[10px] leading-tight text-faint sm:text-xs sm:leading-snug">{t(lang, 'legal')}</p>
       </footer>
+    </div>
+  )
+}
+
+/**
+ * 絞り込みの数値入力1つ。空欄 ＝ 絞らない（`null`）。
+ *
+ * 「なし」を別のトグルで持たせず空欄そのものに割り当てる。閾値を入れる／消すの1動作で
+ * 切り替わるので、ON/OFF と値の2つを合わせる必要がない。ラベルは指標名そのまま
+ * （平均順位・Top4率・1位率・採用数）で、向き（以下／以上）は指標の意味から決まるので
+ * 画面には書かない。説明はツールチップに置く。
+ */
+function numField(
+  id: string,
+  label: string,
+  title: string,
+  value: number | null,
+  onChange: (v: number | null) => void,
+  step = 1,
+) {
+  return (
+    <div className="flex items-center gap-1.5 text-sm">
+      <label
+        htmlFor={id}
+        title={title}
+        className="cursor-help whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-faint"
+      >
+        {label}
+      </label>
+      <input
+        id={id}
+        type="number"
+        min={0}
+        step={step}
+        value={value ?? ''}
+        onChange={(e) => {
+          const raw = e.target.value.trim()
+          if (raw === '') return onChange(null)
+          const v = Number(raw)
+          onChange(Number.isFinite(v) ? v : null)
+        }}
+        className={`w-16 rounded-md border bg-surface-2 px-2 py-1 text-sm font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+          value === null ? 'border-line text-faint' : 'border-line-strong text-ink'
+        }`}
+      />
     </div>
   )
 }

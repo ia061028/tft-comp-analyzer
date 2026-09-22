@@ -296,9 +296,6 @@ export function sampleLevel(n: number): 0 | 1 | 2 | 3 {
   return 3
 }
 
-/** 「少数を薄く」ON のときに淡く描く採用数の上限。隠さず弱めるだけ。 */
-export const DIM_SAMPLE_MAX = 2
-
 /**
  * 採用数の段階 → メーターの塗り色と数字の色。
  * 銅＝この率は信じるな、ニュートラル＝そのまま読んでよい。金は紋章の色なので使わない。

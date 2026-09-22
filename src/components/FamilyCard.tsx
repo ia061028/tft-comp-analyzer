@@ -1,7 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { StatsFile } from '../../shared/types'
 import type { Family } from '../lib/backbone'
-import { DIM_SAMPLE_MAX } from '../lib/format'
 import { t, type Lang } from '../lib/i18n'
 import { DerivRow } from './DerivRow'
 
@@ -9,8 +8,6 @@ interface FamilyCardProps {
   stats: StatsFile
   family: Family
   cohort: Map<number, number>
-  /** 採用数が薄い派生行を淡く描く（「少数を薄く」ON のとき）。消さずに弱めるだけ。 */
-  dimLowSample: boolean
   /** 「活用紋章 n/k」を出すか。 */
   showUtilization?: boolean
   /** 選択紋章の総数（活用度の分母）。 */
@@ -41,7 +38,6 @@ export function FamilyCard({
   stats,
   family,
   cohort,
-  dimLowSample,
   showUtilization,
   total,
   bronzeMode,
@@ -102,7 +98,6 @@ export function FamilyCard({
               lanes={g.lanes}
               cohort={cohort}
               showEmblems={family.mixedEmblems}
-              dim={dimLowSample && d.row.n <= DIM_SAMPLE_MAX}
               showUtilization={showUtilization}
               total={total}
               bronzeMode={bronzeMode}

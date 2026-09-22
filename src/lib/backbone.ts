@@ -111,6 +111,15 @@ export interface GroupLane {
    * 選ぶ枠は複数のユニットで共有するので、どの駒かは派生の `slots` が持つ。
    */
   fixed: number | null
+  /**
+   * この列に**いちばん多く入る駒**。空きマスを薄く描くのに使う。
+   *
+   * 空きマスは選ぶ枠にしか出ないが、真っ黒の穴だと「この行には何が無いのか」が分からず、
+   * 上下の行と見比べて自分で埋める作業になる。その列の主役を薄く置けば、欠けている駒が
+   * 並びだけで読める。選ぶ枠は複数の駒で共有するので「主役」は1つに決め打ちできない ——
+   * `rest` を出現数の降順で詰めるので、その列に最初に入った駒が最頻の駒になる。
+   */
+  hint: number | null
 }
 
 export interface Family {
@@ -335,7 +344,7 @@ function buildGroupLanes(g: UnitGroup, order: Map<number, number>): GroupLane[] 
   common.sort((a, b) => rank(a) - rank(b))
   rest.sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || rank(a) - rank(b))
 
-  const lanes: GroupLane[] = common.map((u) => ({ fixed: u }))
+  const lanes: GroupLane[] = common.map((u) => ({ fixed: u, hint: u }))
   const slots = g.derivs.map(() => common.slice())
 
   // 選ぶ枠。派生ごとに「その列はもう埋まっているか」を見ながら、置ける一番左へ。
@@ -346,8 +355,10 @@ function buildGroupLanes(g: UnitGroup, order: Map<number, number>): GroupLane[] 
       if (inDerivs.every((i) => (slots[i][col] ?? -1) < 0)) break
     }
     if (col >= lanes.length) {
-      for (let c = lanes.length; c <= col; c++) lanes.push({ fixed: null })
+      for (let c = lanes.length; c <= col; c++) lanes.push({ fixed: null, hint: null })
     }
+    // rest は出現数の降順なので、その列に最初に入った駒がその列の最頻の駒。
+    if (lanes[col].hint === null) lanes[col].hint = u
     for (const i of inDerivs) {
       for (let c = slots[i].length; c < col; c++) slots[i].push(-1)
       slots[i][col] = u

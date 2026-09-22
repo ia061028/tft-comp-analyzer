@@ -31,8 +31,6 @@ interface DerivRowProps {
    * 差分（追加・欠落）が同じでも紋章の使い方が違えば別の構成なので、出さないと見分けがつかない。
    */
   showEmblems: boolean
-  /** 採用数が薄い行を淡く描く（「少数を薄く」ON のとき）。消さずに弱めるだけ。 */
-  dim?: boolean
   /** 「活用紋章 n/k」を出すか。分母は `total`。1枚しか選んでいなければ常に 1/1 なので出さない。 */
   showUtilization?: boolean
   /** 選択紋章の総数（活用度の分母）。 */
@@ -61,7 +59,6 @@ export function DerivRow({
   lanes,
   cohort,
   showEmblems,
-  dim,
   showUtilization,
   total = 0,
   bronzeMode,
@@ -119,9 +116,7 @@ export function DerivRow({
 
   return (
     <div
-      className={`flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line px-4 py-2.5 transition-all hover:bg-surface-2/40 ${
-        dim ? 'opacity-55 hover:opacity-100' : ''
-      }`}
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line px-4 py-2.5 transition-all hover:bg-surface-2/40"
     >
       {/*
        * 列そろえの盤面。共通駒は縦にそろい、変わるのは帯を敷いた「選ぶ枠」の列だけ。
@@ -138,6 +133,7 @@ export function DerivRow({
                 stats={stats}
                 unitIdx={deriv.slots[i] ?? -1}
                 pick={lane.fixed === null}
+                hint={lane.hint}
                 comp={comp}
                 holders={holders}
                 choices={unitChoices.get(deriv.slots[i] ?? -1) ?? []}
