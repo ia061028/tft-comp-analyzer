@@ -12,7 +12,7 @@
 import type { CompStats, EmblemInfo, TraitGranter, TraitInfo, UnitInfo } from '../../shared/types'
 import type { CompRow } from './multiset'
 import {
-  GRANT_APPLY_SHARE,
+  appliedGrants,
   activeTier,
   activeTraitCounts,
   activeTraitTotal,
@@ -262,10 +262,11 @@ function coreTraitCounts(
     counts.set(ti, (counts.get(ti) ?? 0) + 1)
   }
   const bset = new Set(backbone)
+  const applied = new Set(appliedGrants(best.comp, granters))
   for (const [ui, grants] of grantsByUnit(best.comp, granters)) {
     if (!bset.has(ui)) continue
     for (const g of grants) {
-      if (g.share < GRANT_APPLY_SHARE) continue
+      if (!applied.has(g)) continue
       counts.set(g.trait, (counts.get(g.trait) ?? 0) + g.delta)
     }
   }
@@ -506,8 +507,9 @@ export function makeRow(
   units: UnitInfo[],
   emblems: EmblemInfo[],
   traits: TraitInfo[],
+  granters: TraitGranter[] = [],
 ): Row {
-  const traitCount = activeTraitCounts(comp, row.used, units, emblems)
+  const traitCount = activeTraitCounts(comp, row.used, units, emblems, granters)
   return {
     comp,
     row,

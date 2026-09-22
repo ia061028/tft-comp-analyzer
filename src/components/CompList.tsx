@@ -79,13 +79,13 @@ export function CompList({
     const out: Row[] = []
     for (const comp of comps) {
       for (const row of compRows(comp, sel)) {
-        const traitCount = activeTraitCounts(comp, row.used, units, emblems)
+        const traitCount = activeTraitCounts(comp, row.used, units, emblems, granters)
         const bronze = bronzeTraitCount(traitCount, traits)
         out.push({ comp, row, traitCount, bronze, active: activeTraitTotal(traitCount, traits) })
       }
     }
     return out
-  }, [comps, sel, units, emblems, traits])
+  }, [comps, sel, units, emblems, traits, granters])
 
   // 同体数コホートの平均順位。Tier バッジの色と、Tier順ソートの両方の基準にする。
   // 絶対値で切ると 10体グループが全部 S になり、色も順位も情報を運ばなくなる。

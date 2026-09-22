@@ -17,6 +17,7 @@ import {
   appliedGrants,
   effectiveUnits,
   grantsByUnit,
+  granterOfTrait,
   cohortPlace,
 } from './format'
 
@@ -219,6 +220,55 @@ test('appliedGrants: しきい値ちょうどは採用する', () => {
     appliedGrants(withGrants(grants)).map((g) => g.trait),
     [0],
   )
+})
+
+test('appliedGrants: 付与元が分かるユニットの最頻の選択は過半に届かなくても足す', () => {
+  // ラックス型: N 択から1つ。構成の中で 43% / 21% / 18% と割れている（付与元は u0）。
+  const grants = [
+    { trait: 0, delta: 2, n: 43, share: 0.43 },
+    { trait: 1, delta: 2, n: 21, share: 0.21 },
+    { trait: 2, delta: 2, n: 18, share: 0.18 },
+  ]
+  const granters: [number, number, number][] = [[0, 0, 2], [0, 1, 2], [0, 2, 2]]
+  assert.deepEqual(
+    appliedGrants(withGrants(grants), granters).map((g) => g.trait),
+    [0], // 最頻の 43% だけ。21% / 18% は足さない
+  )
+  // 付与元が分からなければ従来どおり過半の条件だけ（何も足さない）
+  assert.deepEqual(appliedGrants(withGrants(grants)), [])
+})
+
+test('appliedGrants: 最頻とは別に過半の選択は個別に足す（カ＝ジックス型）', () => {
+  const grants = [
+    { trait: 0, delta: 1, n: 86, share: 0.86 },
+    { trait: 1, delta: 1, n: 80, share: 0.8 },
+    { trait: 2, delta: 1, n: 22, share: 0.22 },
+  ]
+  const granters: [number, number, number][] = [[0, 0, 1], [0, 1, 1], [0, 2, 1]]
+  assert.deepEqual(
+    appliedGrants(withGrants(grants), granters).map((g) => g.trait),
+    [0, 1], // 86% と 80% は足す。22% は最頻でも過半でもない
+  )
+})
+
+test('activeTraitCounts: 最頻の選択は発動数にも入る', () => {
+  const grants = [
+    { trait: 0, delta: 2, n: 43, share: 0.43 },
+    { trait: 2, delta: 2, n: 21, share: 0.21 },
+  ]
+  const c = activeTraitCounts(withGrants(grants), [], units, emblems, [[0, 0, 2], [0, 2, 2]])
+  assert.equal(c.get(0), 4) // 盤面 2 + 最頻の上乗せ 2
+  assert.equal(c.get(2), undefined) // 21% は入らない
+})
+
+test('granterOfTrait: 発動数に足した上乗せだけを返す（顔が出る＝数に入っている）', () => {
+  const grants = [
+    { trait: 0, delta: 2, n: 43, share: 0.43 },
+    { trait: 2, delta: 2, n: 21, share: 0.21 },
+  ]
+  const m = granterOfTrait(withGrants(grants), [[0, 0, 2], [0, 2, 2]])
+  assert.deepEqual([...m.keys()], [0])
+  assert.equal(m.get(0)?.unit, 0)
 })
 
 test('grantsByUnit: 付与元が盤面に居る上乗せだけを振り分ける', () => {
