@@ -23,19 +23,18 @@ interface GrantBadgesProps {
  * 選択制の機構は構成の中でも選択が割れるので、過半に満たない選択は薄く描く。
  * 数字や凡例は出さない（割合は吹き出しに入れる）。盤面は一瞬で読む場所なので、
  * 「確実な選択か、割れている選択か」は濃さだけで伝える。
+ *
+ * **丸で描く**。紋章バッジ（四角・金リング）と同じ形だと、駒が持ち込む特性を
+ * 装備した紋章と読み違える。形が違えば凡例なしで別物だと分かる。
  */
 export function GrantBadges({ grants, traits, lang, size }: GrantBadgesProps) {
   if (grants.length === 0) return null
-  // 最大4個（カ＝ジックスの進化）を横一列に並べると駒の幅を超えて隣の列に被るので、
-  // 2個で折り返して駒の左上に 2×2 で積む。3個以上は駒そのものが隠れない寸法まで縮める。
-  const scale = grants.length > 2 ? 0.62 : 1
-  const side = typeof size === 'number' ? `${size * scale}px` : `calc(${size} * ${scale})`
-  const maxWidth = `calc(${side} * 2 + 2px)`
+  // 最大4個（カ＝ジックスの進化）。横一列だと駒の幅を超えて隣の列のアイテムに被るので、
+  // 2個で折り返して駒の左上に 2×2 で積む。**駒の枠から出さない**（出すと隣に被る）。
+  // 駒は隠れるが、隠れて困るのは名前だけでアイコンは端が見えていれば分かる。
+  const maxWidth = `calc(${typeof size === 'number' ? `${size}px` : size} * 2 + 2px)`
   return (
-    <div
-      className="absolute -left-1.5 -top-1.5 z-10 flex flex-wrap gap-0.5"
-      style={{ maxWidth }}
-    >
+    <div className="grant-badges" style={{ maxWidth }}>
       {grants.map((g) => {
         const trait = traits[g.trait]
         if (!trait) return null
@@ -50,8 +49,8 @@ export function GrantBadges({ grants, traits, lang, size }: GrantBadgesProps) {
               src={trait.icon}
               alt=""
               loading="lazy"
-              style={{ height: side, width: side, opacity: applied ? 1 : 0.45 }}
-              className="shrink-0 rounded-md bg-base object-contain p-[1px] ring-2 ring-line-strong"
+              style={{ height: size, width: size, opacity: applied ? 1 : 0.45 }}
+              className="shrink-0 rounded-full bg-base object-contain p-[1px] ring-2 ring-line-strong"
             />
           </Tip>
         )
