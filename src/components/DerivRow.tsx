@@ -1,26 +1,26 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { StatsFile } from '../../shared/types'
-import type { Deriv } from '../lib/backbone'
+import type { Deriv, GroupLane } from '../lib/backbone'
 import {
   activeTier,
   buildPlannerCode,
-  costBorder,
   effectiveUnits,
   grantsByUnit,
   holderMap,
-  starColor,
   styleClasses,
   tierOfEdge,
 } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
+import { LaneUnit } from './LaneUnit'
 import { RecipeLabel } from './RecipeLabel'
 import { SampleMeter } from './SampleMeter'
 import { Tip } from './Tip'
-import { GrantBadges } from './GrantBadges'
 
 interface DerivRowProps {
   stats: StatsFile
   deriv: Deriv
+  /** この体数グループの列。盤面はこの並びで描く。 */
+  lanes: GroupLane[]
   /** 同ユニット数コホートの平均順位。平均順位の**色**の根拠にだけ使う（数値は出さない）。 */
   cohort: Map<number, number>
   /**
@@ -34,19 +34,27 @@ interface DerivRowProps {
 }
 
 /**
- * 背骨からの派生1行。「＋この駒を足す」だけを見せる。
+ * 背骨からの派生1行。盤面・アイテム・装備者・発動特性を**この行のものとして全部**描く。
  *
- * 背骨（＝共通ユニット・装備者・アイテム・特性）は FamilyCard が1回描いているので、
- * ここでは差分だけを描く。9枚のアイコンを見比べる作業を「あと1〜2体を選ぶ」に縮めるのが目的。
+ * 差分（＋この駒）だけを描いていた頃は、読み手が毎行コアと差分から盤面を組み直す必要があり、
+ * それがゲーム中の瞬間判断をいちばん妨げていた。代わりに列をそろえる: 同じ体数の派生では
+ * 共通駒が必ず同じ横位置に来るので、共通であることが並びだけで分かり、目が動くのは
+ * 右側の「選ぶ枠」だけになる。ユニットの名前は出さない（ツールチップで拾う）。
  *
  * 平均順位の色は**同じ体数のコホートからの差**で切る（`tierOfEdge`）。絶対値だと 10体グループが
  * 全部 S（同じ赤）になり、色が情報を運ばなくなるため。差の数値は画面に出さない。
  */
-export function DerivRow({ stats, deriv, cohort, showEmblems, dim, lang }: DerivRowProps) {
-  const { traits, units, emblems, items } = stats
-  const { comp, row, adds, synergy } = deriv
-  // コアに無いユニット（＝この派生で足す駒）。全ユニットを出すので枠で示すためだけに使う。
-  const addSet = new Set(adds)
+export function DerivRow({
+  stats,
+  deriv,
+  lanes,
+  cohort,
+  showEmblems,
+  dim,
+  lang,
+}: DerivRowProps) {
+  const { traits, units, emblems } = stats
+  const { comp, row, synergy } = deriv
   const [copied, setCopied] = useState(false)
 
   const unitCount = effectiveUnits(comp)
@@ -99,111 +107,58 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, dim, lang }: Deriv
         dim ? 'opacity-55 hover:opacity-100' : ''
       }`}
     >
-      {/* 盤面のユニットを全部出す。コアからの追加分だけは枠で示す。 */}
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        {/* 1段目: 盤面のユニットと、この行が活用している紋章 */}
+      {/*
+       * 列そろえの盤面。共通駒は縦にそろい、変わるのは帯を敷いた「選ぶ枠」の列だけ。
+       * 狭い画面では盤面に1行まるごと使う（順位と率は下に回す）。列をそろえる以上、
+       * 盤面の幅を削ると駒が潰れて読めなくなるので、そちらを優先する。
+       */}
+      <div className="flex w-full min-w-0 flex-col gap-1.5 md:w-auto md:flex-1">
+        {/* 1段目: 列そろえの盤面と、この行が活用している紋章 */}
         <div className="flex flex-wrap items-center gap-2">
-        {comp.units.map((unitIdx, pos) => {
-          const unit = units[unitIdx]
-          if (!unit) return null
-          const unitName = pickName(lang, unit)
-          const star = comp.unitStars?.[pos] ?? 0
-          const unitItems = comp.unitItems
-            .filter((ui) => ui[0] === unitIdx)
-            .map((ui) => items?.[ui[1]])
-            .filter(Boolean)
-          const held = (holders.get(unitIdx) ?? []).map((ei) => emblems[ei]).filter(Boolean)
-          // コアに無いユニット＝この派生で足す駒。全部出すぶん、差分は枠で示す。
-          const isAdd = addSet.has(unitIdx)
+          <div className="lanes" style={{ '--lane-n': lanes.length } as CSSProperties}>
+            {lanes.map((lane, i) => (
+              <LaneUnit
+                key={i}
+                stats={stats}
+                unitIdx={deriv.slots[i] ?? -1}
+                pick={lane.fixed === null}
+                comp={comp}
+                holders={holders}
+                grants={unitGrants}
+                lang={lang}
+              />
+            ))}
+          </div>
 
-          return (
-            <div key={`${unitIdx}-${pos}`} className="flex w-[46px] flex-col items-center gap-0.5">
-              <div className={`h-3 text-[10px] leading-none tracking-[1px] ${starColor(star)}`}>
-                {star > 0 ? '★'.repeat(star) : ''}
-              </div>
-              <div className="relative">
-                <Tip label={star > 0 ? `${unitName} ★${star}` : unitName}>
-                  <img
-                    src={unit.icon}
-                    alt={unitName}
-                    loading="lazy"
-                    className={`h-[42px] w-[42px] shrink-0 rounded-lg border-2 object-cover ${costBorder(unit.cost)}`}
-                    style={
-                      held.length > 0
-                        ? { boxShadow: '0 0 0 2px var(--color-gold), 0 0 12px rgba(232,183,92,.45)' }
-                        : isAdd
-                          ? { boxShadow: '0 0 0 2px var(--color-ink)' }
-                          : undefined
-                    }
-                  />
-                </Tip>
-                <GrantBadges
-                  grants={unitGrants.get(unitIdx) ?? []}
-                  traits={traits}
-                  lang={lang}
-                  size={17}
-                />
-                {held.length > 0 && (
-                  <div className="absolute -right-1.5 -top-1.5 z-10 flex gap-0.5">
-                    {held.map((e, j) => (
-                      <Tip key={j} label={<RecipeLabel label={pickName(lang, e!)} recipe={e!.recipe} />}>
-                        <img
-                          src={e!.icon}
-                          alt=""
-                          loading="lazy"
-                          className="h-[18px] w-[18px] shrink-0 rounded bg-base object-contain ring-2 ring-gold"
-                        />
-                      </Tip>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex h-[15px] justify-center gap-[1px]">
-                {unitItems.slice(0, 3).map((it) => (
-                  <Tip key={it!.api} label={<RecipeLabel label={pickName(lang, it!)} recipe={it!.recipe} />}>
+          {/*
+           * この行が実際に活用している紋章。同じ盤面でも「1枚だけ使う」と「2枚とも使う」は
+           * 別の構成なので、系統内で使い方が割れているときは出さないと2行が同一に見える。
+           */}
+          {showEmblems && (
+            <span className="ml-1 inline-flex items-center gap-1">
+              {row.used.map((ei, i) => {
+                const e = emblems[ei]
+                if (!e) return null
+                return (
+                  <Tip key={i} label={<RecipeLabel label={pickName(lang, e)} recipe={e.recipe} />}>
                     <img
-                      src={it!.icon}
+                      src={e.icon}
                       alt=""
                       loading="lazy"
-                      className="h-[15px] w-[15px] shrink-0 rounded border border-base bg-base object-cover"
+                      className="h-[20px] w-[20px] shrink-0 rounded bg-base object-contain ring-1 ring-gold"
                     />
                   </Tip>
-                ))}
-              </div>
-              <span className="max-w-[46px] truncate text-[9px] leading-none text-muted">{unitName}</span>
-            </div>
-          )
-        })}
-
-        {/*
-         * この行が実際に活用している紋章。同じ盤面でも「1枚だけ使う」と「2枚とも使う」は
-         * 別の構成なので、系統内で使い方が割れているときは出さないと2行が同一に見える。
-         */}
-        {showEmblems && (
-          <span className="ml-1 inline-flex items-center gap-1">
-            {row.used.map((ei, i) => {
-              const e = emblems[ei]
-              if (!e) return null
-              return (
-                <Tip key={i} label={<RecipeLabel label={pickName(lang, e)} recipe={e.recipe} />}>
-                  <img
-                    src={e.icon}
-                    alt=""
-                    loading="lazy"
-                    className="h-[20px] w-[20px] shrink-0 rounded bg-base object-contain ring-1 ring-gold"
-                  />
-                </Tip>
-              )
-            })}
-          </span>
-        )}
-
+                )
+              })}
+            </span>
+          )}
         </div>
 
         {/*
          * この盤面で発動している特性を**すべて**出す（コアだけの行も空にならない）。
          * そのうえで、この駒を足したことで伸びた特性は明るく・太く出す ＝ この派生を選ぶ理由。
-         * 金は紋章の色なので使わない（役割が混ざる）。強調は明度と太さでやる。
+         * 金は紋章の色なので使わない（役割が混ざる）。**強調は明度と太さだけでやる。**
+         * 高さやアイコンの大きさまで変えると、折り返した行の背が揃わずガタつく。
          */}
         {chips.length > 0 && (
           <div className="flex flex-wrap items-center gap-1">
@@ -216,12 +171,12 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, dim, lang }: Deriv
               return (
                 <Tip key={traitIdx} label={gained ? `${name} ${count} — ${t(lang, 'synergyGain')}` : `${name} ${count}`}>
                   <span
-                    className={`inline-flex items-center gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${styleClasses(
+                    className={`inline-flex h-[20px] items-center gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${styleClasses(
                       style,
                     )} ${
                       gained
-                        ? 'h-[22px] font-bold ring-1 ring-ink/25'
-                        : `h-[19px] font-semibold ${dimChip ? 'opacity-55' : ''}`
+                        ? 'font-bold ring-1 ring-ink/25'
+                        : `font-semibold ${dimChip ? 'opacity-55' : ''}`
                     }`}
                   >
                     {trait?.icon && (
@@ -229,7 +184,7 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, dim, lang }: Deriv
                         src={trait.icon}
                         alt=""
                         loading="lazy"
-                        className={gained ? 'h-4 w-4 object-contain' : 'h-3.5 w-3.5 object-contain'}
+                        className="h-3.5 w-3.5 object-contain"
                       />
                     )}
                     {count}
@@ -269,8 +224,14 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, dim, lang }: Deriv
         onClick={copy}
         title={t(lang, 'copyCodeTitle')}
         aria-label={t(lang, 'copyCode')}
-        className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[9px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
-          copied ? 'bg-[#6fc06a] text-[#0f1a10]' : 'bg-ink text-base hover:bg-white'
+        /*
+         * 押すまでは控えめに。白ベタだとカードの中でいちばん明るい面になり、肝心の
+         * 盤面と数字より先に目が行ってしまう。
+         */
+        className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[9px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+          copied
+            ? 'border-transparent bg-[#6fc06a] text-[#0f1a10]'
+            : 'border-line bg-surface-2 text-muted hover:border-line-strong hover:text-ink'
         }`}
       >
         {copied ? (

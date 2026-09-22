@@ -8,8 +8,8 @@ interface GrantBadgesProps {
   grants: TraitGrant[]
   traits: TraitInfo[]
   lang: Lang
-  /** バッジ1つの辺の長さ(px)。ユニットアイコンの大きさに合わせる。 */
-  size: number
+  /** バッジ1つの辺の長さ。数値は px、文字列は CSS の長さ（`var(--lane-badge)` など）。 */
+  size: number | string
 }
 
 /**

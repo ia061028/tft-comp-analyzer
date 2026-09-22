@@ -21,8 +21,15 @@ import {
   holderMap,
 } from './format'
 
-/** ツリー化の対象は上位N行だけ。全行だと系統が40個に割れ、クラスタリングも 600ms 超で実用外。 */
-export const TOP_N = 20
+/**
+ * ツリー化の対象は上位N行だけ。全行だと系統が40個に割れ、クラスタリングも 600ms 超で実用外。
+ *
+ * 20 では紋章1枚の一覧 962 行のうち系統に入るのが 15 行しかなく、残り 947 行はフラットカードに
+ * 落ちていた。実測（人気上位5紋章）でツリー化率は N を広げても 88〜90% で一定、クラスタリングは
+ * N=60 で最悪 7.8ms（N=120 で 35ms、160 で 75ms）。3倍の行を系統に載せても一覧が長くなりすぎない
+ * ところとして 60 を取る。
+ */
+export const TOP_N = 60
 /** 完全連結クラスタリングのカット高さ（Jaccard 距離）。実測でツリー化率が最大になる値。 */
 export const CUT = 0.4
 /** 背骨がこれ未満の系統は、差分表示がフル盤面より読みにくくなるのでフラット縮退。 */
@@ -55,6 +62,11 @@ export interface Deriv extends Row {
   synergy: [number, number, number][]
   /** sorted 内での順位（0 が最良）。系統の並び順に使う。 */
   rank: number
+  /**
+   * 体数グループの列ごとに、この盤面が置く unitIdx。空きマスは -1。
+   * 長さは `UnitGroup.lanes` と同じ。グループ分けのあとに `buildGroupLanes` が入れる。
+   */
+  slots: number[]
 }
 
 /** 最小・中央値・最大。「だいたいどのくらいか」を1行で示すための要約。 */
@@ -79,6 +91,35 @@ export interface UnitGroup {
   top4: Span
   /** 1位率 %。 */
   win: Span
+  /**
+   * このグループの列。長さは体数とほぼ同じで、系統ぜんぶの和集合にはしない。
+   * 共通駒が左に固定で並び、残りは右に詰まる。
+   */
+  lanes: GroupLane[]
+}
+
+/**
+ * 系統の「列」。1列＝1ユニットで、系統のどの体数グループでも同じ横位置に来る。
+ *
+ * 派生ごとに盤面を素直に並べると、同じ駒が行ごとに違う位置に出る。読み手は毎行アイコンを
+ * 見比べて共通部分を組み直すことになり、それがゲーム中の瞬間判断をいちばん妨げる。
+ * 列を固定すれば共通駒は縦にそろい、目が動くのは「選ぶ枠」だけになる。
+ */
+export interface Lane {
+  unitIdx: number
+  /** このユニットが固定枠（＝その体数グループの全派生に出る）になっているグループ数。 */
+  fixedIn: number
+  /** このユニットが現れる体数グループ数。 */
+  inGroups: number
+}
+
+/** 体数グループの列1本。 */
+export interface GroupLane {
+  /**
+   * 全派生に同じ駒が入る列なら、その unitIdx。派生ごとに中身が変わる列（＝選ぶ枠）なら null。
+   * 選ぶ枠は複数のユニットで共有するので、どの駒かは派生の `slots` が持つ。
+   */
+  fixed: number | null
 }
 
 export interface Family {
@@ -100,6 +141,11 @@ export interface Family {
   mixedEmblems: boolean
   /** 盤面ユニット数の降順。 */
   groups: UnitGroup[]
+  /**
+   * 系統ぜんぶで見たユニットの序列。列そのものは体数グループごとに組む（`UnitGroup.lanes`）が、
+   * 並べる順番はここで一度決めるので、体数が違っても共通駒の相対順が変わらない。
+   */
+  lanes: Lane[]
   /** この系統の派生総数。 */
   total: number
   /** 最良の派生の順位（0 が最良）。系統の並び順に使う。 */
@@ -246,6 +292,96 @@ function synergyGain(
 }
 
 /**
+ * 系統ぜんぶで見たユニットの序列を決める。
+ *
+ * 並びは「どの体数グループでも固定の駒 → 出てくるグループが多い駒 → 高コスト」。
+ * 実際の列はこの順を土台に体数グループごとに組む（`buildGroupLanes`）が、順番を系統で
+ * 一度だけ決めておくことで、8体と9体で共通駒の相対順が入れ替わらない。
+ */
+function buildLanes(groups: UnitGroup[], units: UnitInfo[]): Lane[] {
+  // グループごとに「そのユニットが何派生に出るか」を数える。
+  const counts = groups.map((g) => {
+    const m = new Map<number, number>()
+    for (const d of g.derivs) for (const u of new Set(d.comp.units)) m.set(u, (m.get(u) ?? 0) + 1)
+    return m
+  })
+
+  const byUnit = new Map<number, Lane>()
+  groups.forEach((g, gi) => {
+    for (const [u, c] of counts[gi]) {
+      const lane = byUnit.get(u) ?? { unitIdx: u, fixedIn: 0, inGroups: 0 }
+      lane.inGroups += 1
+      if (c === g.derivs.length) lane.fixedIn += 1
+      byUnit.set(u, lane)
+    }
+  })
+
+  return [...byUnit.values()].sort(
+    (a, b) =>
+      b.fixedIn - a.fixedIn ||
+      b.inGroups - a.inGroups ||
+      (units[b.unitIdx]?.cost ?? 0) - (units[a.unitIdx]?.cost ?? 0) ||
+      a.unitIdx - b.unitIdx,
+  )
+}
+
+/**
+ * 1つの体数グループの列を組み、各派生の `slots` を埋める。
+ *
+ * **系統ぜんぶの和集合を列にしない。** 和集合だと 8体の構成が 21 列に薄く散り、
+ * どの行も大半が空きマスになって、かえって盤面が読めなくなる。列はこのグループの
+ * 体数ぶんに詰める。
+ *
+ * 1. **全派生に出る駒＝共通駒**を左から固定で並べる。並べ方は系統の序列どおりなので、
+ *    どの派生も同じ横位置に同じ駒が来て、共通であることが並びだけで分かる。
+ * 2. 残りの駒は右側の列を共有する。同じ派生に同居する駒どうしだけ別の列に分ければよい
+ *    （＝共起グラフの彩色）ので、出現派生数の多い駒から順に、置ける一番左の列へ入れる。
+ *    A,B,C と A,B,D なら A・B はそろい、C と D は同居しないので同じ列に詰まる。
+ *
+ * 列数の下限は1派生が置く駒の数そのもの（どの派生も同時にそれだけの列を使うため）で、
+ * 貪欲法がそれを超えるのは駒の重なり方が悪いときだけ。空きマスは選ぶ枠にしか出ない。
+ * グループのキー（`units`）は実効の盤面サイズなので、1駒で2枠を取る駒が居ると列数より多い。
+ */
+function buildGroupLanes(g: UnitGroup, order: Map<number, number>): GroupLane[] {
+  const rank = (u: number) => order.get(u) ?? Number.MAX_SAFE_INTEGER
+  const sets = g.derivs.map((d) => new Set(d.comp.units))
+
+  const counts = new Map<number, number>()
+  for (const set of sets) for (const u of set) counts.set(u, (counts.get(u) ?? 0) + 1)
+
+  const common: number[] = []
+  const rest: number[] = []
+  for (const [u, c] of counts) (c === g.derivs.length ? common : rest).push(u)
+  common.sort((a, b) => rank(a) - rank(b))
+  rest.sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || rank(a) - rank(b))
+
+  const lanes: GroupLane[] = common.map((u) => ({ fixed: u }))
+  const slots = g.derivs.map(() => common.slice())
+
+  // 選ぶ枠。派生ごとに「その列はもう埋まっているか」を見ながら、置ける一番左へ。
+  for (const u of rest) {
+    const inDerivs = sets.map((set, i) => (set.has(u) ? i : -1)).filter((i) => i >= 0)
+    let col = common.length
+    for (; ; col++) {
+      if (inDerivs.every((i) => (slots[i][col] ?? -1) < 0)) break
+    }
+    if (col >= lanes.length) {
+      for (let c = lanes.length; c <= col; c++) lanes.push({ fixed: null })
+    }
+    for (const i of inDerivs) {
+      for (let c = slots[i].length; c < col; c++) slots[i].push(-1)
+      slots[i][col] = u
+    }
+  }
+
+  for (let i = 0; i < g.derivs.length; i++) {
+    for (let c = slots[i].length; c < lanes.length; c++) slots[i].push(-1)
+    g.derivs[i].slots = slots[i]
+  }
+  return lanes
+}
+
+/**
  * 上位 TOP_N 行を系統に分け、系統ごとにコアと派生（体数グループ）を作る。
  * コアが取れない系統・差分が大きすぎる行・1行だけの系統は flat に落とす（ツリーを強制しない）。
  *
@@ -257,8 +393,9 @@ export function buildTree(
   emblems: EmblemInfo[] = [],
   traits: TraitInfo[] = [],
   granters: TraitGranter[] = [],
+  topN: number = TOP_N,
 ): Tree {
-  const head = sorted.slice(0, TOP_N)
+  const head = sorted.slice(0, topN)
   if (head.length < MIN_FAMILY) return { families: [], flat: sorted }
 
   const families: Family[] = []
@@ -298,6 +435,7 @@ export function buildTree(
         removes,
         synergy: synergyGain(m.traitCount, coreCounts, traits),
         rank: idxs[k],
+        slots: [],
       })
     }
     // 差分の大きい行を落とした結果、派生が1件以下になったら系統として成立しない。
@@ -325,7 +463,12 @@ export function buildTree(
         place: spanOf(ds.map((d) => d.row.p / d.row.n)),
         top4: spanOf(ds.map((d) => (d.row.top4 / d.row.n) * 100)),
         win: spanOf(ds.map((d) => (d.row.win / d.row.n) * 100)),
+        lanes: [],
       }))
+
+    const lanes = buildLanes(groups, units)
+    const order = new Map(lanes.map((l, i) => [l.unitIdx, i]))
+    for (const g of groups) g.lanes = buildGroupLanes(g, order)
 
     // コアの装備者は系統の最良行のものを使う（derivs は rank 昇順なので先頭が最良）。
     const best = derivs[0]
@@ -337,6 +480,7 @@ export function buildTree(
       used: best.row.used,
       mixedEmblems: derivs.some((d) => d.row.used.join(',') !== bestKey),
       groups,
+      lanes,
       total: derivs.length,
       rank: best.rank,
     })
@@ -348,7 +492,7 @@ export function buildTree(
 
   return {
     families,
-    flat: [...flatRanks.map((i) => head[i]), ...sorted.slice(TOP_N)],
+    flat: [...flatRanks.map((i) => head[i]), ...sorted.slice(topN)],
   }
 }
 

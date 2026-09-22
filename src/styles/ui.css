@@ -1,0 +1,1093 @@
+/*
+ * デザイン言語「黒鉛×灯」（Graphite & Ember）— コンポーネント。
+ *
+ * ここが .comp / .tile / .unit のような**意味を持つクラス**の唯一の定義場所。
+ * 生の値（px・色・影）を書いてよいのはこのファイルだけで、色と寸法は tokens.css から
+ * var() で参照する。.tsx 側はこのクラス名を使うだけにして、Tailwind の任意値
+ * （[#...] / [NNpx]）を持ち込まない。
+ *
+ * design/ds/styles.css はこのファイルと tokens.css から `npm run design:sync` で
+ * 生成される。design/ds 側を直接編集しない。
+ */
+
+@layer components {
+  /* ===== シェル =====
+   * アプリの骨格。デスクトップは「レール ＋ 本体」、モバイルはレールを畳んでシートに移す。
+   */
+  .app {
+    background-color: var(--color-g-0);
+    width: 100%;
+    height: 100dvh;
+    color: var(--color-ink);
+    flex-direction: column;
+    display: flex;
+  }
+  .rail {
+    width: var(--rail-w);
+    border-right-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-1);
+    padding: 0.75rem;
+    flex-direction: column;
+    flex-shrink: 0;
+    display: none;
+    overflow-y: auto;
+  }
+  @media (min-width: 48rem) {
+    .rail {
+      display: flex;
+    }
+  }
+  .main {
+    min-width: 0;
+    flex-direction: column;
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+  .scroll {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .bar {
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-0);
+    padding-inline: 0.5rem;
+    padding-block: 0.5rem;
+    flex-shrink: 0;
+    display: flex;
+  }
+  @media (min-width: 48rem) {
+    .bar {
+      gap: 1rem;
+      padding-inline: 1.25rem;
+    }
+  }
+  .bar__group {
+    gap: 0.125rem;
+    flex-direction: column;
+    flex-shrink: 0;
+    display: flex;
+  }
+
+  /* ===== 操作要素 =====
+   * セグメント / アイコンボタン / チップ / ポップ / 入力。
+   * 高さは必ず --ctl-h。モバイルではトークン側で 44px に切り替わるので、ここで分岐しない。
+   */
+  .seg {
+    border-radius: var(--radius-md);
+    border-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-2);
+    padding: 0.125rem;
+    flex-shrink: 0;
+    display: inline-flex;
+    overflow: hidden;
+  }
+  .seg__btn {
+    height: var(--ctl-h);
+    border-radius: var(--radius-sm);
+    padding-inline: 0.625rem;
+    font-size: var(--text-sm);
+    color: var(--color-ink-2);
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: .15s;
+    flex-shrink: 0;
+    font-weight: 500;
+    line-height: 1.4286;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (hover:hover) {
+    .seg__btn:hover {
+      color: var(--color-ink);
+    }
+  }
+  .seg__btn:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-hand) 50%, transparent);
+  }
+  .seg__btn--on {
+    background-color: var(--color-g-4);
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+  .icon-btn {
+    height: var(--ctl-h);
+    width: var(--ctl-h);
+    border-radius: var(--radius-md);
+    border-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-1);
+    color: var(--color-ink-2);
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: .15s;
+    flex-shrink: 0;
+    justify-content: center;
+    align-items: center;
+    display: inline-flex;
+  }
+  @media (hover:hover) {
+    .icon-btn:hover {
+      border-color: var(--color-g-4);
+      color: var(--color-ink);
+    }
+  }
+  .icon-btn:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-hand) 50%, transparent);
+  }
+  .icon-btn--on {
+    border-color: var(--color-g-4);
+    background-color: var(--color-g-4);
+    color: var(--color-ink);
+  }
+  .chip {
+    height: var(--ctl-h);
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: var(--radius-md);
+    border-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-2);
+    padding-inline: 0.75rem;
+    font-size: var(--text-sm);
+    color: var(--color-ink);
+    flex-shrink: 0;
+    display: inline-flex;
+    font-weight: 600;
+    line-height: 1.4286;
+  }
+  .chip:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-hand) 50%, transparent);
+  }
+  .pop {
+    top: 100%;
+    right: 0;
+    z-index: 30;
+    margin-top: 0.25rem;
+    width: 16rem;
+    gap: 0.5rem;
+    border-radius: var(--radius-lg);
+    border-width: 1px;
+    border-color: var(--color-g-4);
+    background-color: var(--color-g-1);
+    padding: 0.5rem;
+    flex-direction: column;
+    display: flex;
+    position: absolute;
+    box-shadow: 0 25px 50px -12px color-mix(in oklab, var(--color-black) 60%, transparent);
+  }
+  .pop__item {
+    height: var(--ctl-h);
+    border-radius: var(--radius-md);
+    width: 100%;
+    padding-inline: 0.75rem;
+    font-size: var(--text-md);
+    color: var(--color-ink-2);
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: .15s;
+    align-items: center;
+    display: flex;
+  }
+  @media (hover:hover) {
+    .pop__item:hover {
+      background-color: var(--color-g-2);
+      color: var(--color-ink);
+    }
+  }
+  .pop__item--on {
+    background-color: var(--color-g-4);
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+  .field {
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding-inline: 0.25rem;
+    display: flex;
+  }
+  .input {
+    height: var(--ctl-h);
+    width: 5rem;
+    border-radius: var(--radius-md);
+    border-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-2);
+    padding-inline: 0.5rem;
+    font-size: var(--text-md);
+    color: var(--color-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .input:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-hand) 50%, transparent);
+  }
+
+  /* ===== 紋章の選択面 =====
+   * カテゴリ区切り（.wall__sep）はテキスト見出しを持たず、素材アイコンとヘアラインだけで語る。
+   * 金（--color-hand）が出てよいのはここと装備者リングだけ＝「手の内」。
+   * データ上活用できない枚数は .tile--over（灯の赤）で警告するが、ブロックはしない。
+   */
+  .wall {
+    gap: 0.375rem;
+    grid-template-columns: repeat(auto-fill, minmax(var(--tile-size), 1fr));
+    display: grid;
+  }
+  .wall__sep {
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.25rem;
+    grid-column: 1/-1;
+    display: flex;
+  }
+  .wall__sep:after {
+    content: "";
+    background-color: var(--color-g-3);
+    flex: 1;
+    height: 1px;
+  }
+  .tile {
+    aspect-ratio: 1;
+    border-radius: var(--radius-md);
+    border-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-2);
+    width: 100%;
+    padding: 0.25rem;
+    transition-property: all;
+    transition-duration: .15s;
+    justify-content: center;
+    align-items: center;
+    display: flex;
+    position: relative;
+  }
+  @media (hover:hover) {
+    .tile:hover {
+      border-color: var(--color-g-4);
+    }
+  }
+  .tile:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-hand) 50%, transparent);
+  }
+  .tile--on {
+    border-color: var(--color-hand);
+    background-color: color-mix(in oklab, var(--color-hand) 10%, transparent);
+  }
+  .tile__img {
+    object-fit: contain;
+    opacity: .8;
+    width: 100%;
+    height: 100%;
+    transition-property: opacity;
+    transition-duration: .15s;
+  }
+  .tile--on .tile__img {
+    opacity: 1;
+  }
+  .tile__count {
+    top: calc(var(--spacing) * -1);
+    right: calc(var(--spacing) * -1);
+    height: 1rem;
+    min-width: 1rem;
+    background-color: var(--color-hand);
+    padding-inline: 0.25rem;
+    font-size: var(--text-xs);
+    line-height: 1;
+    color: var(--color-g-0);
+    border-radius: 3.40282e38px;
+    justify-content: center;
+    align-items: center;
+    display: flex;
+    position: absolute;
+    font-weight: 900;
+  }
+  .tile--over {
+    border-color: var(--color-ember-hot);
+  }
+  .tile--over .tile__count {
+    background-color: var(--color-ember-hot);
+    color: var(--color-ink);
+  }
+  .summary {
+    margin-top: 1rem;
+    gap: 0.5rem;
+    border-top-width: 1px;
+    border-color: var(--color-g-3);
+    padding-top: 0.75rem;
+    flex-direction: column;
+    display: flex;
+  }
+  .summary__hand {
+    align-items: center;
+    gap: 0.5rem;
+    display: flex;
+  }
+  .summary__hand img {
+    width: var(--tile-size);
+    aspect-ratio: 1;
+    border-radius: var(--radius-md);
+    background-color: var(--color-g-2);
+    object-fit: contain;
+    padding: 0.125rem;
+    box-shadow: 0 0 0 2px var(--color-hand);
+  }
+  .summary__count {
+    align-items: baseline;
+    gap: 0.375rem;
+    display: flex;
+  }
+  .summary__count>.val {
+    font-size: var(--text-hero);
+    line-height: 1;
+    color: var(--color-ink);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .summary__row {
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: var(--text-xs);
+    display: flex;
+    line-height: 1.3333;
+  }
+  .summary__row>.val {
+    font-size: var(--text-md);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== 構成カード =====
+   * 灯は3段のみ（--hot / --warm / --cold）。灰は「その規模として普通」＝無信号であり、
+   * 劣っているという意味ではない。段を増やさない。
+   * 破線が許されるのは .nchip--low（サンプル不足＝不確か）だけ。装飾に使わない。
+   */
+  .comp {
+    align-items: center;
+    column-gap: 0.5rem;
+    row-gap: 0.5rem;
+    border-radius: var(--radius-lg);
+    border-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-1);
+    padding: 0.625rem;
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: .15s;
+    padding-left: calc(var(--ember-rail) + .625rem);
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "rank place""gauge gauge""traits traits""board board""copy copy";
+    display: grid;
+    position: relative;
+  }
+  @media (hover:hover) {
+    .comp:hover {
+      border-color: var(--color-g-4);
+    }
+  }
+  .comp:before {
+    content: "";
+    width: var(--ember-rail);
+    background: var(--ember);
+    border-radius: var(--radius) 0 0 var(--radius);
+    top: 0;
+    bottom: 0;
+    left: 0;
+    position: absolute;
+  }
+  .comp--hot {
+    --ember: var(--color-ember-hot);
+  }
+  .comp--warm {
+    --ember: var(--color-ember-warm);
+  }
+  .comp--cold {
+    --ember: var(--color-ember-cold);
+  }
+  @media (min-width: 48rem) {
+    .comp {
+      grid-template-columns: 1.5rem var(--place-w) var(--board-w) 1fr var(--stats-w) auto;
+      column-gap: 0.75rem;
+      padding-block: 0.5rem;
+      grid-template-areas: "rank place board traits gauge copy";
+    }
+  }
+  .comp__rank {
+    font-size: var(--text-sm);
+    color: var(--color-ink-3);
+    grid-area: rank;
+    align-self: center;
+    font-weight: 700;
+    line-height: 1.4286;
+    font-variant-numeric: tabular-nums;
+  }
+  .comp__place {
+    align-items: baseline;
+    gap: 0.5rem;
+    grid-area: place;
+    display: flex;
+  }
+  @media (min-width: 48rem) {
+    .comp__place {
+      align-items: flex-start;
+      gap: 0.125rem;
+      flex-direction: column;
+    }
+  }
+  .comp__place>.val {
+    font-size: var(--text-hero);
+    line-height: 1;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .comp__place>.edge {
+    font-size: var(--text-sm);
+    line-height: 1;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .comp--hot .comp__place {
+    color: var(--color-ember-hot);
+  }
+  .comp--warm .comp__place {
+    color: var(--color-ember-warm);
+  }
+  .comp--cold .comp__place {
+    color: var(--color-ember-cold);
+  }
+  .gauge {
+    gap: 0.25rem;
+    flex-direction: column;
+    grid-area: gauge;
+    display: flex;
+  }
+  .gauge__row {
+    align-items: center;
+    gap: 0.5rem;
+    display: flex;
+  }
+  .gauge__label {
+    width: 2rem;
+    font-size: var(--text-xs);
+    color: var(--color-ink-3);
+    text-transform: uppercase;
+    flex-shrink: 0;
+    line-height: 1.3333;
+  }
+  .meter {
+    height: 0.375rem;
+    min-width: 0;
+    background-color: var(--color-g-2);
+    border-radius: 3.40282e38px;
+    flex: 1;
+    overflow: hidden;
+  }
+  .meter--sub {
+    height: 0.25rem;
+  }
+  .meter__fill {
+    background-color: var(--color-ink-2);
+    border-radius: 3.40282e38px;
+    height: 100%;
+  }
+  .meter--sub .meter__fill {
+    background-color: var(--color-g-4);
+  }
+  .gauge__val {
+    width: 2.5rem;
+    text-align: right;
+    font-size: var(--text-sm);
+    color: var(--color-ink);
+    flex-shrink: 0;
+    font-weight: 700;
+    line-height: 1.4286;
+    font-variant-numeric: tabular-nums;
+  }
+  .gauge__val--sub {
+    font-size: var(--text-xs);
+    color: var(--color-ink-3);
+    font-weight: 400;
+    line-height: 1.3333;
+  }
+  .nchip {
+    border-radius: var(--radius-sm);
+    padding-inline: 0.375rem;
+    font-size: var(--text-xs);
+    color: var(--color-ink-3);
+    border-width: 1px;
+    border-color: #0000;
+    margin-left: auto;
+    line-height: 1.3333;
+    font-variant-numeric: tabular-nums;
+  }
+  .nchip--low {
+    border-style: dashed;
+    border-color: var(--color-tier-bronze);
+    color: var(--color-tier-bronze);
+  }
+  .stat--on .gauge__val,.stat--on .gauge__label {
+    color: var(--color-ink);
+    font-weight: 700;
+  }
+
+  /* ===== 盤面 =====
+   * 装備者（.holder）は一回り大きく金のリングを負う。視線の起点なのでサイズで区別する。
+   */
+  .board {
+    min-width: 0;
+    align-items: center;
+    gap: 0.5rem;
+    grid-area: board;
+    display: flex;
+  }
+  @media (min-width: 48rem) {
+    .board {
+      gap: 0.75rem;
+    }
+  }
+  .holder {
+    align-items: center;
+    gap: 0.125rem;
+    flex-direction: column;
+    flex-shrink: 0;
+    display: flex;
+  }
+  .holder__units {
+    align-items: center;
+    gap: 0.25rem;
+    display: flex;
+  }
+  .holder__tag {
+    font-size: var(--text-xs);
+    line-height: 1;
+    color: var(--color-hand);
+    font-weight: 700;
+  }
+  .board__rule {
+    height: 2.5rem;
+    background-color: var(--color-g-3);
+    flex-shrink: 0;
+    width: 1px;
+  }
+  @media (min-width: 48rem) {
+    .board__rule {
+      height: 3rem;
+    }
+  }
+  .units {
+    min-width: 0;
+    align-items: center;
+    gap: 0.125rem;
+    flex-wrap: wrap;
+    display: flex;
+  }
+  @media (min-width: 48rem) {
+    .units {
+      gap: 0.375rem;
+    }
+  }
+  .unit {
+    width: var(--unit-size);
+    height: var(--unit-size);
+    border-radius: var(--radius-md);
+    background-color: var(--color-g-2);
+    border-width: 2px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .holder .unit {
+    width: var(--unit-holder);
+    height: var(--unit-holder);
+    box-shadow: 0 0 0 2px var(--color-hand);
+  }
+  .unit--c1 {
+    border-color: var(--color-cost-1);
+  }
+  .unit--c2 {
+    border-color: var(--color-cost-2);
+  }
+  .unit--c3 {
+    border-color: var(--color-cost-3);
+  }
+  .unit--c4 {
+    border-color: var(--color-cost-4);
+  }
+  .unit--c5 {
+    border-color: var(--color-cost-5);
+  }
+  .unit__img {
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+  }
+  .unit__stars {
+    pointer-events: none;
+    inset-inline: 0;
+    top: 0;
+    text-align: center;
+    font-size: var(--text-xs);
+    line-height: 1.25;
+    text-shadow: 0 1px 2px var(--color-g-0);
+    position: absolute;
+  }
+  .unit__items {
+    pointer-events: none;
+    inset-inline: 0;
+    bottom: 0;
+    justify-content: center;
+    gap: 1px;
+    display: flex;
+    position: absolute;
+  }
+  .item {
+    height: 1rem;
+    width: 1rem;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .item--emblem {
+    box-shadow: 0 0 0 1px var(--color-hand);
+  }
+  .star-3 {
+    color: var(--color-cost-5);
+  }
+  .star-2 {
+    color: var(--color-tier-silver);
+  }
+  .star-1 {
+    color: var(--color-ember-cold);
+  }
+  .traits {
+    min-width: 0;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    grid-area: traits;
+    display: flex;
+  }
+  .trait {
+    height: 1.25rem;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: var(--radius-sm);
+    padding-inline: 0.25rem;
+    font-size: var(--text-xs);
+    border-width: 1px;
+    display: inline-flex;
+    font-weight: 600;
+    line-height: 1.3333;
+    font-variant-numeric: tabular-nums;
+  }
+  .trait__img {
+    height: 0.875rem;
+    width: 0.875rem;
+    object-fit: contain;
+  }
+  .trait--prism {
+    border-color: color-mix(in oklab, var(--color-tier-prism) 50%, transparent);
+    background-color: color-mix(in oklab, var(--color-tier-prism) 15%, transparent);
+    color: var(--color-tier-prism);
+  }
+  .trait--gold {
+    border-color: color-mix(in oklab, var(--color-tier-gold) 50%, transparent);
+    background-color: color-mix(in oklab, var(--color-tier-gold) 15%, transparent);
+    color: var(--color-tier-gold);
+  }
+  .trait--silver {
+    border-color: color-mix(in oklab, var(--color-tier-silver) 50%, transparent);
+    background-color: color-mix(in oklab, var(--color-tier-silver) 15%, transparent);
+    color: var(--color-tier-silver);
+  }
+  .trait--bronze {
+    border-color: color-mix(in oklab, var(--color-tier-bronze) 50%, transparent);
+    background-color: color-mix(in oklab, var(--color-tier-bronze) 15%, transparent);
+    color: var(--color-tier-bronze);
+  }
+  .match {
+    height: 1.25rem;
+    border-radius: var(--radius-sm);
+    border-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-2);
+    padding-inline: 0.375rem;
+    font-size: var(--text-xs);
+    color: var(--color-ink-2);
+    align-items: center;
+    display: inline-flex;
+    font-weight: 700;
+    line-height: 1.3333;
+    font-variant-numeric: tabular-nums;
+  }
+  .comp__copy {
+    height: var(--ctl-h-touch);
+    justify-content: center;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: var(--radius-md);
+    border-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-2);
+    width: 100%;
+    font-size: var(--text-md);
+    color: var(--color-ink-2);
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: .15s;
+    grid-area: copy;
+    display: inline-flex;
+    font-weight: 600;
+  }
+  @media (hover:hover) {
+    .comp__copy:hover {
+      border-color: var(--color-g-4);
+      color: var(--color-ink);
+    }
+  }
+  .comp__copy:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-hand) 50%, transparent);
+  }
+  .comp__copy--done {
+    border-color: var(--color-g-4);
+    color: var(--color-ink);
+  }
+  @media (min-width: 48rem) {
+    .comp__copy {
+      height: var(--ctl-h);
+      width: var(--ctl-h);
+    }
+  }
+
+  /* ===== モバイル =====
+   * デスクトップのレールに代わる常設ドック（.dock）と、その展開シート（.sheet）。
+   * 「最近」（.recent）は親指の定位置なので他より大きい。
+   */
+  .dock {
+    gap: 0.5rem;
+    border-top-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-1);
+    padding-inline: 0.75rem;
+    padding-top: 0.5rem;
+    padding-bottom: 1rem;
+    flex-direction: column;
+    flex-shrink: 0;
+    display: flex;
+  }
+  @media (min-width: 48rem) {
+    .dock {
+      display: none;
+    }
+  }
+  .dock__head {
+    height: var(--ctl-h-touch);
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    font-size: var(--text-md);
+    display: flex;
+  }
+  .dock__head img {
+    height: 1.5rem;
+    width: 1.5rem;
+    border-radius: var(--radius-sm);
+    background-color: var(--color-g-2);
+    object-fit: contain;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2px var(--color-hand);
+  }
+  .dock__strip {
+    gap: 0.5rem;
+    scroll-snap-type: x proximity;
+    display: flex;
+    overflow-x: auto;
+  }
+  .dock__tile {
+    width: var(--dock-tile);
+    height: var(--dock-tile);
+    border-radius: var(--radius-md);
+    border-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-2);
+    padding: 0.25rem;
+    scroll-snap-align: start;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .dock__tile--on {
+    border-color: var(--color-hand);
+    box-shadow: 0 0 0 1px var(--color-hand);
+  }
+  .dock__tile img {
+    object-fit: contain;
+    width: 100%;
+    height: 100%;
+  }
+  .sheet__bd {
+    inset: 0;
+    z-index: 40;
+    background-color: color-mix(in oklab, var(--color-g-0) 70%, transparent);
+    position: fixed;
+    -webkit-backdrop-filter: blur(var(--blur-sm));
+    backdrop-filter: blur(var(--blur-sm));
+  }
+  @media (min-width: 48rem) {
+    .sheet__bd {
+      display: none;
+    }
+  }
+  .sheet {
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 50;
+    border-top-left-radius: var(--radius-2xl);
+    border-top-right-radius: var(--radius-2xl);
+    border-top-width: 1px;
+    border-color: var(--color-g-4);
+    background-color: var(--color-g-1);
+    max-height: 85dvh;
+    padding-inline: 1rem;
+    padding-bottom: 1rem;
+    flex-direction: column;
+    display: flex;
+    position: fixed;
+  }
+  @media (min-width: 48rem) {
+    .sheet {
+      display: none;
+    }
+  }
+  .sheet__grip {
+    margin-inline: auto;
+    margin-block: 0.5rem;
+    height: 0.375rem;
+    width: 2.5rem;
+    background-color: var(--color-g-4);
+    border-radius: 3.40282e38px;
+    flex-shrink: 0;
+  }
+  .sheet__body {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .recent {
+    margin-top: 0.75rem;
+    border-top-width: 1px;
+    border-color: var(--color-g-3);
+    padding-top: 0.75rem;
+    flex-shrink: 0;
+  }
+  .recent__tiles {
+    gap: 0.75rem;
+    display: flex;
+  }
+  .recent__tile {
+    width: var(--recent-tile);
+    height: var(--recent-tile);
+    border-radius: var(--radius-lg);
+    border-width: 1px;
+    border-color: var(--color-g-3);
+    background-color: var(--color-g-2);
+    padding: 0.375rem;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .recent__tile--on {
+    border-color: var(--color-hand);
+    box-shadow: 0 0 0 1px var(--color-hand);
+  }
+  .recent__tile img {
+    object-fit: contain;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ===== ツールチップ・ラベル =====
+   */
+  .tip {
+    display: inline-flex;
+    position: relative;
+  }
+  .tip__bubble {
+    pointer-events: none;
+    bottom: 100%;
+    left: 0;
+    z-index: 50;
+    margin-bottom: 0.375rem;
+    width: max-content;
+    max-width: 13rem;
+    border-radius: var(--radius-md);
+    background-color: var(--color-g-2);
+    padding-inline: 0.5rem;
+    padding-block: 0.25rem;
+    font-size: var(--text-xs);
+    color: var(--color-ink);
+    opacity: 0;
+    transition-property: all;
+    transition-duration: .1s;
+    position: absolute;
+    font-weight: 500;
+    line-height: 1.3333;
+    translate: 0 0.25rem;
+    box-shadow: 0 0 0 1px var(--color-g-4), 0 20px 25px -5px color-mix(in oklab, var(--color-black) 50%, transparent), 0 8px 10px -6px color-mix(in oklab, var(--color-black) 50%, transparent);
+  }
+  .tip:hover .tip__bubble {
+    opacity: 1;
+    translate: 0 0;
+  }
+  .tip:has(:focus-visible) .tip__bubble {
+    opacity: 1;
+    translate: 0 0;
+  }
+  .label {
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wide);
+    color: var(--color-ink-3);
+    text-transform: uppercase;
+    flex-shrink: 0;
+    font-weight: 600;
+    line-height: 1.3333;
+  }
+  .count {
+    font-size: var(--text-sm);
+    color: var(--color-ink-2);
+    flex-shrink: 0;
+    line-height: 1.4286;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== 空状態 =====
+   */
+  .empty {
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    height: 100%;
+    min-height: 100%;
+    padding-inline: 1rem;
+    text-align: center;
+    font-size: var(--text-md);
+    color: var(--color-ink-3);
+    flex-direction: column;
+    display: flex;
+  }
+  .empty__action {
+    height: var(--ctl-h);
+    border-radius: var(--radius-md);
+    border-width: 1px;
+    border-color: var(--color-g-4);
+    background-color: var(--color-g-2);
+    padding-inline: 0.75rem;
+    font-size: var(--text-sm);
+    color: var(--color-ink);
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: .15s;
+    align-items: center;
+    display: inline-flex;
+    font-weight: 600;
+    line-height: 1.4286;
+  }
+  @media (hover:hover) {
+    .empty__action:hover {
+      border-color: var(--color-ink-3);
+    }
+  }
+  .empty__action:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-hand) 50%, transparent);
+  }
+
+  /* ===== 構成の列そろえ ===== */
+  /*
+   * 1列＝1ユニット。系統のどの体数グループでも同じ横位置に来るので、共通駒は縦にそろい、
+   * 目が動くのは「選ぶ枠」の列だけになる。列数 --lane-n は呼び出し側が渡す。
+   */
+  /*
+   * 列は --lane-w で頭打ちにし、幅が足りなければそこまで縮める。列をそろえる以上
+   * ユニット数ぶんの幅が要るので、折り返す（＝そろわなくなる）よりマスを縮めるほうを取る。
+   */
+  .lanes {
+    display: grid;
+    grid-template-columns: repeat(var(--lane-n), minmax(0, var(--lane-w)));
+    justify-content: start;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+  }
+  /*
+   * 列のマス本体。デスクトップは --unit-size で頭打ち、狭い画面では列幅いっぱいまで縮む。
+   * max-height と overflow は画像が読めなかったとき用: alt が伸びてマスが縦に膨らむと
+   * 列そのものがずれるので、必ず正方形に収める。
+   */
+  .lane__box {
+    width: 100%;
+    max-width: var(--unit-size);
+    max-height: var(--unit-size);
+    aspect-ratio: 1;
+    overflow: hidden;
+  }
+  /* 派生ごとに中身が変わる列。ここだけ帯を敷いて、目が行く場所を固定する。 */
+  .lane--pick {
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklab, var(--color-hand) 12%, transparent);
+  }
+  /*
+   * 詰めた結果その列に駒が来なかった枠。**破線は使わない**（破線はサンプル不足の
+   * 意味で予約済み）。沈んだ面として置き、列そのものは残す。
+   */
+  .lane__hole {
+    border-radius: var(--radius-sm);
+    background: var(--color-g-2);
+  }
+  /* 列ごとの印。灰＝そのグループの共通駒 / 灯＝選ぶ枠。 */
+  .lane__mark {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--color-g-4);
+  }
+  .lane__mark--pick {
+    background: var(--color-hand);
+  }
+  /*
+   * 星は列の幅からはみ出させない。はみ出すと隣の列と繋がって一本の帯に見え、
+   * 列そろえそのものが壊れて読めなくなる。狭い画面では字も一段小さくする。
+   */
+  .lane__star {
+    width: 100%;
+    height: 0.75rem;
+    overflow: hidden;
+    text-align: center;
+    font-size: var(--lane-star);
+    line-height: 1;
+    letter-spacing: -0.05em;
+  }
+
+  /*
+   * アイテム。1個の幅は列幅に対する割合で、3個のときだけ重ねて1列に収める。
+   *
+   * 幅を「列幅の 1/3」にすると 390px では 10px になり、何のアイテムか判別できない。
+   * 少し重ねれば同じ列幅で 1.5 倍の大きさにできる。重なりの量は個数で変わるので、
+   * 個数を `--lane-item-n` として React から受け取る（2個なら隙間、1個なら中央）。
+   */
+  /* 駒の角に付くバッジ。狭い画面では駒ごと縮むので、バッジも一緒に縮める。 */
+  .lane__badge {
+    width: var(--lane-badge);
+    height: var(--lane-badge);
+  }
+  .lane__items {
+    display: flex;
+    width: 100%;
+    justify-content: center;
+  }
+  .lane__item {
+    width: var(--lane-item);
+    aspect-ratio: 1;
+    flex: none;
+  }
+  .lane__item + .lane__item {
+    margin-left: calc(
+      (100% - var(--lane-item) * var(--lane-item-n)) / (var(--lane-item-n) - 1)
+    );
+  }
+}
