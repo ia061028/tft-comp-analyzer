@@ -30,6 +30,8 @@ interface CompCardProps {
   traitCount: Map<number, number>
   /** 生涯ブロンズ数（CompList で算出済み）。 */
   bronze: number
+  /** 発動特性の種類数（固有特性込み。CompList で算出済み）。 */
+  active: number
   /**
    * 同ユニット数コホートの平均順位（CompList で算出済み）。Tier バッジと平均順位の**色**の
    * 根拠にだけ使う（差の数値は画面に出さない）。DerivRow と同じ基準に揃えるためのもの。
@@ -38,6 +40,8 @@ interface CompCardProps {
   sortKey: SortKey
   lang: Lang
   bronzeMode?: boolean
+  /** 特性ラダーモード: 発動特性の種類数を統計行に出す（並べ替えの第1キーなので数字を見せる）。 */
+  ladderMode?: boolean
   /** 「活用紋章 n/k」を出すか。「すべて使う」ON のときは全行 k/k になるので出さない。 */
   showUtilization: boolean
   /** 採用数が薄い行を淡く描く（「少数を薄く」ON のとき）。消さずに弱めるだけ。 */
@@ -63,10 +67,12 @@ export function CompCard({
   total,
   traitCount,
   bronze,
+  active,
   cohort,
   sortKey,
   lang,
   bronzeMode,
+  ladderMode,
   showUtilization,
   dim,
 }: CompCardProps) {
@@ -186,6 +192,14 @@ export function CompCard({
                 className="text-[17px] font-bold leading-tight text-ink tabular-nums"
               >
                 {row.match}/{total}
+              </span>
+            </div>
+          )}
+          {ladderMode && (
+            <div className="flex flex-col">
+              <span className="text-[11px] leading-tight text-faint">{t(lang, 'ladderMode')}</span>
+              <span className="text-[17px] font-bold leading-tight text-gold tabular-nums">
+                {active}
               </span>
             </div>
           )}

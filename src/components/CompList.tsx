@@ -7,12 +7,13 @@ import {
   PRIOR_TOP4,
   PRIOR_WIN,
   activeTraitCounts,
+  activeTraitTotal,
   bronzeTraitCount,
   cohortPlace,
   effectiveUnits,
   shrunk,
 } from '../lib/format'
-import { buildTree } from '../lib/backbone'
+import { TOP_N, buildTree } from '../lib/backbone'
 import { t, type Lang } from '../lib/i18n'
 import { CompCard, type SortKey } from './CompCard'
 import { FamilyCard } from './FamilyCard'
@@ -28,6 +29,8 @@ interface CompListProps {
   lang: Lang
   /** 生涯ブロンズモード: ブロンズ特性数の多い順に並べる。 */
   bronzeMode: boolean
+  /** 特性ラダーモード: 発動している特性の種類数の多い順にまとめ、その中を Tier 順に並べる。 */
+  ladderMode: boolean
 }
 
 /**
@@ -46,6 +49,8 @@ type Row = {
   traitCount: Map<number, number>
   /** 生涯ブロンズ数。CompCard と共有し二重計算を避ける。 */
   bronze: number
+  /** 発動特性の種類数（固有特性込み）。CompCard と共有し二重計算を避ける。 */
+  active: number
 }
 
 export function CompList({
@@ -56,6 +61,7 @@ export function CompList({
   dimLowSample,
   lang,
   bronzeMode,
+  ladderMode,
 }: CompListProps) {
   const { units, emblems, traits, granters } = stats
 
@@ -75,7 +81,7 @@ export function CompList({
       for (const row of compRows(comp, sel)) {
         const traitCount = activeTraitCounts(comp, row.used, units, emblems)
         const bronze = bronzeTraitCount(traitCount, traits)
-        out.push({ comp, row, traitCount, bronze })
+        out.push({ comp, row, traitCount, bronze, active: activeTraitTotal(traitCount, traits) })
       }
     }
     return out
@@ -121,6 +127,9 @@ export function CompList({
     const keys = [sortKey, ...PRIORITY.filter((k) => k !== sortKey)]
 
     return rows.slice().sort((a, b) => {
+      // 特性ラダーは「発動している特性の種類数」でまとめるのが目的なので、それを第1キーにする。
+      // 同数の中は下の keys（既定の先頭は Tier）で決まる。
+      if (ladderMode && a.active !== b.active) return b.active - a.active
       if (bronzeMode && a.bronze !== b.bronze) return b.bronze - a.bronze
       for (const k of keys) {
         const d = metric(a.row, effectiveUnits(a.comp), k) - metric(b.row, effectiveUnits(b.comp), k)
@@ -128,7 +137,7 @@ export function CompList({
       }
       return 0
     })
-  }, [rows, sortKey, bronzeMode, cohort])
+  }, [rows, sortKey, bronzeMode, ladderMode, cohort])
 
   // 紋章を2枚以上選んでいるときは「何枚を使う構成か」でセクションを分ける。
   // 3枚選んだら「3枚すべて使う」「2枚だけ使う」「1枚だけ使う」の3段になる。
@@ -158,15 +167,24 @@ export function CompList({
 
   // 上位を「コア ＋ 派生」の系統に畳む。コアが取れない行は flat に落ちて従来カードで描かれる。
   // セクションごとに畳む（TOP_N はセクション単位で効く）。
+  //
+  // **特性ラダーでは畳まない。** 系統は体数グループごとに行を並べ直すので、せっかく
+  // 発動特性数の順に並べても 11枠(15,14) → 10枠(14,13) → 11枠… と数字が上下してしまう。
+  // ラダーで見たいのは「上から順にどれだけ特性を出せるか」そのものなので、
+  // topN=0 で全行を flat に落とし、並べた順でそのまま描く。
   const trees = useMemo(
-    () => sections.map((s) => ({ ...s, tree: buildTree(s.rows, units, emblems, traits, granters) })),
-    [sections, units, emblems, traits, granters],
+    () =>
+      sections.map((s) => ({
+        ...s,
+        tree: buildTree(s.rows, units, emblems, traits, granters, ladderMode ? 0 : TOP_N),
+      })),
+    [sections, units, emblems, traits, granters, ladderMode],
   )
 
   // セクションごとのフルカード表示件数。選択・並び順・対象構成が変わったら先頭に戻す。
   // リセット用の useEffect を置くと1フレームだけ古い件数で描いてしまうので、
   // 基準キーを state に同梱して読み出し時に比較する。
-  const pageKey = `${sel.join(',')}|${sortKey}|${bronzeMode}|${comps.length}`
+  const pageKey = `${sel.join(',')}|${sortKey}|${bronzeMode}|${ladderMode}|${comps.length}`
   const [page, setPage] = useState<{ key: string; shown: Record<string, number> }>({
     key: pageKey,
     shown: {},
@@ -266,7 +284,7 @@ export function CompList({
                   </div>
                 )}
                 {/* 同一盤面でも紋章の使われ方（row.used）が違えば別カード。キーに両方を含める。 */}
-                {visible.map(({ comp, row, traitCount, bronze }) => (
+                {visible.map(({ comp, row, traitCount, bronze, active }) => (
                   <CompCard
                     key={`${comp.units.join(',')}|${row.used.join(',')}`}
                     stats={stats}
@@ -275,10 +293,12 @@ export function CompList({
                     total={sel.length}
                     traitCount={traitCount}
                     bronze={bronze}
+                    active={active}
                     cohort={cohort}
                     sortKey={sortKey}
                     lang={lang}
                     bronzeMode={bronzeMode}
+                    ladderMode={ladderMode}
                     showUtilization={sel.length > 1}
                     dim={dimLowSample && row.n <= DIM_SAMPLE_MAX}
                   />

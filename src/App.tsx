@@ -49,6 +49,9 @@ function App() {
   // 48rem 以上では常に開いた状態で出す（CSS 側で無視される）。
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [bronzeMode, setBronzeMode] = useState(false)
+  // 特性ラダー（ゲーム内機構）用: 発動している特性の種類数でまとめる。生涯ブロンズとは
+  // 数える対象が違うだけの近い軸なので、同時に ON にしても意味がない。片方を押すと他方は切る。
+  const [ladderMode, setLadderMode] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -265,6 +268,7 @@ function App() {
               {v}
             </span>
           ))}
+          {ladderMode && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden />}
           {bronzeMode && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bronze" aria-hidden />}
           {dimLowSample && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink" aria-hidden />}
           <svg
@@ -347,10 +351,39 @@ function App() {
             />
           </div>
 
+          {/*
+           * 特性ラダー。発動している特性の**種類数**が多い順にまとめ、同じ種類数の中は
+           * 選んだ指標（既定は Tier）で並べる。金は紋章の色だが、この軸はブロンズと対になる
+           * ので、あちらの銅に対してこちらは金で区別する。
+           */}
+          <button
+            type="button"
+            aria-pressed={ladderMode}
+            onClick={() => {
+              setLadderMode((l) => !l)
+              setBronzeMode(false)
+            }}
+            title={t(lang, 'ladderModeTitle')}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+              ladderMode
+                ? 'border-gold bg-gold text-base shadow-sm'
+                : 'border-line bg-surface-2 text-muted hover:border-gold/60 hover:text-ink'
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${ladderMode ? 'bg-base' : 'bg-gold'}`}
+              aria-hidden
+            />
+            {t(lang, 'ladderMode')}
+          </button>
+
           <button
             type="button"
             aria-pressed={bronzeMode}
-            onClick={() => setBronzeMode((b) => !b)}
+            onClick={() => {
+              setBronzeMode((b) => !b)
+              setLadderMode(false)
+            }}
             title={t(lang, 'bronzeModeTitle')}
             className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
               bronzeMode
@@ -434,6 +467,7 @@ function App() {
             dimLowSample={dimLowSample}
             lang={lang}
             bronzeMode={bronzeMode}
+            ladderMode={ladderMode}
           />
         </main>
       </div>

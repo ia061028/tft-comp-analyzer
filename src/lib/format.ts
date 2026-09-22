@@ -148,6 +148,26 @@ export function bronzeTraitCount(counts: Map<number, number>, traits: TraitInfo[
 }
 
 /**
+ * 発動している特性の種類数（固有特性も数える）。
+ *
+ * ゲーム内の「特性ラダー」は**重複しない特性を何種類発動させたか**で報酬が決まり、必要数は
+ * 段を追うごとに増える。数えるのは種類であって発動段の高さではないので、ブロンズ1段でも
+ * プリズムでも1種類は1種類。
+ *
+ * 生涯ブロンズ（`bronzeTraitCount`）とは別物。あちらは「最小ティアで発動している非固有特性」
+ * を数えるので、固有特性を除外し、段が上がった特性も落とす。ラダーはどちらも数える。
+ */
+export function activeTraitTotal(counts: Map<number, number>, traits: TraitInfo[]): number {
+  let c = 0
+  for (const [ti, n] of counts) {
+    const tr = traits[ti]
+    if (!tr) continue
+    if (activeTier(n, tr.tiers)) c++
+  }
+  return c
+}
+
+/**
  * 並び順のための縮約（ベイズ平滑化）。
  *
  * TFT は8人対戦なので理論ベースレートが確定している（Top4=50%、1位=12.5%、平均順位=4.5）。

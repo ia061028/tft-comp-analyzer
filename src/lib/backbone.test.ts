@@ -27,6 +27,7 @@ const row = (
     row: { used, match: used.length, n, top4: n * s.top4, win: n * s.win, p: n * s.place },
     traitCount: new Map(),
     bronze: 0,
+    active: 0,
   }
 }
 
@@ -364,4 +365,18 @@ test('同居する駒は別の列に分かれる', () => {
       '選ぶ枠にその構成の残りが入る',
     )
   }
+})
+
+test('topN=0 は全行をフラットに、並べた順のまま返す（特性ラダーの並びを崩さないため）', () => {
+  // 系統は体数グループごとに行を並べ直すので、発動特性数の順に並べた一覧に被せると
+  // 数字が上下してしまう。ラダーでは畳まずに、渡した順をそのまま描く。
+  const sorted = [row([...CORE, 9]), row([...CORE, 10]), row([...CORE, 11]), row([...CORE, 9, 10])]
+  const { families, flat } = buildTree(sorted, [], [], [], [], 0)
+
+  assert.equal(families.length, 0, '系統は作らない')
+  assert.deepEqual(
+    flat.map((r) => r.comp.units),
+    sorted.map((r) => r.comp.units),
+    '渡した順のまま',
+  )
 })
