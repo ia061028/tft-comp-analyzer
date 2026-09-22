@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import type { StatsFile } from '../../shared/types'
-import type { Deriv, Lane, LaneUse } from '../lib/backbone'
+import type { Deriv, GroupLane } from '../lib/backbone'
 import { activeTier, buildPlannerCode, holderMap, styleClasses, tierOfEdge } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { LaneUnit } from './LaneUnit'
@@ -11,10 +11,8 @@ import { Tip } from './Tip'
 interface DerivRowProps {
   stats: StatsFile
   deriv: Deriv
-  /** 系統ぜんぶで共通の列。盤面はこの並びで描く。 */
-  lanes: Lane[]
-  /** この体数グループから見た各列の状態（`lanes` と同じ並び）。 */
-  laneUse: LaneUse[]
+  /** この体数グループの列。盤面はこの並びで描く。 */
+  lanes: GroupLane[]
   /** 同ユニット数コホートの平均順位。平均順位の**色**の根拠にだけ使う（数値は出さない）。 */
   cohort: Map<number, number>
   /**
@@ -31,9 +29,9 @@ interface DerivRowProps {
  * 背骨からの派生1行。盤面・アイテム・装備者・発動特性を**この行のものとして全部**描く。
  *
  * 差分（＋この駒）だけを描いていた頃は、読み手が毎行コアと差分から盤面を組み直す必要があり、
- * それがゲーム中の瞬間判断をいちばん妨げていた。代わりに列をそろえる: 系統ぜんぶで
- * 1列＝1ユニットに固定するので、共通駒は縦にそろい、目が動くのは「選ぶ枠」の列だけになる。
- * ユニットの名前は列見出し（FamilyCard）が1回出すので、行では出さない。
+ * それがゲーム中の瞬間判断をいちばん妨げていた。代わりに列をそろえる: 同じ体数の派生では
+ * 共通駒が必ず同じ横位置に来るので、共通であることが並びだけで分かり、目が動くのは
+ * 右側の「選ぶ枠」だけになる。ユニットの名前は出さない（ツールチップで拾う）。
  *
  * 平均順位の色は**同じ体数のコホートからの差**で切る（`tierOfEdge`）。絶対値だと 10体グループが
  * 全部 S（同じ赤）になり、色が情報を運ばなくなるため。差の数値は画面に出さない。
@@ -42,7 +40,6 @@ export function DerivRow({
   stats,
   deriv,
   lanes,
-  laneUse,
   cohort,
   showEmblems,
   dim,
@@ -111,10 +108,10 @@ export function DerivRow({
           <div className="lanes" style={{ '--lane-n': lanes.length } as CSSProperties}>
             {lanes.map((lane, i) => (
               <LaneUnit
-                key={lane.unitIdx}
+                key={i}
                 stats={stats}
-                lane={lane}
-                use={laneUse[i]}
+                unitIdx={deriv.slots[i] ?? -1}
+                pick={lane.fixed === null}
                 comp={comp}
                 holders={holders}
                 lang={lang}

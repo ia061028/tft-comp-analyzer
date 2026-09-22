@@ -1027,32 +1027,20 @@
     aspect-ratio: 1;
     overflow: hidden;
   }
-  /* 列見出しの顔。行のマスより一回り小さくして、見出しだと分かるようにする。 */
-  .lane__head {
-    width: 100%;
-    max-width: var(--lane-head);
-    max-height: var(--lane-head);
-    aspect-ratio: 1;
-    overflow: hidden;
-  }
   /* 派生ごとに中身が変わる列。ここだけ帯を敷いて、目が行く場所を固定する。 */
   .lane--pick {
     border-radius: var(--radius-sm);
     background: color-mix(in oklab, var(--color-hand) 12%, transparent);
   }
   /*
-   * その列を「この派生では取らなかった」枠。**破線は使わない**（破線はサンプル不足の
+   * 詰めた結果その列に駒が来なかった枠。**破線は使わない**（破線はサンプル不足の
    * 意味で予約済み）。沈んだ面として置き、列そのものは残す。
    */
   .lane__hole {
     border-radius: var(--radius-sm);
     background: var(--color-g-2);
   }
-  /* その体数グループにそもそも居ないユニットの列。場所だけ取って何も描かない。 */
-  .lane__hole--none {
-    background: transparent;
-  }
-  /* 列ごとの印。灰＝そのグループの共通駒 / 灯＝選ぶ枠 / 無色＝この体数では使わない。 */
+  /* 列ごとの印。灰＝そのグループの共通駒 / 灯＝選ぶ枠。 */
   .lane__mark {
     height: 3px;
     border-radius: 2px;
@@ -1060,9 +1048,6 @@
   }
   .lane__mark--pick {
     background: var(--color-hand);
-  }
-  .lane__mark--none {
-    background: transparent;
   }
   /*
    * 星は列の幅からはみ出させない。はみ出すと隣の列と繋がって一本の帯に見え、

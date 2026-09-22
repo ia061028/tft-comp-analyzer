@@ -278,7 +278,7 @@ test('シナジー: コアから発動段が上がる／新たに発動する特
   assert.deepEqual(byAdd.get(11), [], '+u11 は何も伸びない')
 })
 
-test('レーンは共通駒が左、選ぶ枠が右にそろう', () => {
+test('列は体数ぶんに詰まり、共通駒が左にそろう', () => {
   const sorted = [
     row([...CORE, 9]),
     row([...CORE, 10]),
@@ -287,27 +287,79 @@ test('レーンは共通駒が左、選ぶ枠が右にそろう', () => {
   ]
   const f = buildTree(sorted).families[0]
 
-  // 固定されているグループ数 → 出てくるグループ数 → unitIdx。9/10 は10体グループでだけ固定、
-  // 11 はどのグループでも固定されないので最後に来る。
-  assert.deepEqual(
-    f.lanes.map((l) => l.unitIdx),
-    [...CORE, 9, 10, 11],
-  )
-  assert.equal(f.lanes.length, new Set(f.lanes.map((l) => l.unitIdx)).size, '1ユニット1列')
-
   const nine = f.groups.find((g) => g.units === 9)!
-  assert.equal(nine.lanes.length, f.lanes.length, 'グループの列は系統の列と同じ並び・同じ長さ')
-  assert.ok(
-    nine.lanes.slice(0, CORE.length).every((u) => u.fixed && !u.absent),
-    '9体グループでは背骨の8体が共通駒',
+  assert.equal(nine.lanes.length, 9, '9体グループの列は9本（21本の和集合にしない）')
+  assert.deepEqual(
+    nine.lanes.map((l) => l.fixed),
+    [...CORE, null],
+    '背骨8体が左に固定、9/10/11 は右端の1列を共有する',
   )
-  assert.ok(
-    nine.lanes.slice(CORE.length).every((u) => !u.fixed && !u.absent),
-    '9/10/11 は9体グループの「選ぶ枠」',
+  assert.deepEqual(
+    nine.derivs.map((d) => d.slots),
+    [
+      [...CORE, 9],
+      [...CORE, 10],
+      [...CORE, 11],
+    ],
+    '同居しない駒は同じ列に詰まるので、空きマスが出ない',
   )
 
   const ten = f.groups.find((g) => g.units === 10)!
-  // 10体グループは派生1件なので、その盤面にある駒はすべて固定扱いになる。
-  assert.ok(ten.lanes.slice(0, CORE.length + 2).every((u) => u.fixed))
-  assert.ok(ten.lanes[CORE.length + 2].absent, '11 は10体グループには居ない')
+  // 派生1件なので、その盤面にある駒はすべて共通駒になる。
+  assert.deepEqual(ten.lanes.map((l) => l.fixed), [...CORE, 9, 10])
+  assert.deepEqual(ten.derivs[0].slots, [...CORE, 9, 10])
+})
+
+test('共通でない駒も、そろえられるものは同じ列にそろう', () => {
+  // 8体 ＝ 共通5体 ＋ 残り3体。A(20)・B(21) は4構成すべてに出るので共通側に回り、
+  // C/D/E/F は1構成ずつなので同居しない ＝ 1列を共有できる。
+  const base = [1, 2, 3, 4, 5]
+  const sorted = [
+    row([...base, 20, 21, 30]),
+    row([...base, 20, 21, 31]),
+    row([...base, 20, 21, 32]),
+    row([...base, 20, 21, 33]),
+  ]
+  const g = buildTree(sorted).families[0].groups.find((x) => x.units === 8)!
+
+  assert.equal(g.lanes.length, 8, '列は体数ぶん。空き列を作らない')
+  assert.equal(g.lanes.filter((l) => l.fixed !== null).length, 7, '共通は 5 + A,B の7体')
+  assert.equal(g.lanes[7].fixed, null, '残り1列だけが選ぶ枠')
+
+  // 共通駒の横位置は全構成で同じ。ここが「並びだけで共通と分かる」の実体。
+  const heads = g.derivs.map((d) => d.slots.slice(0, 7).join(','))
+  assert.equal(new Set(heads).size, 1, '共通7体は全構成で同じ並び')
+  assert.deepEqual(
+    g.derivs.map((d) => d.slots[7]).sort((a, b) => a - b),
+    [30, 31, 32, 33],
+    '揃わない駒は同じ列に詰めて出す',
+  )
+  assert.ok(
+    g.derivs.every((d) => d.slots.length === 8 && d.slots.every((u) => u >= 0)),
+    '詰めた結果、空きマスは出ない',
+  )
+})
+
+test('同居する駒は別の列に分かれる', () => {
+  // 30 と 31 は同じ構成に同居するので同じ列に置けない。列は体数(8)ぶんで足りる。
+  const base = [1, 2, 3, 4, 5, 6]
+  const sorted = [
+    row([...base, 30, 31]),
+    row([...base, 30, 32]),
+    row([...base, 31, 33]),
+    row([...base, 32, 33]),
+  ]
+  const g = buildTree(sorted).families[0].groups.find((x) => x.units === 8)!
+
+  assert.equal(g.lanes.length, 8)
+  assert.deepEqual(g.lanes.map((l) => l.fixed), [...base, null, null])
+  for (const d of g.derivs) {
+    assert.equal(d.slots.length, 8)
+    assert.deepEqual(d.slots.slice(0, 6), base, '共通6体は同じ横位置')
+    assert.deepEqual(
+      d.slots.slice(6).filter((u) => u >= 0).sort((a, b) => a - b),
+      d.comp.units.slice(6).sort((a, b) => a - b),
+      '選ぶ枠にその構成の残りが入る',
+    )
+  }
 })

@@ -1,5 +1,4 @@
 import type { CompStats, StatsFile } from '../../shared/types'
-import type { Lane, LaneUse } from '../lib/backbone'
 import { costBorder, starColor } from '../lib/format'
 import { pickName, type Lang } from '../lib/i18n'
 import { RecipeLabel } from './RecipeLabel'
@@ -7,9 +6,11 @@ import { Tip } from './Tip'
 
 interface LaneUnitProps {
   stats: StatsFile
-  lane: Lane
-  use: LaneUse
-  /** この派生の盤面。列のユニットが居なければ空きマスになる。 */
+  /** この列にこの派生が置く駒。空きマスなら -1。 */
+  unitIdx: number
+  /** 選ぶ枠の列か（＝派生ごとに中身が変わる列）。 */
+  pick: boolean
+  /** この派生の盤面。星とアイテムをここから引く。 */
   comp: CompStats
   /** unitIdx → この行で持たせている紋章。 */
   holders: Map<number, number[]>
@@ -21,20 +22,18 @@ interface LaneUnitProps {
  *
  * **アイテムも紋章の装備者も、必ずこの行のものを描く。** 同じ系統でも派生によって
  * 装備者そのものが変わる（実データで確認済み）ので、系統の見出しで代表させると嘘になる。
- * ユニットの名前は出さない（21列まで伸びると潰れて読めない）。名前はツールチップで拾う。
+ * ユニットの名前は出さない（列が増えると潰れて読めない）。名前はツールチップで拾う。
  */
-export function LaneUnit({ stats, lane, use, comp, holders, lang }: LaneUnitProps) {
+export function LaneUnit({ stats, unitIdx, pick, comp, holders, lang }: LaneUnitProps) {
   const { units, emblems, items } = stats
-  const pick = !use.fixed && !use.absent
+  const pos = unitIdx < 0 ? -1 : comp.units.indexOf(unitIdx)
+  const unit = unitIdx < 0 ? undefined : units[unitIdx]
 
-  const pos = comp.units.indexOf(lane.unitIdx)
-  const unit = units[lane.unitIdx]
-
-  // 空きマス。「この派生では取らなかった枠」と「この体数では使わない駒」を描き分ける。
+  // 空きマス。詰めた結果ここに駒が来なかった選ぶ枠でだけ出る。
   if (pos < 0 || !unit) {
     return (
       <div className={pick ? 'lane--pick' : undefined}>
-        <div className={`lane__box lane__hole ${use.absent ? 'lane__hole--none' : ''}`} />
+        <div className="lane__box lane__hole" />
       </div>
     )
   }
@@ -42,10 +41,10 @@ export function LaneUnit({ stats, lane, use, comp, holders, lang }: LaneUnitProp
   const unitName = pickName(lang, unit)
   const star = comp.unitStars?.[pos] ?? 0
   const unitItems = comp.unitItems
-    .filter((ui) => ui[0] === lane.unitIdx)
+    .filter((ui) => ui[0] === unitIdx)
     .map((ui) => items?.[ui[1]])
     .filter(Boolean)
-  const held = (holders.get(lane.unitIdx) ?? []).map((ei) => emblems[ei]).filter(Boolean)
+  const held = (holders.get(unitIdx) ?? []).map((ei) => emblems[ei]).filter(Boolean)
 
   return (
     <div className={`flex min-w-0 flex-col items-center gap-0.5 ${pick ? 'lane--pick' : ''}`}>
