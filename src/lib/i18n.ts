@@ -11,7 +11,7 @@ const ja = {
   loading: '読み込み中…',
   loadFailed: '読み込みに失敗しました',
   retry: '再試行',
-  title: 'TFT 紋章構成アナライザー',
+  title: 'TFT 紋章構成検索',
   matchesCount: '{n} マッチ',
   generated: '生成 {time}',
   langSwitchTitle: '表示言語を切替',
@@ -31,9 +31,9 @@ const ja = {
   minSampleTitle: '採用数がこの数に満たない構成を一覧から外します。初期値の 1 では何も外れません。',
   filterAny: '指定なし',
   filterReset: '解除',
-  groupBy: 'まとめ',
+  groupBy: 'オーグメント',
   groupNone: 'なし',
-  groupByTitle: '一覧の第1キー。「特性ラダー」は発動している特性の種類数、「生涯ブロンズ」は初段だけで止めた特性の数でまとめます。',
+  groupByTitle: 'そのオーグメント向けの並べ方に切り替えます。「特性ラダー」は発動している特性の種類数、「生涯ブロンズ」は初段だけで止めた特性の数が多い順にまとめます。',
   maxPlaceTitle: '平均順位がこの数より悪い（大きい）構成を一覧から外します。「指定なし」なら絞りません。',
   minTop4Title: 'Top4率がこの % に満たない構成を一覧から外します。「指定なし」なら絞りません。',
   minWinTitle: '1位率がこの % に満たない構成を一覧から外します。「指定なし」なら絞りません。',
@@ -90,7 +90,7 @@ const ja = {
   emblemCatSpatula: 'へら',
   emblemCatPan: 'フライパン',
   emblemCatNone: '合成不可',
-  legal: "TFT Emblem Comp Analyzer isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
+  legal: "TFT Emblem Comp Search isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 }
 
 /** 翻訳キー（ja を基準に型化。en はこの全キーを持つことを型で強制）。 */
@@ -100,7 +100,7 @@ const en: Record<UIKey, string> = {
   loading: 'Loading…',
   loadFailed: 'Failed to load',
   retry: 'Retry',
-  title: 'TFT Emblem Comp Analyzer',
+  title: 'TFT Emblem Comp Search',
   matchesCount: '{n} matches',
   generated: 'Generated {time}',
   langSwitchTitle: 'Switch language',
@@ -120,9 +120,9 @@ const en: Record<UIKey, string> = {
   minSampleTitle: 'Hides comps played fewer times than this. At the default of 1 nothing is hidden.',
   filterAny: 'Any',
   filterReset: 'Reset',
-  groupBy: 'Group by',
+  groupBy: 'Augment',
   groupNone: 'None',
-  groupByTitle: 'Primary ordering key. "Trait ladder" groups by the number of distinct traits activated, "Lifetime bronze" by traits stopped at their first tier.',
+  groupByTitle: 'Reorders the list for that augment. "Trait Ladder" groups by how many distinct traits are activated, "Lifelong Bronze" by traits stopped at their first tier.',
   maxPlaceTitle: 'Hides comps whose average placement is worse (higher) than this. "Any" means no filter.',
   minTop4Title: 'Hides comps with a top-4 rate below this %. "Any" means no filter.',
   minWinTitle: 'Hides comps with a win rate below this %. "Any" means no filter.',
@@ -179,7 +179,7 @@ const en: Record<UIKey, string> = {
   emblemCatSpatula: 'Spatula',
   emblemCatPan: 'Frying Pan',
   emblemCatNone: 'Non-craftable',
-  legal: "TFT Emblem Comp Analyzer isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
+  legal: "TFT Emblem Comp Search isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 }
 
 const STRINGS: Record<Lang, Record<UIKey, string>> = { ja, en }

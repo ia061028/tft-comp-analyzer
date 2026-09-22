@@ -298,7 +298,7 @@ function App() {
           {patchOptions.length > 1 && (
             <div className="flex items-center gap-2.5 text-sm">
               <span
-                className="cursor-help text-xs font-semibold uppercase tracking-wide text-faint"
+                className="cursor-help text-xs font-semibold tracking-wide text-faint"
                 title={t(lang, 'patchTitle')}
               >
                 {t(lang, 'patch')}
@@ -328,7 +328,7 @@ function App() {
           )}
 
           <div className="flex items-center gap-2.5 text-sm">
-            <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t(lang, 'boardSize')}</span>
+            <span className="text-xs font-semibold tracking-wide text-faint">{t(lang, 'boardSize')}</span>
             <SegmentedControl<SizeKey>
               ariaLabel={t(lang, 'boardSize')}
               value={size}
@@ -345,7 +345,7 @@ function App() {
 
           <div className="flex items-center gap-2.5 text-sm">
             <span
-              className="cursor-help text-xs font-semibold uppercase tracking-wide text-faint"
+              className="cursor-help text-xs font-semibold tracking-wide text-faint"
               title={t(lang, 'sortHint')}
             >
               {t(lang, 'sort')}
@@ -364,15 +364,15 @@ function App() {
           </div>
 
           {/*
-           * まとめ方。特性ラダーと生涯ブロンズは**同時に立たない**ので、2つの独立した
-           * トグルではなく1つの選択にする。押すと相手が消えるトグルは、消えた理由が
-           * 画面に出ないぶん読み取りにくい。
+           * オーグメント別の並べ方。特性ラダーも生涯ブロンズもゲーム内のオーグメントで、
+           * **同時には持てない**ので、2つの独立したトグルではなく1つの選択にする。
+           * 押すと相手が消えるトグルは、消えた理由が画面に出ないぶん読み取りにくい。
            *
            * 選択中の塗りは行に出る数字の色に合わせる（ラダー＝金 / ブロンズ＝銅）。
            */}
           <div className="flex items-center gap-2.5 text-sm">
             <span
-              className="cursor-help text-xs font-semibold uppercase tracking-wide text-faint"
+              className="cursor-help text-xs font-semibold tracking-wide text-faint"
               title={t(lang, 'groupByTitle')}
             >
               {t(lang, 'groupBy')}
@@ -404,7 +404,7 @@ function App() {
         <div
           className={`${filtersOpen ? 'flex' : 'hidden'} mt-2 flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-2 md:flex`}
         >
-          <span className="text-xs font-semibold uppercase tracking-wide text-faint">
+          <span className="text-xs font-semibold tracking-wide text-faint">
             {t(lang, 'filters')}
           </span>
           {pickField({
@@ -587,7 +587,7 @@ function pickField({ id, label, title, value, onChange, options, dir, fmt, lang 
       <label
         htmlFor={id}
         title={title}
-        className="cursor-help whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-faint"
+        className="cursor-help whitespace-nowrap text-xs font-semibold tracking-wide text-faint"
       >
         {label}
       </label>
@@ -595,7 +595,7 @@ function pickField({ id, label, title, value, onChange, options, dir, fmt, lang 
         id={id}
         value={value === null ? '' : String(value)}
         onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-        className={`h-8 rounded-md border bg-surface-2 py-1 pl-2 pr-1.5 text-sm font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+        className={`rounded-md border bg-surface-2 py-1 pl-2 pr-1.5 text-sm font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
           any ? 'border-line text-faint' : 'border-line-strong text-ink'
         }`}
       >
