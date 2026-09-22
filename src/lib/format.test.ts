@@ -7,7 +7,6 @@ import {
   activeTraitTotal,
   sampleLevel,
   shrunk,
-  DIM_SAMPLE_MAX,
   LOW_SAMPLE,
   SAMPLE_TONE,
   PRIOR_TOP4,
@@ -174,11 +173,6 @@ test('sampleLevel: 段は単調（採用数が増えて段が下がることは�
 
 test('SAMPLE_TONE: 全ての段に配色がある', () => {
   for (const n of [1, 2, 5, LOW_SAMPLE]) assert.ok(SAMPLE_TONE[sampleLevel(n)])
-})
-
-test('薄く描く上限は最下段に収まる（淡い行が「十分」段に混ざらない）', () => {
-  assert.equal(sampleLevel(DIM_SAMPLE_MAX), 1)
-  assert.ok(sampleLevel(DIM_SAMPLE_MAX) < sampleLevel(LOW_SAMPLE))
 })
 
 // ---- 静的データ外の上乗せ特性（ラックス/カ＝ジックス/エルダードラゴン型） ----

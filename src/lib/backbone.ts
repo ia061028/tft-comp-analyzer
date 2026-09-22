@@ -72,28 +72,16 @@ export interface Deriv extends Row {
   slots: number[]
 }
 
-/** 最小・中央値・最大。「だいたいどのくらいか」を1行で示すための要約。 */
-export interface Span {
-  min: number
-  median: number
-  max: number
-}
-
 /**
  * 同じ盤面ユニット数の派生の束。**比較が正当なのはこの中だけ。**
  *
- * 統計サマリ（place/top4/win）は**このグループの中だけ**で集計する。系統全体で集計すると
- * 7体〜10体が混ざり、平均順位の幅（例 1.83〜6.74）が構成の差ではなく生存バイアスそのものになる。
+ * グループの要約値（平均順位・Top4率・1位率の中央値）は持たない。3つの中央値はそれぞれ
+ * 別の行から選ばれるので、どの構成にも存在しない数字の組み合わせが見出しに立ち、
+ * 行ごとの数字と食い違って見えた。要約が要るなら、真下に並ぶ行そのものを読む。
  */
 export interface UnitGroup {
   units: number
   derivs: Deriv[]
-  /** 平均順位（小さいほど良い）。 */
-  place: Span
-  /** Top4率 %。 */
-  top4: Span
-  /** 1位率 %。 */
-  win: Span
   /**
    * このグループの列。長さは体数とほぼ同じで、系統ぜんぶの和集合にはしない。
    * 共通駒が左に固定で並び、残りは右に詰まる。
@@ -123,6 +111,15 @@ export interface GroupLane {
    * 選ぶ枠は複数のユニットで共有するので、どの駒かは派生の `slots` が持つ。
    */
   fixed: number | null
+  /**
+   * この列に**いちばん多く入る駒**。空きマスを薄く描くのに使う。
+   *
+   * 空きマスは選ぶ枠にしか出ないが、真っ黒の穴だと「この行には何が無いのか」が分からず、
+   * 上下の行と見比べて自分で埋める作業になる。その列の主役を薄く置けば、欠けている駒が
+   * 並びだけで読める。選ぶ枠は複数の駒で共有するので「主役」は1つに決め打ちできない ——
+   * `rest` を出現数の降順で詰めるので、その列に最初に入った駒が最頻の駒になる。
+   */
+  hint: number | null
 }
 
 export interface Family {
@@ -223,18 +220,6 @@ function backboneOf(members: Row[]): number[] {
     .filter(([, c]) => c >= need)
     .sort((a, b) => b[1] - a[1] || a[0] - b[0])
     .map(([u]) => u)
-}
-
-/** 昇順ソートした配列の中央値（偶数個は中央2つの平均）。 */
-function median(xs: number[]): number {
-  if (xs.length === 0) return NaN
-  const s = xs.slice().sort((a, b) => a - b)
-  const m = s.length >> 1
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
-}
-
-function spanOf(xs: number[]): Span {
-  return { min: Math.min(...xs), median: median(xs), max: Math.max(...xs) }
 }
 
 /**
@@ -359,7 +344,7 @@ function buildGroupLanes(g: UnitGroup, order: Map<number, number>): GroupLane[] 
   common.sort((a, b) => rank(a) - rank(b))
   rest.sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || rank(a) - rank(b))
 
-  const lanes: GroupLane[] = common.map((u) => ({ fixed: u }))
+  const lanes: GroupLane[] = common.map((u) => ({ fixed: u, hint: u }))
   const slots = g.derivs.map(() => common.slice())
 
   // 選ぶ枠。派生ごとに「その列はもう埋まっているか」を見ながら、置ける一番左へ。
@@ -370,8 +355,10 @@ function buildGroupLanes(g: UnitGroup, order: Map<number, number>): GroupLane[] 
       if (inDerivs.every((i) => (slots[i][col] ?? -1) < 0)) break
     }
     if (col >= lanes.length) {
-      for (let c = lanes.length; c <= col; c++) lanes.push({ fixed: null })
+      for (let c = lanes.length; c <= col; c++) lanes.push({ fixed: null, hint: null })
     }
+    // rest は出現数の降順なので、その列に最初に入った駒がその列の最頻の駒。
+    if (lanes[col].hint === null) lanes[col].hint = u
     for (const i of inDerivs) {
       for (let c = slots[i].length; c < col; c++) slots[i].push(-1)
       slots[i][col] = u
@@ -464,9 +451,6 @@ export function buildTree(
       .map(([unitCount, ds]) => ({
         units: unitCount,
         derivs: ds,
-        place: spanOf(ds.map((d) => d.row.p / d.row.n)),
-        top4: spanOf(ds.map((d) => (d.row.top4 / d.row.n) * 100)),
-        win: spanOf(ds.map((d) => (d.row.win / d.row.n) * 100)),
         lanes: [],
       }))
 

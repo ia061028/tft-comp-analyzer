@@ -190,11 +190,15 @@ test('mixedEmblems: 系統内で紋章の使い方が割れていれば true（�
   assert.equal(buildTree(mixed).families[0].mixedEmblems, true, '使い方が割れている')
 })
 
-// --- 体数グループの統計サマリ（最小・中央値・最大） ---
+// --- 体数グループ ---
 
-test('統計サマリは「同じ体数のグループの中だけ」で集計する（体数をまたがない）', () => {
-  // 9体3件（平均 2.0 / 3.0 / 4.0）と 10体1件（平均 1.0）。
-  // 系統全体で集計すると 1.0〜4.0 になるが、これは生存バイアス。9体は 2.0〜4.0 でなければならない。
+test('派生は体数グループに分かれ、グループをまたがない', () => {
+  // 9体4件と 10体1件。平均順位は実質ユニット数を測っているので（9体 2.0〜4.0 に対し
+  // 10体 1.0）、この2つを同じ束にすると生存バイアスを構成の差として読んでしまう。
+  //
+  // グループの要約値（中央値）は**持たない**。平均順位・Top4率・1位率の中央値はそれぞれ
+  // 別の行から選ばれるので、どの構成にも無い数字の組み合わせが見出しに立ち、真下の行と
+  // 食い違って見えた。読むべき数字は行そのものにある。
   const sorted = [
     row([...CORE, 20], 50, [0], { top4: 1.0, win: 0.5, place: 1.0 }), // 9体
     row([...CORE, 9], 50, [0], { top4: 0.9, win: 0.4, place: 2.0 }),
@@ -206,34 +210,19 @@ test('統計サマリは「同じ体数のグループの中だけ」で集計�
   assert.equal(families.length, 1)
 
   const nine = families[0].groups.find((g) => g.units === 9)!
-  assert.equal(nine.derivs.length, 4)
-  assert.equal(nine.place.min, 1.0)
-  assert.equal(nine.place.max, 4.0)
-  assert.equal(nine.place.median, 2.5, '4件の中央値は中央2つ(2.0,3.0)の平均')
-
   const ten = families[0].groups.find((g) => g.units === 10)!
+  assert.equal(nine.derivs.length, 4)
   assert.equal(ten.derivs.length, 1)
-  assert.equal(ten.place.min, 1.0)
-  assert.equal(ten.place.max, 1.0)
-  assert.equal(ten.place.median, 1.0, '1件なら min=median=max')
 
-  // 10体の 1.0 が 9体グループの幅に混ざっていないこと（＝体数をまたいでいない）。
-  assert.ok(nine.place.max === 4.0 && ten.place.max === 1.0)
-})
+  // 9体グループの行はすべて 9体（10体の 1.0 が混ざっていない）。
+  for (const d of nine.derivs) assert.equal(d.comp.units.length, 9)
+  assert.equal(ten.derivs[0].comp.units.length, 10)
 
-test('統計サマリ: Top4率・1位率も % で集計される', () => {
-  const sorted = [
-    row([...CORE, 9], 100, [0], { top4: 1.0, win: 0.5, place: 2.0 }),
-    row([...CORE, 10], 100, [0], { top4: 0.6, win: 0.1, place: 3.0 }),
-    row([...CORE, 11], 100, [0], { top4: 0.8, win: 0.3, place: 2.5 }),
-  ]
-  const g = buildTree(sorted).families[0].groups[0]
-  assert.equal(g.top4.min, 60)
-  assert.equal(g.top4.max, 100)
-  assert.equal(g.top4.median, 80)
-  assert.equal(g.win.min, 10)
-  assert.equal(g.win.max, 50)
-  assert.equal(g.win.median, 30)
+  // グループは降順（大きい体数が先）。
+  assert.deepEqual(
+    families[0].groups.map((g) => g.units),
+    [10, 9],
+  )
 })
 
 // --- 派生のシナジー（コアから伸びる特性） ---

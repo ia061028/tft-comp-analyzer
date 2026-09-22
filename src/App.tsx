@@ -3,15 +3,16 @@ import type { StatsFile } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
 import { loadStats, remapSelection, DEFAULT_STATS_FILE, ALL_PATCHES_KEY } from './lib/data'
 import { maxEmblemMultiplicity } from './lib/multiset'
-import { DIM_SAMPLE_MAX, effectiveUnits } from './lib/format'
+import { effectiveUnits } from './lib/format'
 import { EmblemDock } from './components/EmblemDock'
 import { EmblemGrid } from './components/EmblemGrid'
-import { SelectionBar } from './components/SelectionBar'
 import { CompList } from './components/CompList'
 import { SegmentedControl } from './components/SegmentedControl'
-import type { SortKey } from './components/CompCard'
+import type { SortKey } from './lib/format'
 
 type SizeKey = 'all' | '7' | '8' | '9' | '10'
+/** 一覧の第1キー。特性ラダーと生涯ブロンズは同時に立たないので1つの選択にする。 */
+type GroupKey = 'none' | 'ladder' | 'bronze'
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
@@ -37,7 +38,6 @@ function App() {
   const [sortKey, setSortKey] = useState<SortKey>('place')
   // 採用数の下限フィルタは廃止した（紋章を2枚以上使う構成がほぼ全部そこで消えていた）。
   // 代わりに薄い行を「淡く描くだけ」のトグル。既定 ON で見た目は従来に近く、OFF で全部が等価に出る。
-  const [dimLowSample, setDimLowSample] = useState(true)
   const [lang, setLang] = useState<Lang>(() => {
     const saved = localStorage.getItem(LANG_STORAGE_KEY)
     return saved === 'ja' || saved === 'en' ? saved : 'ja'
@@ -52,6 +52,12 @@ function App() {
   // 特性ラダー（ゲーム内機構）用: 発動している特性の種類数でまとめる。生涯ブロンズとは
   // 数える対象が違うだけの近い軸なので、同時に ON にしても意味がない。片方を押すと他方は切る。
   const [ladderMode, setLadderMode] = useState(false)
+  // 絞り込み。既定はどれも「絞らない」（採用数だけは下限 1 ＝ 全行が通る）。
+  // 閾値は**画面に出ている数字**に対して効かせる（並べ替えの縮約値ではない）。
+  const [minN, setMinN] = useState(1)
+  const [maxPlace, setMaxPlace] = useState<number | null>(null)
+  const [minTop4, setMinTop4] = useState<number | null>(null)
+  const [minWin, setMinWin] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -115,8 +121,8 @@ function App() {
       : statsOrNull.comps.filter((c) => effectiveUnits(c) === Number(size))
   }, [statsOrNull, size])
 
-  // 紋章ごとの「データ上1レコードで同時活用された最大枚数」。選択枚数がこれを超えたら
-  // SelectionBar で警告する（構成全体が対象。ユニット数フィルタの影響を受けない）。
+  // 紋章ごとの「データ上1レコードで同時活用された最大枚数」。選択枚数がこれを超えた紋章は
+  // タイルの個数バッジを銅にして知らせる（構成全体が対象。ユニット数フィルタの影響を受けない）。
   const maxMult = useMemo(
     () => (statsOrNull ? maxEmblemMultiplicity(statsOrNull.comps, statsOrNull.emblems.length) : []),
     [statsOrNull],
@@ -201,6 +207,10 @@ function App() {
   }))
   const currentPatchFile = stats.patches.find((p) => p.key === stats.patch)?.file ?? patchFile
 
+  // 効いている絞り込みの数。畳んだ帯と「解除」の出し分けに使う。
+  const activeFilters =
+    (minN > 1 ? 1 : 0) + (maxPlace !== null ? 1 : 0) + (minTop4 !== null ? 1 : 0) + (minWin !== null ? 1 : 0)
+
   // 畳んだフィルタ帯に出す今の値。ラベルは付けず、値だけを並べる。
   const shownPatchFile = switching ? patchFile : currentPatchFile
   const summary = [
@@ -208,6 +218,9 @@ function App() {
     patchOptions.find((o) => o.key === shownPatchFile)?.label,
     size === 'all' ? t(lang, 'all') : t(lang, 'unitsGroup', { n: Number(size) }),
     { place: t(lang, 'sortTier'), win: t(lang, 'sortWin'), top4: t(lang, 'sortTop4'), adopt: t(lang, 'sortAdopt') }[sortKey],
+    // 絞り込みは効いている数だけ出す。値そのものを並べると帯が2段になり、
+    // 畳んでいる意味が無くなる（何で絞ったかは開けば分かる）。
+    activeFilters > 0 ? `${t(lang, 'filters')} ${activeFilters}` : null,
   ].filter(Boolean) as string[]
 
   return (
@@ -263,14 +276,13 @@ function App() {
           {summary.map((v) => (
             <span
               key={v}
-              className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted ring-1 ring-inset ring-line"
+              className="whitespace-nowrap rounded-md bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted ring-1 ring-inset ring-line"
             >
               {v}
             </span>
           ))}
           {ladderMode && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden />}
           {bronzeMode && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bronze" aria-hidden />}
-          {dimLowSample && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink" aria-hidden />}
           <svg
             viewBox="0 0 12 12"
             aria-hidden
@@ -286,7 +298,7 @@ function App() {
           {patchOptions.length > 1 && (
             <div className="flex items-center gap-2.5 text-sm">
               <span
-                className="cursor-help text-xs font-semibold uppercase tracking-wide text-faint"
+                className="cursor-help text-xs font-semibold tracking-wide text-faint"
                 title={t(lang, 'patchTitle')}
               >
                 {t(lang, 'patch')}
@@ -316,7 +328,7 @@ function App() {
           )}
 
           <div className="flex items-center gap-2.5 text-sm">
-            <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t(lang, 'boardSize')}</span>
+            <span className="text-xs font-semibold tracking-wide text-faint">{t(lang, 'boardSize')}</span>
             <SegmentedControl<SizeKey>
               ariaLabel={t(lang, 'boardSize')}
               value={size}
@@ -333,7 +345,7 @@ function App() {
 
           <div className="flex items-center gap-2.5 text-sm">
             <span
-              className="cursor-help text-xs font-semibold uppercase tracking-wide text-faint"
+              className="cursor-help text-xs font-semibold tracking-wide text-faint"
               title={t(lang, 'sortHint')}
             >
               {t(lang, 'sort')}
@@ -352,73 +364,107 @@ function App() {
           </div>
 
           {/*
-           * 特性ラダー。発動している特性の**種類数**が多い順にまとめ、同じ種類数の中は
-           * 選んだ指標（既定は Tier）で並べる。金は紋章の色だが、この軸はブロンズと対になる
-           * ので、あちらの銅に対してこちらは金で区別する。
+           * オーグメント別の並べ方。特性ラダーも生涯ブロンズもゲーム内のオーグメントで、
+           * **同時には持てない**ので、2つの独立したトグルではなく1つの選択にする。
+           * 押すと相手が消えるトグルは、消えた理由が画面に出ないぶん読み取りにくい。
+           *
+           * 選択中の塗りは行に出る数字の色に合わせる（ラダー＝金 / ブロンズ＝銅）。
            */}
-          <button
-            type="button"
-            aria-pressed={ladderMode}
-            onClick={() => {
-              setLadderMode((l) => !l)
-              setBronzeMode(false)
-            }}
-            title={t(lang, 'ladderModeTitle')}
-            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
-              ladderMode
-                ? 'border-gold bg-gold text-base shadow-sm'
-                : 'border-line bg-surface-2 text-muted hover:border-gold/60 hover:text-ink'
-            }`}
-          >
+          <div className="flex items-center gap-2.5 text-sm">
             <span
-              className={`h-1.5 w-1.5 rounded-full ${ladderMode ? 'bg-base' : 'bg-gold'}`}
-              aria-hidden
+              className="cursor-help text-xs font-semibold tracking-wide text-faint"
+              title={t(lang, 'groupByTitle')}
+            >
+              {t(lang, 'groupBy')}
+            </span>
+            <SegmentedControl<GroupKey>
+              ariaLabel={t(lang, 'groupBy')}
+              value={ladderMode ? 'ladder' : bronzeMode ? 'bronze' : 'none'}
+              onChange={(k) => {
+                setLadderMode(k === 'ladder')
+                setBronzeMode(k === 'bronze')
+              }}
+              options={[
+                { key: 'none', label: t(lang, 'groupNone') },
+                { key: 'ladder', label: t(lang, 'ladderMode'), accent: 'gold' },
+                { key: 'bronze', label: t(lang, 'bronzeMode'), accent: 'bronze' },
+              ]}
             />
-            {t(lang, 'ladderMode')}
-          </button>
+          </div>
+        </div>
 
-          <button
-            type="button"
-            aria-pressed={bronzeMode}
-            onClick={() => {
-              setBronzeMode((b) => !b)
-              setLadderMode(false)
-            }}
-            title={t(lang, 'bronzeModeTitle')}
-            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
-              bronzeMode
-                ? 'border-bronze bg-bronze text-base shadow-sm'
-                : 'border-line bg-surface-2 text-muted hover:border-bronze/60 hover:text-ink'
-            }`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${bronzeMode ? 'bg-base' : 'bg-bronze'}`}
-              aria-hidden
-            />
-            {t(lang, 'bronzeMode')}
-          </button>
-
-          {/*
-           * 「少数を薄く」。以前はここが「採用数下限」の入力欄で、既定の 5 が複数紋章の構成を
-           * ほぼ全部消していた。行は常に全部出し、薄いものを淡くするかどうかだけを選ばせる。
-           */}
-          <button
-            type="button"
-            aria-pressed={dimLowSample}
-            onClick={() => setDimLowSample((d) => !d)}
-            title={t(lang, 'dimLowSampleTitle', { n: DIM_SAMPLE_MAX })}
-            className={`ml-auto inline-flex items-center gap-1.5 rounded-md border bg-surface-2 px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
-              dimLowSample
-                ? 'border-line-strong text-ink'
-                : 'border-line text-faint hover:border-line-strong hover:text-muted'
-            }`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${dimLowSample ? 'bg-ink' : 'bg-faint'}`}
-              aria-hidden
-            />
-            {t(lang, 'dimLowSample')}
-          </button>
+        {/*
+         * 絞り込みは別の段に分ける。上の段は「何を見て、どう並べるか」、この段は
+         * 「何を外すか」で、手の種類が違う。1段に混ぜると、並び替えと絞り込みが
+         * 同じ重さで並んで読み分けられなくなる。
+         *
+         * 値は自由入力ではなく決め打ちの段から選ぶ。2.47 のような刻みに意味は無く、
+         * 打ち間違いで一覧が空になるだけなので、意味のある区切りだけを出す。
+         */}
+        <div
+          className={`${filtersOpen ? 'flex' : 'hidden'} mt-2 flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-2 md:flex`}
+        >
+          <span className="text-xs font-semibold tracking-wide text-faint">
+            {t(lang, 'filters')}
+          </span>
+          {pickField({
+            id: 'min-n',
+            label: t(lang, 'minSample'),
+            title: t(lang, 'minSampleTitle'),
+            value: minN,
+            onChange: (v) => setMinN(v ?? 1),
+            options: MIN_N_STEPS,
+            dir: 'min',
+            lang,
+          })}
+          {pickField({
+            id: 'max-place',
+            label: t(lang, 'avgPlace'),
+            title: t(lang, 'maxPlaceTitle'),
+            value: maxPlace,
+            onChange: setMaxPlace,
+            options: PLACE_STEPS,
+            dir: 'max',
+            fmt: (v) => v.toFixed(2),
+            lang,
+          })}
+          {pickField({
+            id: 'min-top4',
+            label: t(lang, 'metricTop4'),
+            title: t(lang, 'minTop4Title'),
+            value: minTop4,
+            onChange: setMinTop4,
+            options: RATE_STEPS,
+            dir: 'min',
+            fmt: (v) => `${v}%`,
+            lang,
+          })}
+          {pickField({
+            id: 'min-win',
+            label: t(lang, 'metricWin'),
+            title: t(lang, 'minWinTitle'),
+            value: minWin,
+            onChange: setMinWin,
+            options: WIN_STEPS,
+            dir: 'min',
+            fmt: (v) => `${v}%`,
+            lang,
+          })}
+          {/* 解除は効いているときだけ出す。何も外していないときに押せる「解除」は嘘。 */}
+          {activeFilters > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setMinN(1)
+                setMaxPlace(null)
+                setMinTop4(null)
+                setMinWin(null)
+              }}
+              className="text-xs font-semibold text-faint underline-offset-2 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+            >
+              {t(lang, 'filterReset')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -447,27 +493,23 @@ function App() {
             onAdd={addEmblem}
             onRemove={removeEmblem}
             baseItemIcons={stats.baseItemIcons}
+            maxMult={maxMult}
           />
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          <SelectionBar
-            emblems={stats.emblems}
-            counts={counts}
-            lang={lang}
-            onClear={clear}
-            onRemove={removeEmblem}
-            maxMult={maxMult}
-          />
           <CompList
             stats={stats}
             comps={selectedComps}
             sel={selection}
             sortKey={sortKey}
-            dimLowSample={dimLowSample}
             lang={lang}
             bronzeMode={bronzeMode}
             ladderMode={ladderMode}
+            minN={minN}
+            maxPlace={maxPlace}
+            minTop4={minTop4}
+            minWin={minWin}
           />
         </main>
       </div>
@@ -481,6 +523,7 @@ function App() {
         onRemove={removeEmblem}
         onClear={clear}
         baseItemIcons={stats.baseItemIcons}
+        maxMult={maxMult}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
       />
@@ -489,6 +532,81 @@ function App() {
       <footer className="shrink-0 border-t border-line bg-surface px-4 py-1.5 sm:px-5 sm:py-2">
         <p className="text-[10px] leading-tight text-faint sm:text-xs sm:leading-snug">{t(lang, 'legal')}</p>
       </footer>
+    </div>
+  )
+}
+
+/**
+ * 絞り込みの段。自由入力ではなく決め打ちの区切りから選ばせる。
+ *
+ * 平均順位は 2.00〜4.50 の 0.25 刻み（実データの行はほぼこの幅に収まる）、率は
+ * 意味のある節目だけ。細かい刻みは「2.47 以下」のような、読む側に何も伝えない
+ * 閾値を作るだけで、1つ打ち間違えると一覧が丸ごと消える。
+ *
+ * 採用数だけ「指定なし」が無い。1 ＝ 何も外れない、が既定なので同じものになる。
+ */
+const MIN_N_STEPS = [1, 2, 3, 5, 10, 20, 50] as const
+const PLACE_STEPS = [2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 4, 4.5] as const
+const RATE_STEPS = [50, 60, 65, 70, 75, 80, 85, 90, 95] as const
+const WIN_STEPS = [10, 15, 20, 25, 30, 40, 50] as const
+
+/**
+ * 閾値の向きを言葉にする。日本語は「2.50 以下」、英語は「≤ 2.50」。
+ *
+ * 選択肢にも畳んだ帯にも同じ書き方を使う。片方が「≤ 2.50」で片方が「2.50 以下」だと、
+ * 同じ設定を指しているのか確かめる手間が要る。
+ */
+function limitText(lang: Lang, dir: 'max' | 'min', n: string) {
+  return lang === 'ja' ? `${n} ${dir === 'max' ? '以下' : '以上'}` : `${dir === 'max' ? '≤' : '≥'} ${n}`
+}
+
+interface PickFieldProps {
+  id: string
+  label: string
+  title: string
+  value: number | null
+  onChange: (v: number | null) => void
+  options: readonly number[]
+  /** 向き。max ＝ この値以下だけ残す、min ＝ この値以上だけ残す。 */
+  dir: 'max' | 'min'
+  fmt?: (v: number) => string
+  lang: Lang
+}
+
+/**
+ * 絞り込みの選択1つ。「指定なし」は選択肢そのもの（= `null`）に割り当てる。
+ *
+ * 向き（以下／以上）は選択肢そのものに書く。ラベルに指標名だけを置いて向きを
+ * 伏せると、「Top4率 80」がそれ以上なのか以下なのか画面から読めない。
+ */
+function pickField({ id, label, title, value, onChange, options, dir, fmt, lang }: PickFieldProps) {
+  const show = (v: number) => limitText(lang, dir, fmt ? fmt(v) : String(v))
+  const any = value === null
+  return (
+    <div className="flex items-center gap-1.5 text-sm">
+      <label
+        htmlFor={id}
+        title={title}
+        className="cursor-help whitespace-nowrap text-xs font-semibold tracking-wide text-faint"
+      >
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value === null ? '' : String(value)}
+        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        className={`rounded-md border bg-surface-2 py-1 pl-2 pr-1.5 text-sm font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+          any ? 'border-line text-faint' : 'border-line-strong text-ink'
+        }`}
+      >
+        {/* 採用数のように 1 が既定のものは「指定なし」を出さない（同じ意味になる）。 */}
+        {!options.includes(1) && <option value="">{t(lang, 'filterAny')}</option>}
+        {options.map((v) => (
+          <option key={v} value={v}>
+            {show(v)}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

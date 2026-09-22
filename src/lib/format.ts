@@ -1,5 +1,5 @@
 // 構成カードの見た目に関する純粋なヘルパ群（配色・ティア判定・チームコード生成）。
-// CompList/CompCard から共有する。
+// CompList と各行コンポーネントから共有する。
 
 import type {
   CompStats,
@@ -43,7 +43,7 @@ export function activeTier(
 
 /**
  * 構成＋活用紋章の発動特性数（盤面ユニットの所持特性 ＋ 活用紋章の付与分）。
- * trait idx → 発動数。CompCard の特性チップ表示と CompList のブロンズ集計で共有する。
+ * trait idx → 発動数。行の特性チップ表示と CompList のブロンズ集計で共有する。
  * used は CompRow.used（この行で実際に使われた紋章の多重集合）。
  */
 export function activeTraitCounts(
@@ -247,6 +247,12 @@ export function activeTraitTotal(counts: Map<number, number>, traits: TraitInfo[
 }
 
 /**
+ * 一覧の並べ替え指標。'place' は**同体数コホートからの差**（＝Tier）で測る。
+ * 画面のラベルは i18n の sortTier / sortWin / sortTop4 / sortAdopt。
+ */
+export type SortKey = 'place' | 'top4' | 'win' | 'adopt'
+
+/**
  * 並び順のための縮約（ベイズ平滑化）。
  *
  * TFT は8人対戦なので理論ベースレートが確定している（Top4=50%、1位=12.5%、平均順位=4.5）。
@@ -289,9 +295,6 @@ export function sampleLevel(n: number): 0 | 1 | 2 | 3 {
   if (n < LOW_SAMPLE) return 2
   return 3
 }
-
-/** 「少数を薄く」ON のときに淡く描く採用数の上限。隠さず弱めるだけ。 */
-export const DIM_SAMPLE_MAX = 2
 
 /**
  * 採用数の段階 → メーターの塗り色と数字の色。
@@ -340,7 +343,7 @@ export function costBorder(cost: number): string {
  * そのため絶対値でティアを切ると 10体構成が全部 S になり、色が情報を運ばなくなる。
  *
  * これを「同じ体数の中での相対」に直す基準として使う。**画面には一切出さない**（ティアと色の
- * 根拠のみ）。CompList で1回だけ算出し、CompCard・FamilyCard・DerivRow に配る。
+ * 根拠のみ）。CompList で1回だけ算出し、FamilyCard・DerivRow に配る。
  * CI でデータが更新されるたびに実際の値が動くので、定数で埋め込まず stats から算出する。
  */
 export function cohortPlace(comps: CompStats[]): Map<number, number> {

@@ -11,6 +11,8 @@ interface LaneUnitProps {
   unitIdx: number
   /** 選ぶ枠の列か（＝派生ごとに中身が変わる列）。 */
   pick: boolean
+  /** この列にいちばん多く入る駒。空きマスのときだけ、薄く下敷きとして描く。 */
+  hint?: number | null
   /** この派生の盤面。星とアイテムをここから引く。 */
   comp: CompStats
   /** unitIdx → この行で持たせている紋章。 */
@@ -27,16 +29,39 @@ interface LaneUnitProps {
  * 装備者そのものが変わる（実データで確認済み）ので、系統の見出しで代表させると嘘になる。
  * ユニットの名前は出さない（列が増えると潰れて読めない）。名前はツールチップで拾う。
  */
-export function LaneUnit({ stats, unitIdx, pick, comp, holders, choices = [], lang }: LaneUnitProps) {
+export function LaneUnit({ stats, unitIdx, pick, hint, comp, holders, choices = [], lang }: LaneUnitProps) {
   const { units, emblems, items, traits } = stats
   const pos = unitIdx < 0 ? -1 : comp.units.indexOf(unitIdx)
   const unit = unitIdx < 0 ? undefined : units[unitIdx]
 
   // 空きマス。詰めた結果ここに駒が来なかった選ぶ枠でだけ出る。
+  //
+  // 真っ黒の穴のままだと「この行には何が無いのか」が上下の行と見比べないと分からない。
+  // その列にいちばん多く入る駒を薄く敷けば、欠けている駒が並びだけで読める。
+  // **薄いのは「この行には居ない」という意味なので、名前も星もアイテムも出さない。**
+  // 吹き出しだけは出す（誰なのかを確かめたいときのため）。
   if (pos < 0 || !unit) {
+    const ghost = hint == null ? undefined : units[hint]
+    // 星の段は空でも必ず置く。駒のある列には星の行があるので、抜くとこの列だけ
+    // 上に詰まり、同じ行の駒と高さが揃わない。
     return (
-      <div className={pick ? 'lane--pick' : undefined}>
-        <div className="lane__box lane__hole" />
+      <div className={`flex min-w-0 flex-col items-center gap-0.5 ${pick ? 'lane--pick' : ''}`}>
+        <div className="lane__star" />
+        <div className="flex w-full justify-center">
+          {ghost ? (
+            <Tip className="lane__box lane__hole" label={pickName(lang, ghost)}>
+              <img
+                src={ghost.icon}
+                alt=""
+                aria-hidden
+                loading="lazy"
+                className="h-full w-full rounded-lg object-cover opacity-20 grayscale"
+              />
+            </Tip>
+          ) : (
+            <div className="lane__box lane__hole" />
+          )}
+        </div>
       </div>
     )
   }
