@@ -146,7 +146,8 @@ export function DerivRow({
         {/*
          * この盤面で発動している特性を**すべて**出す（コアだけの行も空にならない）。
          * そのうえで、この駒を足したことで伸びた特性は明るく・太く出す ＝ この派生を選ぶ理由。
-         * 金は紋章の色なので使わない（役割が混ざる）。強調は明度と太さでやる。
+         * 金は紋章の色なので使わない（役割が混ざる）。**強調は明度と太さだけでやる。**
+         * 高さやアイコンの大きさまで変えると、折り返した行の背が揃わずガタつく。
          */}
         {chips.length > 0 && (
           <div className="flex flex-wrap items-center gap-1">
@@ -159,12 +160,12 @@ export function DerivRow({
               return (
                 <Tip key={traitIdx} label={gained ? `${name} ${count} — ${t(lang, 'synergyGain')}` : `${name} ${count}`}>
                   <span
-                    className={`inline-flex items-center gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${styleClasses(
+                    className={`inline-flex h-[20px] items-center gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${styleClasses(
                       style,
                     )} ${
                       gained
-                        ? 'h-[22px] font-bold ring-1 ring-ink/25'
-                        : `h-[19px] font-semibold ${dimChip ? 'opacity-55' : ''}`
+                        ? 'font-bold ring-1 ring-ink/25'
+                        : `font-semibold ${dimChip ? 'opacity-55' : ''}`
                     }`}
                   >
                     {trait?.icon && (
@@ -172,7 +173,7 @@ export function DerivRow({
                         src={trait.icon}
                         alt=""
                         loading="lazy"
-                        className={gained ? 'h-4 w-4 object-contain' : 'h-3.5 w-3.5 object-contain'}
+                        className="h-3.5 w-3.5 object-contain"
                       />
                     )}
                     {count}
@@ -212,8 +213,14 @@ export function DerivRow({
         onClick={copy}
         title={t(lang, 'copyCodeTitle')}
         aria-label={t(lang, 'copyCode')}
-        className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[9px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
-          copied ? 'bg-[#6fc06a] text-[#0f1a10]' : 'bg-ink text-base hover:bg-white'
+        /*
+         * 押すまでは控えめに。白ベタだとカードの中でいちばん明るい面になり、肝心の
+         * 盤面と数字より先に目が行ってしまう。
+         */
+        className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[9px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+          copied
+            ? 'border-transparent bg-[#6fc06a] text-[#0f1a10]'
+            : 'border-line bg-surface-2 text-muted hover:border-line-strong hover:text-ink'
         }`}
       >
         {copied ? (
