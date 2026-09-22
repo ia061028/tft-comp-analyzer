@@ -91,7 +91,6 @@ export function DerivRow({
       b[1] - a[1] ||
       (traits[a[0]].name < traits[b[0]].name ? -1 : 1),
   )
-  const anyGained = chips.some((c) => c[3])
 
   const copy = async () => {
     try {
@@ -166,9 +165,6 @@ export function DerivRow({
             {chips.map(([traitIdx, style, count, gained]) => {
               const trait = traits[traitIdx]
               const name = trait ? pickName(lang, trait) : `#${traitIdx}`
-              // 伸びた特性が1つも無い行（＝コアのまま）は全部を等しく出す。落とす相手がいないのに
-              // 全チップを淡くすると、ただ読みにくいだけになる。
-              const dimChip = anyGained && !gained
               const src = traitGranters.get(traitIdx)
               const tip = `${name} ${count}${granterTip(src, units, lang)}`
               return (
@@ -177,9 +173,7 @@ export function DerivRow({
                     className={`inline-flex h-[20px] items-center gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${styleClasses(
                       style,
                     )} ${
-                      gained
-                        ? 'font-bold ring-1 ring-ink/25'
-                        : `font-semibold ${dimChip ? 'opacity-55' : ''}`
+                      gained ? 'font-bold ring-1 ring-ink/25' : 'font-semibold'
                     }`}
                   >
                     <GranterFace source={src} units={units} lang={lang} />

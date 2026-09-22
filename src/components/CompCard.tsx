@@ -289,7 +289,7 @@ export function CompCard({
                   )} ${
                     fromEmblem
                       ? 'h-[22px] font-bold ring-1 ring-gold/60'
-                      : 'h-[19px] font-semibold opacity-80'
+                      : 'h-[19px] font-semibold'
                   }`}
                 >
                   <GranterFace source={src} units={units} lang={lang} />

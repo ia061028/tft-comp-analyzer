@@ -1,5 +1,5 @@
 import type { UnitInfo } from '../../shared/types'
-import { GRANT_APPLY_SHARE, type GrantSource } from '../lib/format'
+import type { GrantSource } from '../lib/format'
 import { pickName, type Lang } from '../lib/i18n'
 
 interface GranterFaceProps {
@@ -18,7 +18,8 @@ interface GranterFaceProps {
  * バッジで埋まって読めなかった。上乗せは結局「その特性が何体分か」の話なので、
  * 数が出ているチップ側に置く。チップの高さは変えない（折り返した行の背がガタつく）。
  *
- * 選択制の機構は構成の中でも選択が割れるので、過半に満たない選択は薄く描く。
+ * 濃淡は付けない。チップ側の濃淡（その派生で伸びた特性か）と意味が混ざって読めなくなる。
+ * 選択が割れているかどうかは吹き出しの割合で出す。
  */
 export function GranterFace({ source, units, lang }: GranterFaceProps) {
   if (!source) return null
@@ -29,7 +30,6 @@ export function GranterFace({ source, units, lang }: GranterFaceProps) {
       src={unit.icon}
       alt={pickName(lang, unit)}
       loading="lazy"
-      style={{ opacity: source.grant.share >= GRANT_APPLY_SHARE ? 1 : 0.45 }}
       className="-ml-1 h-4 w-4 shrink-0 rounded-full object-cover ring-1 ring-ink/40"
     />
   )
