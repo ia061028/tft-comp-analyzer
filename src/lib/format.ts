@@ -88,11 +88,19 @@ export function grantsByUnit(
 ): Map<number, TraitGrant[]> {
   const out = new Map<number, TraitGrant[]>()
   if (!comp.grants?.length || !granters.length) return out
+  // 照合はトレイトと上乗せ数の組。同じトレイトでも由来ごとに上乗せ数が違うため
+  // （セット18 ではラックスが +2、別経路が +1）、数まで一致したものだけを付与元とする。
+  // delta を持たない旧ファイル（schemaVersion 5）はトレイトだけで引けるよう別に持つ。
+  const unitOfTraitDelta = new Map<string, number>()
   const unitOfTrait = new Map<number, number>()
-  for (const [ui, ti] of granters) unitOfTrait.set(ti, ui)
+  for (const g of granters) {
+    const [ui, ti, delta] = g
+    if (delta === undefined) unitOfTrait.set(ti, ui)
+    else unitOfTraitDelta.set(`${ti}|${delta}`, ui)
+  }
   const board = new Set(comp.units)
   for (const g of comp.grants) {
-    const ui = unitOfTrait.get(g.trait)
+    const ui = unitOfTraitDelta.get(`${g.trait}|${g.delta}`) ?? unitOfTrait.get(g.trait)
     if (ui === undefined || !board.has(ui)) continue
     const list = out.get(ui)
     if (list) list.push(g)
