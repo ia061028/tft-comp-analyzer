@@ -1063,10 +1063,26 @@
     letter-spacing: -0.05em;
   }
 
-  /* アイテムは必ず3個ぶんが1列に収まる幅にする（欄が広いときだけ --lane-item で頭打ち）。 */
+  /*
+   * アイテム。1個の幅は列幅に対する割合で、3個のときだけ重ねて1列に収める。
+   *
+   * 幅を「列幅の 1/3」にすると 390px では 10px になり、何のアイテムか判別できない。
+   * 少し重ねれば同じ列幅で 1.5 倍の大きさにできる。重なりの量は個数で変わるので、
+   * 個数を `--lane-item-n` として React から受け取る（2個なら隙間、1個なら中央）。
+   */
+  .lane__items {
+    display: flex;
+    width: 100%;
+    justify-content: center;
+  }
   .lane__item {
-    width: calc((100% - 2px) / 3);
-    max-width: var(--lane-item);
+    width: var(--lane-item);
     aspect-ratio: 1;
+    flex: none;
+  }
+  .lane__item + .lane__item {
+    margin-left: calc(
+      (100% - var(--lane-item) * var(--lane-item-n)) / (var(--lane-item-n) - 1)
+    );
   }
 }

@@ -45,6 +45,9 @@ function App() {
   const [size, setSize] = useState<SizeKey>('all')
   // モバイルの紋章シート。ドックの帯から1タップで選べるので、既定は閉じたまま。
   const [sheetOpen, setSheetOpen] = useState(false)
+  // モバイルのフィルタ。開いたままだと 844px のうち 172px を占めるので、既定は畳んでおく。
+  // 48rem 以上では常に開いた状態で出す（CSS 側で無視される）。
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [bronzeMode, setBronzeMode] = useState(false)
 
   useEffect(() => {
@@ -191,15 +194,27 @@ function App() {
   }))
   const currentPatchFile = stats.patches.find((p) => p.key === stats.patch)?.file ?? patchFile
 
+  // 畳んだフィルタ帯に出す今の値。ラベルは付けず、値だけを並べる。
+  const shownPatchFile = switching ? patchFile : currentPatchFile
+  const summary = [
+    `Set ${stats.setNumber}`,
+    patchOptions.find((o) => o.key === shownPatchFile)?.label,
+    size === 'all' ? t(lang, 'all') : t(lang, 'unitsGroup', { n: Number(size) }),
+    { place: t(lang, 'sortTier'), win: t(lang, 'sortWin'), top4: t(lang, 'sortTop4'), adopt: t(lang, 'sortAdopt') }[sortKey],
+  ].filter(Boolean) as string[]
+
   return (
     <div className="mx-auto flex h-screen w-full max-w-[1480px] flex-col">
       {/* タイトル＆情報ヘッダー */}
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-5 py-3.5">
-        <div className="flex items-center gap-2.5">
-          <span className="h-5 w-1 rounded-full bg-gold" aria-hidden />
-          <h1 className="text-lg font-extrabold tracking-tight text-ink">{t(lang, 'title')}</h1>
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-2.5 md:px-5 md:py-3.5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="h-5 w-1 shrink-0 rounded-full bg-gold" aria-hidden />
+          <h1 className="truncate text-base font-extrabold tracking-tight text-ink md:text-lg">
+            {t(lang, 'title')}
+          </h1>
         </div>
-        <div className="flex items-center gap-2">
+        {/* セットとパッチはモバイルでは畳んだフィルタ帯に出るので、ここでは出さない。 */}
+        <div className="hidden items-center gap-2 md:flex">
           <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted ring-1 ring-inset ring-line">
             Set {stats.setNumber}
           </span>
@@ -225,9 +240,41 @@ function App() {
         </div>
       </header>
 
-      {/* スティッキー・フィルタツールバー */}
-      <div className="sticky top-0 z-10 border-b border-line bg-base/85 px-5 py-2.5 backdrop-blur-md">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5">
+      {/* スティッキー・フィルタツールバー。モバイルでは畳んで、今の値だけを1行で出す。 */}
+      <div className="sticky top-0 z-10 border-b border-line bg-base/85 px-4 py-2 backdrop-blur-md md:px-5 md:py-2.5">
+        {/*
+         * 畳んだ帯。開いたままだと 844px の画面で 172px を占め、肝心の一覧が半分以下になる。
+         * 値そのものを並べるだけで、何のフィルタかは開けば分かる。
+         */}
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((o) => !o)}
+          aria-expanded={filtersOpen}
+          aria-label={t(lang, 'filters')}
+          className="flex w-full items-center gap-1.5 text-left md:hidden"
+        >
+          {summary.map((v) => (
+            <span
+              key={v}
+              className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted ring-1 ring-inset ring-line"
+            >
+              {v}
+            </span>
+          ))}
+          {bronzeMode && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bronze" aria-hidden />}
+          {dimLowSample && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink" aria-hidden />}
+          <svg
+            viewBox="0 0 12 12"
+            aria-hidden
+            className={`ml-auto h-3.5 w-3.5 shrink-0 text-faint transition-transform duration-150 ${filtersOpen ? 'rotate-180' : ''}`}
+          >
+            <path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+
+        <div
+          className={`${filtersOpen ? 'flex' : 'hidden'} flex-wrap items-center gap-x-6 gap-y-2.5 pt-2.5 md:flex md:pt-0`}
+        >
           {patchOptions.length > 1 && (
             <div className="flex items-center gap-2.5 text-sm">
               <span

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { CompStats, StatsFile } from '../../shared/types'
 import { costBorder, starColor } from '../lib/format'
 import { pickName, type Lang } from '../lib/i18n'
@@ -45,18 +46,23 @@ export function LaneUnit({ stats, unitIdx, pick, comp, holders, lang }: LaneUnit
     .map((ui) => items?.[ui[1]])
     .filter(Boolean)
   const held = (holders.get(unitIdx) ?? []).map((ei) => emblems[ei]).filter(Boolean)
+  const shown = unitItems.slice(0, 3)
 
   return (
     <div className={`flex min-w-0 flex-col items-center gap-0.5 ${pick ? 'lane--pick' : ''}`}>
       <div className={`lane__star ${starColor(star)}`}>{star > 0 ? '★'.repeat(star) : ''}</div>
       {/* w-full が要る。auto 幅だと画像の固有幅が親を広げ、狭い画面で列からはみ出す。 */}
       <div className="relative flex w-full justify-center">
-        <Tip label={star > 0 ? `${unitName} ★${star}` : unitName}>
+        {/*
+         * 寸法は Tip の span（＝実際の flex アイテム）に載せる。img 側に width:100% を書くと
+         * 親が中身で決まる span なので幅が決まらず、画像が数pxに潰れる。
+         */}
+        <Tip className="lane__box" label={star > 0 ? `${unitName} ★${star}` : unitName}>
           <img
             src={unit.icon}
             alt={unitName}
             loading="lazy"
-            className={`lane__box rounded-lg border-2 object-cover ${costBorder(unit.cost)}`}
+            className={`h-full w-full rounded-lg border-2 object-cover ${costBorder(unit.cost)}`}
             style={
               held.length > 0
                 ? { boxShadow: '0 0 0 2px var(--color-gold), 0 0 12px rgba(232,183,92,.45)' }
@@ -79,14 +85,21 @@ export function LaneUnit({ stats, unitIdx, pick, comp, holders, lang }: LaneUnit
           </div>
         )}
       </div>
-      <div className="flex h-[var(--lane-item)] w-full justify-center gap-px">
-        {unitItems.slice(0, 3).map((it) => (
-          <Tip key={it!.api} label={<RecipeLabel label={pickName(lang, it!)} recipe={it!.recipe} />}>
+      <div
+        className="lane__items"
+        style={{ '--lane-item-n': shown.length } as CSSProperties}
+      >
+        {shown.map((it) => (
+          <Tip
+            key={it!.api}
+            className="lane__item"
+            label={<RecipeLabel label={pickName(lang, it!)} recipe={it!.recipe} />}
+          >
             <img
               src={it!.icon}
               alt=""
               loading="lazy"
-              className="lane__item rounded border border-base bg-base object-cover"
+              className="h-full w-full rounded border border-base bg-base object-cover"
             />
           </Tip>
         ))}
