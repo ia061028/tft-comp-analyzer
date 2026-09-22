@@ -18,7 +18,9 @@ export interface ParticipantRecord {
   t: Record<string, number>
   /**
    * 発動トレイト → ユニット数(num_units)。例: ブローラー2なら2（旧レコードは欠落）。
-   * 現在の集計では未使用（紋章の活用判定は発動の有無のみで行う）。将来の効率分析のため収集は継続する。
+   * 静的データに出ない特性の上乗せ（ラックスの選択特性・カ＝ジックスの進化・
+   * エルダードラゴンのリフトビースト2体分）を逆算する一次情報。aggregate-core の
+   * inferTraitGrants が使う。発動済みトレイトしか入らないので、未発動の付与は見えない。
    */
   tc?: Record<string, number>
   /** 装備された紋章アイテムの apiName（重複保持・発動フィルタは集計時に適用） */
@@ -103,6 +105,27 @@ export interface EmblemSig {
 }
 
 /**
+ * ユニットの静的トレイトにも紋章にも現れない特性の上乗せ。
+ *
+ * セット18 の例: ラックス（選んだ1特性が2体分）、カ＝ジックス（進化で最大4特性を追加取得）、
+ * エルダードラゴン（リフトビーストを2体分）。いずれも CDragon の champion.traits には出ない。
+ * 実レコードの `traits[].num_units` と静的トレイト＋紋章の期待値との差分から逆算する。
+ *
+ * 選択制の機構（ラックス・カ＝ジックス）は構成ごとに選択が分かれるので、
+ * 構成の中で何割がその選択だったかを share として持つ。
+ */
+export interface TraitGrant {
+  /** traits 配列インデックス。 */
+  trait: number
+  /** 上乗せ数（ラックスなら2、カ＝ジックス／エルダードラゴンなら1）。 */
+  delta: number
+  /** この上乗せが観測されたレコード数。 */
+  n: number
+  /** 逆算できたレコード中でこの上乗せが占める割合(0-1)。選択のばらつきを見せるために持つ。 */
+  share: number
+}
+
+/**
  * 構成 = 盤面ユニット集合が完全一致するレコード群（召喚除外）。
  * 紋章活用は sigs から、選択紋章に応じてランタイムで算出する。
  */
@@ -119,6 +142,14 @@ export interface CompStats {
   holders: [number, number, number][]
   /** 紋章活用シグネチャ群。 */
   sigs: EmblemSig[]
+  /** 静的トレイト・紋章の外で加算されていた特性（share 降順）。 */
+  grants: TraitGrant[]
+  /**
+   * 盤面ユニット数に対する追加の盤面枠（最頻値）。
+   * エルダードラゴンのように1体で2枠使うユニットが居ると 1 になる。
+   * 実効盤面サイズ = units.length + slotExtra。ティアの同体数コホートはこちらで切る。
+   */
+  slotExtra: number
 }
 
 /** オンディスク圧縮形式の構成（stats.json）。data.ts の decodeStats で CompStats へ復元。 */
@@ -134,7 +165,20 @@ export interface WireComp {
   h?: [number, number, number][]
   /** sigs: [活用紋章idx[], n, top4, win, p] */
   g: [number[], number, number, number, number][]
+  /** grants: [traitIdx, delta, n]（空なら省略）。share は n / comp.n で復元する。 */
+  x?: [number, number, number][]
+  /** slotExtra（0 なら省略）。 */
+  s?: number
 }
+
+/**
+ * 特性を上乗せするユニットの推定 [unitIdx, traitIdx]。
+ *
+ * 「この上乗せは誰のものか」をユニット名で決め打ちしないための実測ベースの対応表。
+ * 集計時に「トレイト t の上乗せが観測されたレコードのうち、ユニット u が盤面に居た割合」が
+ * ほぼ 1 のものだけを採用する（GRANTER_MIN_COVERAGE）。
+ */
+export type TraitGranter = [number, number]
 
 /**
  * パッチ別集計ファイルの一覧（全ファイルに同じ内容で埋め込む）。
@@ -153,7 +197,7 @@ export interface PatchIndexEntry {
 
 /** stats.json 全体のオンディスク圧縮形式。 */
 export interface WireStatsFile {
-  schemaVersion: 4
+  schemaVersion: 5
   generatedAt: string
   patch: string
   tftPatch: string
@@ -168,6 +212,8 @@ export interface WireStatsFile {
   units: UnitInfo[]
   items: ItemInfo[]
   comps: WireComp[]
+  /** 特性を上乗せするユニットの推定（旧ファイルは欠落）。 */
+  granters?: TraitGranter[]
   baseItemIcons?: { spatula: string; fryingPan: string }
   /** パッチ別ビューの一覧（旧ファイルは欠落＝単一ビュー）。 */
   patches?: PatchIndexEntry[]
@@ -192,6 +238,8 @@ export interface StatsFile {
   units: UnitInfo[]
   items: ItemInfo[]
   comps: CompStats[]
+  /** 特性を上乗せするユニットの推定。旧ファイルでは空配列。 */
+  granters: TraitGranter[]
   /** 合成素材アイコン（紋章グリッドのカテゴリヘッダ用） */
   baseItemIcons?: { spatula: string; fryingPan: string }
   /** パッチ別ビューの一覧（このファイル自身も含む）。1件以下ならパッチ選択 UI は出さない。 */

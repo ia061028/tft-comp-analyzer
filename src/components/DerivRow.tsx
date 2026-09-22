@@ -5,6 +5,8 @@ import {
   activeTier,
   buildPlannerCode,
   costBorder,
+  effectiveUnits,
+  grantsByUnit,
   holderMap,
   starColor,
   styleClasses,
@@ -14,6 +16,7 @@ import { pickName, t, type Lang } from '../lib/i18n'
 import { RecipeLabel } from './RecipeLabel'
 import { SampleMeter } from './SampleMeter'
 import { Tip } from './Tip'
+import { GrantBadges } from './GrantBadges'
 
 interface DerivRowProps {
   stats: StatsFile
@@ -46,7 +49,7 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, dim, lang }: Deriv
   const addSet = new Set(adds)
   const [copied, setCopied] = useState(false)
 
-  const unitCount = comp.units.length
+  const unitCount = effectiveUnits(comp)
   const avgPlace = row.n > 0 ? row.p / row.n : NaN
   const hasPlace = Number.isFinite(avgPlace)
   const tier = hasPlace
@@ -57,6 +60,8 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, dim, lang }: Deriv
   const winRate = row.n > 0 ? (row.win / row.n) * 100 : 0
 
   const holders = holderMap(comp, row.used)
+  // 静的データに出ない上乗せ特性の付与元（unitIdx → その駒が持ち込む特性）。
+  const unitGrants = grantsByUnit(comp, stats.granters)
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
 
   // この盤面の全発動特性。[traitIdx, style, 発動段, この派生で伸びたか]
@@ -132,6 +137,12 @@ export function DerivRow({ stats, deriv, cohort, showEmblems, dim, lang }: Deriv
                     }
                   />
                 </Tip>
+                <GrantBadges
+                  grants={unitGrants.get(unitIdx) ?? []}
+                  traits={traits}
+                  lang={lang}
+                  size={17}
+                />
                 {held.length > 0 && (
                   <div className="absolute -right-1.5 -top-1.5 z-10 flex gap-0.5">
                     {held.map((e, j) => (

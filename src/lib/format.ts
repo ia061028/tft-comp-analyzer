@@ -1,7 +1,23 @@
 // 構成カードの見た目に関する純粋なヘルパ群（配色・ティア判定・チームコード生成）。
 // CompList/CompCard から共有する。
 
-import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/types'
+import type {
+  CompStats,
+  EmblemInfo,
+  TraitGrant,
+  TraitGranter,
+  TraitInfo,
+  UnitInfo,
+} from '../../shared/types'
+
+/**
+ * 上乗せ特性を発動数に足す最小シェア。
+ *
+ * ラックスやカ＝ジックスは選択制なので、同じ盤面でも選択が割れる。過半がその選択だった
+ * ものだけを「この構成の発動特性」として数え、それ未満は候補として見せるに留める
+ * （盤面に出ていない特性でチップが光ると、構成を真似したときに再現しない）。
+ */
+export const GRANT_APPLY_SHARE = 0.5
 
 /**
  * CDragon の trait effect style 値 → バッジ配色。
@@ -45,7 +61,54 @@ export function activeTraitCounts(
     if (ti == null) continue
     counts.set(ti, (counts.get(ti) ?? 0) + 1)
   }
+  // 静的データに出ない上乗せ（ラックスの選択特性2体分・カ＝ジックスの進化・
+  // エルダードラゴンのリフトビースト2体分）。実レコードからの逆算。
+  for (const g of appliedGrants(comp)) {
+    counts.set(g.trait, (counts.get(g.trait) ?? 0) + g.delta)
+  }
   return counts
+}
+
+/** 発動数に反映する上乗せ（過半のレコードでその選択だったもの）。 */
+export function appliedGrants(comp: CompStats): TraitGrant[] {
+  return (comp.grants ?? []).filter((g) => g.share >= GRANT_APPLY_SHARE)
+}
+
+/**
+ * 上乗せ特性を付与元ユニットごとに振り分ける（unitIdx → その構成で観測された上乗せ）。
+ *
+ * granters は集計側が実データから推定した [unitIdx, traitIdx] の対応。推定できなかった
+ * トレイト（1トレイトを複数ユニットが付与する等）はどのユニットにも付かない。
+ * その場合でも発動数の合計（activeTraitCounts）は正しいままで、
+ * 「誰の分か」の表示だけが落ちる。
+ */
+export function grantsByUnit(
+  comp: CompStats,
+  granters: TraitGranter[],
+): Map<number, TraitGrant[]> {
+  const out = new Map<number, TraitGrant[]>()
+  if (!comp.grants?.length || !granters.length) return out
+  const unitOfTrait = new Map<number, number>()
+  for (const [ui, ti] of granters) unitOfTrait.set(ti, ui)
+  const board = new Set(comp.units)
+  for (const g of comp.grants) {
+    const ui = unitOfTrait.get(g.trait)
+    if (ui === undefined || !board.has(ui)) continue
+    const list = out.get(ui)
+    if (list) list.push(g)
+    else out.set(ui, [g])
+  }
+  for (const list of out.values()) list.sort((a, b) => b.share - a.share || a.trait - b.trait)
+  return out
+}
+
+/**
+ * 実効盤面サイズ。エルダードラゴンのように1体で2枠使うユニットを含む構成は
+ * ユニット数より大きい。平均順位はほぼ盤面サイズを測っているので、
+ * 比較の基準（同体数コホート）はこちらで切らないと複数枠ユニットの構成が不当に強く見える。
+ */
+export function effectiveUnits(comp: CompStats): number {
+  return comp.units.length + (comp.slotExtra ?? 0)
 }
 
 /**
@@ -184,7 +247,10 @@ export function costBorder(cost: number): string {
 export function cohortPlace(comps: CompStats[]): Map<number, number> {
   const sum = new Map<number, { n: number; p: number }>()
   for (const c of comps) {
-    const k = c.units.length
+    // キーは実効盤面サイズ。エルダードラゴン構成は1体で2枠使うので、ユニット数で切ると
+    // 「1体少ない盤面なのに成績が良い」に見えてティアが不当に上がる
+    // （実測: 8体+エルダードラゴン=平均3.69 / 8体のみ=4.96）。
+    const k = effectiveUnits(c)
     const a = sum.get(k) ?? { n: 0, p: 0 }
     for (const sig of c.sigs) {
       a.n += sig.n

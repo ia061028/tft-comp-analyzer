@@ -3,7 +3,10 @@ import type { StatsFile } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
 import { loadStats, remapSelection, DEFAULT_STATS_FILE, ALL_PATCHES_KEY } from './lib/data'
 import { maxEmblemMultiplicity } from './lib/multiset'
-import { DIM_SAMPLE_MAX } from './lib/format'
+import {
+  DIM_SAMPLE_MAX,
+  effectiveUnits,
+} from './lib/format'
 import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
 import { CompList } from './components/CompList'
@@ -96,10 +99,14 @@ function App() {
 
   const statsOrNull = load.status === 'ready' ? load.stats : null
 
-  // 盤面ユニット数でフィルタ。stats/size が変わらない限り再計算しない。
+  // 盤面サイズでフィルタ。ユニット数ではなく実効盤面サイズ（エルダードラゴンのような
+  // 複数枠ユニットを枠数で数えた値）で切る。ラベルが「盤面サイズ」なので、
+  // 9 を選んだら実際に9枠埋まる構成が出るのが期待どおり。
   const selectedComps = useMemo(() => {
     if (!statsOrNull) return []
-    return size === 'all' ? statsOrNull.comps : statsOrNull.comps.filter((c) => c.units.length === Number(size))
+    return size === 'all'
+      ? statsOrNull.comps
+      : statsOrNull.comps.filter((c) => effectiveUnits(c) === Number(size))
   }, [statsOrNull, size])
 
   // 紋章ごとの「データ上1レコードで同時活用された最大枚数」。選択枚数がこれを超えたら
