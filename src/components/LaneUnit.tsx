@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
-import type { CompStats, StatsFile } from '../../shared/types'
-import { costBorder, starColor } from '../lib/format'
+import type { CompStats, StatsFile, TraitGrant } from '../../shared/types'
+import { costBorder, grantChoicesTip, starColor } from '../lib/format'
 import { pickName, type Lang } from '../lib/i18n'
 import { RecipeLabel } from './RecipeLabel'
 import { Tip } from './Tip'
@@ -15,6 +15,8 @@ interface LaneUnitProps {
   comp: CompStats
   /** unitIdx → この行で持たせている紋章。 */
   holders: Map<number, number[]>
+  /** この駒が持ち込む上乗せ特性の選択の割れ方（share 降順）。吹き出しにだけ出す。 */
+  choices?: TraitGrant[]
   lang: Lang
 }
 
@@ -25,8 +27,8 @@ interface LaneUnitProps {
  * 装備者そのものが変わる（実データで確認済み）ので、系統の見出しで代表させると嘘になる。
  * ユニットの名前は出さない（列が増えると潰れて読めない）。名前はツールチップで拾う。
  */
-export function LaneUnit({ stats, unitIdx, pick, comp, holders, lang }: LaneUnitProps) {
-  const { units, emblems, items } = stats
+export function LaneUnit({ stats, unitIdx, pick, comp, holders, choices = [], lang }: LaneUnitProps) {
+  const { units, emblems, items, traits } = stats
   const pos = unitIdx < 0 ? -1 : comp.units.indexOf(unitIdx)
   const unit = unitIdx < 0 ? undefined : units[unitIdx]
 
@@ -57,7 +59,10 @@ export function LaneUnit({ stats, unitIdx, pick, comp, holders, lang }: LaneUnit
          * 寸法は Tip の span（＝実際の flex アイテム）に載せる。img 側に width:100% を書くと
          * 親が中身で決まる span なので幅が決まらず、画像が数pxに潰れる。
          */}
-        <Tip className="lane__box" label={star > 0 ? `${unitName} ★${star}` : unitName}>
+        <Tip
+          className="lane__box"
+          label={`${star > 0 ? `${unitName} ★${star}` : unitName}${grantChoicesTip(choices, traits, lang)}`}
+        >
           <img
             src={unit.icon}
             alt={unitName}

@@ -7,6 +7,7 @@ import {
   effectiveUnits,
   granterOfTrait,
   granterTip,
+  grantsByUnit,
   holderMap,
   styleClasses,
   tierOfEdge,
@@ -72,6 +73,8 @@ export function DerivRow({
   const holders = holderMap(comp, row.used)
   // 静的データに出ない上乗せ特性の付与元（traitIdx → 伸ばした駒）。チップ側に出す。
   const traitGranters = granterOfTrait(comp, stats.granters)
+  // 駒ごとの選択の割れ方（数に入れなかった選択も含む）。駒の吹き出しに出す。
+  const unitChoices = grantsByUnit(comp, stats.granters)
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
 
   // この盤面の全発動特性。[traitIdx, style, 発動段, この派生で伸びたか]
@@ -125,6 +128,7 @@ export function DerivRow({
                 pick={lane.fixed === null}
                 comp={comp}
                 holders={holders}
+                choices={unitChoices.get(deriv.slots[i] ?? -1) ?? []}
                 lang={lang}
               />
             ))}

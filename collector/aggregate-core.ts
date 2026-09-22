@@ -133,13 +133,32 @@ export interface ClassifyEmblemsResult {
   unresolvedEmblems: string[]
 }
 
+/** 発動数 count で到達する発動段（tiers は [minUnits, style] 昇順。0 = 未発動）。 */
+export function tierOfCount(tiers: readonly (readonly [number, number])[], count: number): number {
+  let tier = 0
+  for (const [min] of tiers) if (count >= min) tier++
+  return tier
+}
+
 /**
  * 装備紋章のうち「活用された」ものを抽出する。
  *
- * 活用の定義は二値: 装備している AND 付与トレイト（変種含むいずれか）が発動している(tier>=1)。
- * 発動数がブレークポイントちょうどか超過か（＝余っているか）は区別しない。要件が
- * 「その紋章を使ったシナジーが1つでも発動していれば対象」であり、余りの区別は要求されていないため。
- * 同一紋章を複数装備した場合は rec.e の並びをそのまま辿ることで多重度が保たれる。
+ * 活用の定義: 装備している AND その紋章が**発動段を上げている**。
+ * 付与トレイトの発動数 `rec.tc`（紋章の付与分を含む）から、同じ紋章の枚数ぶんを引いて
+ * 発動段が下がるなら、その紋章が段を上げている。段が変わらない紋章（例: エルダーウッド
+ * 3体の盤面に紋章1枚で 4 → 発動段は 3 のまま）は装備していても活用に数えない。
+ *
+ * 同一紋章を複数装備した場合は「段の維持に要る枚数」だけを活用に数える。
+ * 現在の発動数から現段の下限までの余り（surplus）ぶんは外しても段が変わらないので、
+ * 活用枚数 = 枚数 − min(枚数, surplus)。例: ブローラー [2,4,6] で 5 体・紋章2枚なら
+ * 1枚外しても 4 体で段は同じ → 活用 1枚。並びは rec.e の順を保つ。
+ *
+ * 旧定義（装備 AND 付与トレイトが発動している）では、段を上げない紋章の行が
+ * 盤面×紋章組の 16.6%（アジア片実測）を占め、「紋章を付けても意味が無い構成」が
+ * 選択肢として出ていた。2026-09-22 に IPPEI の判断で段が上がる行だけに絞った。
+ *
+ * `rec.tc` を持たない旧レコードは発動数が分からないので旧定義（発動していれば活用）に
+ * 縮退する。変種トレイトを持つ紋章は `rec.tc` に載っている変種で数える。
  * apiName は staticData.emblemAliases で canonical に正規化してから解決する。
  */
 export function classifyEmblems(
@@ -148,17 +167,51 @@ export function classifyEmblems(
 ): ClassifyEmblemsResult {
   const active: string[] = []
   const unresolvedEmblems: string[] = []
+  // canonical 紋章 apiName → 装備枚数（活用枚数の上限）。
+  const copies = new Map<string, number>()
+  const resolved: (string | undefined)[] = []
   for (const rawApi of rec.e) {
     // 同一トレイトを付与する重複紋章は canonical に正規化してから辞書を引く。
     const eApi = staticData.emblemAliases.get(rawApi) ?? rawApi
-    const emb = staticData.emblems.get(eApi)
-    if (!emb) {
+    if (!staticData.emblems.has(eApi)) {
       unresolvedEmblems.push(rawApi)
+      resolved.push(undefined)
       continue
     }
-    if (emb.traitApis.some((a) => a in rec.t)) active.push(eApi)
+    resolved.push(eApi)
+    copies.set(eApi, (copies.get(eApi) ?? 0) + 1)
+  }
+  // canonical 紋章 apiName → 活用に数える残り枚数。
+  const budget = new Map<string, number>()
+  for (const [eApi, k] of copies) budget.set(eApi, usedEmblemCopies(rec, staticData, eApi, k))
+  for (const eApi of resolved) {
+    if (!eApi) continue
+    const left = budget.get(eApi) ?? 0
+    if (left <= 0) continue
+    budget.set(eApi, left - 1)
+    active.push(eApi)
   }
   return { active, activeEmblemApis: new Set(active), unresolvedEmblems }
+}
+
+/** 紋章 eApi を k 枚装備したレコードで、発動段の維持に要る枚数（0 = 活用なし）。 */
+function usedEmblemCopies(
+  rec: ParticipantRecord,
+  staticData: StaticData,
+  eApi: string,
+  k: number,
+): number {
+  const emb = staticData.emblems.get(eApi)
+  if (!emb) return 0
+  const tApi = emb.traitApis.find((a) => a in rec.t)
+  if (tApi === undefined) return 0
+  const count = rec.tc?.[tApi]
+  const tiers = staticData.traits.get(tApi)?.tiers
+  if (count === undefined || !tiers) return k // 発動数が分からない旧レコードは旧定義に縮退
+  const tier = tierOfCount(tiers, count)
+  if (tier === 0) return 0
+  const surplus = count - tiers[tier - 1][0]
+  return k - Math.min(k, surplus)
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   modeMaxFromCounts,
   splitBoardUnits,
   classifyEmblems,
+  tierOfCount,
   classifyRecord,
   pickTargetSet,
   pickTargetSetFromCounts,
@@ -26,7 +27,7 @@ function makeStaticData(): StaticData {
   return {
     setNumber: 17,
     traits: new Map([
-      ['TraitA', { name: 'Alpha', nameJa: 'アルファ', icon: 'traitA.png', tiers: [[2, 1], [4, 3]] as [number, number][] }],
+      ['TraitA', { name: 'Alpha', nameJa: 'アルファ', icon: 'traitA.png', tiers: [[2, 1], [3, 3]] as [number, number][] }],
       ['TraitB', { name: 'Bravo', nameJa: 'ブラボー', icon: 'traitB.png', tiers: [[2, 1], [4, 3]] as [number, number][] }],
     ]),
     units: new Map([
@@ -146,24 +147,39 @@ test('splitBoardUnits: 盤面空（召喚のみ）', () => {
   assert.equal(boardSet.size, 0)
 })
 
-// ---- classifyEmblems（活用 = 装備 AND 付与トレイト発動 の二値） ----
-test('classifyEmblems: 付与トレイトが発動していれば活用', () => {
+// ---- classifyEmblems（活用 = 装備 AND 紋章が発動段を上げている） ----
+// フィクスチャの TraitA は [2,3]、TraitB は [2,4] の2段。
+test('classifyEmblems: 紋章が段を上げていれば活用（2体+紋章で 2 → 段1）', () => {
   const sd = makeStaticData()
-  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemA'] })
+  const r = rec({ m: 'M', t: { TraitA: 1 }, tc: { TraitA: 2 }, e: ['TFT_Item_EmblemA'] })
   const { active, activeEmblemApis, unresolvedEmblems } = classifyEmblems(r, sd)
   assert.deepEqual(active, ['TFT_Item_EmblemA'])
   assert.ok(activeEmblemApis.has('TFT_Item_EmblemA'))
   assert.deepEqual(unresolvedEmblems, [])
 })
 
-test('classifyEmblems: 発動数(tc)には依存しない（余っていても活用）', () => {
+test('classifyEmblems: 段が変わらない紋章は活用ではない（4体で 4、外しても 3 で段2）', () => {
   const sd = makeStaticData()
-  // 旧実装では tc=3 > bp=2 で「+0.5（余りあり）」だったケース。今は単に活用。
-  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 3 }, e: ['TFT_Item_EmblemA'] })
-  assert.deepEqual(classifyEmblems(r, sd).active, ['TFT_Item_EmblemA'])
-  // tc 自体が無くても判定できる（旧実装ではシグネチャから除外されていた）。
+  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 4 }, e: ['TFT_Item_EmblemA'] })
+  const { active, activeEmblemApis } = classifyEmblems(r, sd)
+  assert.deepEqual(active, [])
+  assert.ok(!activeEmblemApis.has('TFT_Item_EmblemA'))
+})
+
+test('classifyEmblems: tc を持たない旧レコードは発動していれば活用に縮退', () => {
+  const sd = makeStaticData()
   const noTc = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemA'] })
   assert.deepEqual(classifyEmblems(noTc, sd).active, ['TFT_Item_EmblemA'])
+})
+
+test('tierOfCount: 到達段は閾値以上の段数', () => {
+  const tiers: [number, number][] = [[2, 1], [4, 3]]
+  assert.equal(tierOfCount(tiers, 0), 0)
+  assert.equal(tierOfCount(tiers, 1), 0)
+  assert.equal(tierOfCount(tiers, 2), 1)
+  assert.equal(tierOfCount(tiers, 3), 1)
+  assert.equal(tierOfCount(tiers, 4), 2)
+  assert.equal(tierOfCount(tiers, 9), 2)
 })
 
 test('classifyEmblems: 未発動紋章はスキップ（付与トレイト非発動）', () => {
@@ -174,22 +190,30 @@ test('classifyEmblems: 未発動紋章はスキップ（付与トレイト非発
   assert.ok(!activeEmblemApis.has('TFT_Item_EmblemA'))
 })
 
-test('classifyEmblems: 同一紋章2個 → 多重度を保って2回積む', () => {
+test('classifyEmblems: 同一紋章2個で両方要るなら多重度を保って2回積む（1+2 で 3 → 段2）', () => {
   const sd = makeStaticData()
-  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemA', 'TFT_Item_EmblemA'] })
+  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 3 }, e: ['TFT_Item_EmblemA', 'TFT_Item_EmblemA'] })
   assert.deepEqual(classifyEmblems(r, sd).active, ['TFT_Item_EmblemA', 'TFT_Item_EmblemA'])
+})
+
+test('classifyEmblems: 同一紋章2個で1枚余るなら活用は1枚（2+2 で 4、1枚外しても 3 で段2）', () => {
+  const sd = makeStaticData()
+  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 4 }, e: ['TFT_Item_EmblemA', 'TFT_Item_EmblemA'] })
+  const { active, activeEmblemApis } = classifyEmblems(r, sd)
+  assert.deepEqual(active, ['TFT_Item_EmblemA'])
+  assert.ok(activeEmblemApis.has('TFT_Item_EmblemA'))
 })
 
 test('classifyEmblems: 変種トレイトはいずれかが発動していれば活用', () => {
   const sd = makeStaticData()
-  // EmblemB は traitApis=[TraitB, TraitA]。TraitB は非発動だが TraitA が発動 → 活用。
-  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemB'] })
+  // EmblemB は traitApis=[TraitB, TraitA]。TraitB は非発動だが TraitA が発動し段を上げる → 活用。
+  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 2 }, e: ['TFT_Item_EmblemB'] })
   assert.deepEqual(classifyEmblems(r, sd).active, ['TFT_Item_EmblemB'])
 })
 
 test('classifyEmblems: 未解決紋章は記録して無視', () => {
   const sd = makeStaticData()
-  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_Unknown', 'TFT_Item_EmblemA'] })
+  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 2 }, e: ['TFT_Item_Unknown', 'TFT_Item_EmblemA'] })
   const { active, unresolvedEmblems } = classifyEmblems(r, sd)
   assert.deepEqual(active, ['TFT_Item_EmblemA'])
   assert.deepEqual(unresolvedEmblems, ['TFT_Item_Unknown'])
@@ -197,7 +221,7 @@ test('classifyEmblems: 未解決紋章は記録して無視', () => {
 
 test('classifyEmblems: 重複紋章は emblemAliases で canonical に正規化される', () => {
   const sd = makeStaticData()
-  const r = rec({ m: 'M', t: { TraitA: 3 }, e: ['TFT_Item_EmblemA_Dup'] })
+  const r = rec({ m: 'M', t: { TraitA: 3 }, tc: { TraitA: 2 }, e: ['TFT_Item_EmblemA_Dup'] })
   const { active, activeEmblemApis, unresolvedEmblems } = classifyEmblems(r, sd)
   assert.deepEqual(active, ['TFT_Item_EmblemA'])
   assert.deepEqual([...activeEmblemApis], ['TFT_Item_EmblemA'])
@@ -263,7 +287,7 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
     setNumber: 17,
     totals: { matches: 6, participants: 6, byRoute: { sea: 6 } },
     traits: [
-      { api: 'TraitA', name: 'Alpha', nameJa: 'アルファ', icon: 'traitA.png', tiers: [[2, 1], [4, 3]] },
+      { api: 'TraitA', name: 'Alpha', nameJa: 'アルファ', icon: 'traitA.png', tiers: [[2, 1], [3, 3]] },
       { api: 'TraitB', name: 'Bravo', nameJa: 'ブラボー', icon: 'traitB.png', tiers: [[2, 1], [4, 3]] },
     ],
     emblems: [
