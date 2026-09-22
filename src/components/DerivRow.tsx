@@ -169,6 +169,8 @@ export function DerivRow({
         {/*
          * この盤面で発動している特性を**すべて**出す（コアだけの行も空にならない）。
          * そのうえで、この駒を足したことで伸びた特性は明るく・太く出す ＝ この派生を選ぶ理由。
+         * 吹き出しに「伸びる特性」とは書かない。何と比べて伸びたのかが吹き出しからは
+         * 分からないので、読んでも意味が取れない（見た目の強調だけで足りる）。
          * 金は紋章の色なので使わない（役割が混ざる）。**強調は明度と太さだけでやる。**
          * 高さやアイコンの大きさまで変えると、折り返した行の背が揃わずガタつく。
          */}
@@ -180,7 +182,7 @@ export function DerivRow({
               const src = traitGranters.get(traitIdx)
               const tip = `${name} ${count}${granterTip(src, units, lang)}`
               return (
-                <Tip key={traitIdx} label={gained ? `${tip} — ${t(lang, 'synergyGain')}` : tip}>
+                <Tip key={traitIdx} label={tip}>
                   <span
                     className={`inline-flex h-[20px] items-center gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${styleClasses(
                       style,

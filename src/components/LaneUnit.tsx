@@ -42,21 +42,26 @@ export function LaneUnit({ stats, unitIdx, pick, hint, comp, holders, choices = 
   // 吹き出しだけは出す（誰なのかを確かめたいときのため）。
   if (pos < 0 || !unit) {
     const ghost = hint == null ? undefined : units[hint]
+    // 星の段は空でも必ず置く。駒のある列には星の行があるので、抜くとこの列だけ
+    // 上に詰まり、同じ行の駒と高さが揃わない。
     return (
-      <div className={pick ? 'lane--pick' : undefined}>
-        {ghost ? (
-          <Tip className="lane__box lane__hole" label={pickName(lang, ghost)}>
-            <img
-              src={ghost.icon}
-              alt=""
-              aria-hidden
-              loading="lazy"
-              className="h-full w-full rounded-lg object-cover opacity-20 grayscale"
-            />
-          </Tip>
-        ) : (
-          <div className="lane__box lane__hole" />
-        )}
+      <div className={`flex min-w-0 flex-col items-center gap-0.5 ${pick ? 'lane--pick' : ''}`}>
+        <div className="lane__star" />
+        <div className="flex w-full justify-center">
+          {ghost ? (
+            <Tip className="lane__box lane__hole" label={pickName(lang, ghost)}>
+              <img
+                src={ghost.icon}
+                alt=""
+                aria-hidden
+                loading="lazy"
+                className="h-full w-full rounded-lg object-cover opacity-20 grayscale"
+              />
+            </Tip>
+          ) : (
+            <div className="lane__box lane__hole" />
+          )}
+        </div>
       </div>
     )
   }
