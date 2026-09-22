@@ -4,6 +4,7 @@ import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/ty
 import {
   activeTraitCounts,
   bronzeTraitCount,
+  activeTraitTotal,
   sampleLevel,
   shrunk,
   DIM_SAMPLE_MAX,
@@ -38,6 +39,32 @@ test('bronzeTraitCount: 複数ティア特性は先頭ティア発動でブロ�
 test('bronzeTraitCount: 次ティア以上は非計上', () => {
   assert.equal(bronzeTraitCount(counts({ 0: 4 }), traits), 0) // Brawler 4 = シルバー
   assert.equal(bronzeTraitCount(counts({ 0: 6 }), traits), 0) // Brawler 6 = ゴールド
+})
+
+// ---- activeTraitTotal（特性ラダー用の「発動している特性の種類数」）----
+test('activeTraitTotal: 発動していない特性は数えない', () => {
+  assert.equal(activeTraitTotal(counts({ 0: 1 }), traits), 0) // Brawler 1 は最小ティア(2)に届かない
+  assert.equal(activeTraitTotal(counts({ 0: 2 }), traits), 1)
+})
+
+test('activeTraitTotal: 固有特性も数える（生涯ブロンズとの決定的な違い）', () => {
+  assert.equal(activeTraitTotal(counts({ 1: 1 }), traits), 1)
+  assert.equal(bronzeTraitCount(counts({ 1: 1 }), traits), 0)
+})
+
+test('activeTraitTotal: 段が上がっても1種類は1種類', () => {
+  // ラダーの報酬は「重複しない特性を何種類発動させたか」で決まる。段の高さは関係ない。
+  assert.equal(activeTraitTotal(counts({ 0: 6 }), traits), 1)
+  assert.equal(bronzeTraitCount(counts({ 0: 6 }), traits), 0) // ブロンズは先頭ティアのみ計上
+})
+
+test('activeTraitTotal: 発動している種類を数え上げる', () => {
+  assert.equal(activeTraitTotal(counts({ 0: 4, 1: 1, 2: 3 }), traits), 3)
+  assert.equal(activeTraitTotal(counts({ 0: 1, 1: 1, 2: 3 }), traits), 2) // Brawler 1 は未発動
+})
+
+test('activeTraitTotal: 未知の trait idx は無視する', () => {
+  assert.equal(activeTraitTotal(counts({ 0: 2, 99: 5 }), traits), 1)
 })
 
 test('bronzeTraitCount: 固有特性(単一ティア)は数えない', () => {

@@ -15,6 +15,7 @@ import {
   appliedGrants,
   activeTier,
   activeTraitCounts,
+  activeTraitTotal,
   bronzeTraitCount,
   effectiveUnits,
   grantsByUnit,
@@ -47,6 +48,8 @@ export interface Row {
   row: CompRow
   traitCount: Map<number, number>
   bronze: number
+  /** 発動している特性の種類数（固有特性込み）。特性ラダー順の並べ替えと表示で使う。 */
+  active: number
 }
 
 /** 背骨からの派生1件。 */
@@ -507,5 +510,11 @@ export function makeRow(
   granters: TraitGranter[] = [],
 ): Row {
   const traitCount = activeTraitCounts(comp, row.used, units, emblems, granters)
-  return { comp, row, traitCount, bronze: bronzeTraitCount(traitCount, traits) }
+  return {
+    comp,
+    row,
+    traitCount,
+    bronze: bronzeTraitCount(traitCount, traits),
+    active: activeTraitTotal(traitCount, traits),
+  }
 }
