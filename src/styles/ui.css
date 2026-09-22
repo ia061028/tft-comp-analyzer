@@ -1070,6 +1070,11 @@
    * 少し重ねれば同じ列幅で 1.5 倍の大きさにできる。重なりの量は個数で変わるので、
    * 個数を `--lane-item-n` として React から受け取る（2個なら隙間、1個なら中央）。
    */
+  /* 駒の角に付くバッジ。狭い画面では駒ごと縮むので、バッジも一緒に縮める。 */
+  .lane__badge {
+    width: var(--lane-badge);
+    height: var(--lane-badge);
+  }
   .lane__items {
     display: flex;
     width: 100%;

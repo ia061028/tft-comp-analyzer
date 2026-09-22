@@ -2,14 +2,15 @@ import { useMemo, useState } from 'react'
 import type { CompStats, StatsFile } from '../../shared/types'
 import { compRows, type CompRow } from '../lib/multiset'
 import {
-  activeTraitCounts,
-  bronzeTraitCount,
-  cohortPlace,
-  shrunk,
   DIM_SAMPLE_MAX,
   PRIOR_PLACE,
   PRIOR_TOP4,
   PRIOR_WIN,
+  activeTraitCounts,
+  bronzeTraitCount,
+  cohortPlace,
+  effectiveUnits,
+  shrunk,
 } from '../lib/format'
 import { buildTree } from '../lib/backbone'
 import { t, type Lang } from '../lib/i18n'
@@ -56,7 +57,7 @@ export function CompList({
   lang,
   bronzeMode,
 }: CompListProps) {
-  const { units, emblems, traits } = stats
+  const { units, emblems, traits, granters } = stats
 
   // 1構成は「紋章の積み方」ごとに複数行へ分解される（2枚使う行と1枚だけ使う行は別カード）。
   //
@@ -122,7 +123,7 @@ export function CompList({
     return rows.slice().sort((a, b) => {
       if (bronzeMode && a.bronze !== b.bronze) return b.bronze - a.bronze
       for (const k of keys) {
-        const d = metric(a.row, a.comp.units.length, k) - metric(b.row, b.comp.units.length, k)
+        const d = metric(a.row, effectiveUnits(a.comp), k) - metric(b.row, effectiveUnits(b.comp), k)
         if (d !== 0) return d
       }
       return 0
@@ -158,8 +159,8 @@ export function CompList({
   // 上位を「コア ＋ 派生」の系統に畳む。コアが取れない行は flat に落ちて従来カードで描かれる。
   // セクションごとに畳む（TOP_N はセクション単位で効く）。
   const trees = useMemo(
-    () => sections.map((s) => ({ ...s, tree: buildTree(s.rows, units, emblems, traits) })),
-    [sections, units, emblems, traits],
+    () => sections.map((s) => ({ ...s, tree: buildTree(s.rows, units, emblems, traits, granters) })),
+    [sections, units, emblems, traits, granters],
   )
 
   // セクションごとのフルカード表示件数。選択・並び順・対象構成が変わったら先頭に戻す。

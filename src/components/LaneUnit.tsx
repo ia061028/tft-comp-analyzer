@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react'
-import type { CompStats, StatsFile } from '../../shared/types'
+import type { CompStats, StatsFile, TraitGrant } from '../../shared/types'
 import { costBorder, starColor } from '../lib/format'
 import { pickName, type Lang } from '../lib/i18n'
+import { GrantBadges } from './GrantBadges'
 import { RecipeLabel } from './RecipeLabel'
 import { Tip } from './Tip'
 
@@ -15,6 +16,8 @@ interface LaneUnitProps {
   comp: CompStats
   /** unitIdx → この行で持たせている紋章。 */
   holders: Map<number, number[]>
+  /** unitIdx → その駒が持ち込む上乗せ特性（静的データに出ない付与）。 */
+  grants: Map<number, TraitGrant[]>
   lang: Lang
 }
 
@@ -25,8 +28,8 @@ interface LaneUnitProps {
  * 装備者そのものが変わる（実データで確認済み）ので、系統の見出しで代表させると嘘になる。
  * ユニットの名前は出さない（列が増えると潰れて読めない）。名前はツールチップで拾う。
  */
-export function LaneUnit({ stats, unitIdx, pick, comp, holders, lang }: LaneUnitProps) {
-  const { units, emblems, items } = stats
+export function LaneUnit({ stats, unitIdx, pick, comp, holders, grants, lang }: LaneUnitProps) {
+  const { units, emblems, items, traits } = stats
   const pos = unitIdx < 0 ? -1 : comp.units.indexOf(unitIdx)
   const unit = unitIdx < 0 ? undefined : units[unitIdx]
 
@@ -70,6 +73,13 @@ export function LaneUnit({ stats, unitIdx, pick, comp, holders, lang }: LaneUnit
             }
           />
         </Tip>
+        {/* この駒が持ち込む上乗せ特性は左上。紋章の装備者バッジ（右上）とぶつからない。 */}
+        <GrantBadges
+          grants={grants.get(unitIdx) ?? []}
+          traits={traits}
+          lang={lang}
+          size="var(--lane-badge)"
+        />
         {held.length > 0 && (
           <div className="absolute -right-1.5 -top-1.5 z-10 flex gap-0.5">
             {held.map((e, j) => (
@@ -78,7 +88,7 @@ export function LaneUnit({ stats, unitIdx, pick, comp, holders, lang }: LaneUnit
                   src={e!.icon}
                   alt=""
                   loading="lazy"
-                  className="h-[18px] w-[18px] shrink-0 rounded bg-base object-contain ring-2 ring-gold"
+                  className="lane__badge shrink-0 rounded bg-base object-contain ring-2 ring-gold"
                 />
               </Tip>
             ))}

@@ -9,9 +9,17 @@
 // 8体 → 9体 を「改善」として見せてはいけない（9体まで生き残れた人の成績なだけ）。
 // **比較可能なのは同じ体数の兄弟だけ。**
 
-import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/types'
+import type { CompStats, EmblemInfo, TraitGranter, TraitInfo, UnitInfo } from '../../shared/types'
 import type { CompRow } from './multiset'
-import { activeTier, activeTraitCounts, bronzeTraitCount, holderMap } from './format'
+import {
+  GRANT_APPLY_SHARE,
+  activeTier,
+  activeTraitCounts,
+  bronzeTraitCount,
+  effectiveUnits,
+  grantsByUnit,
+  holderMap,
+} from './format'
 
 /**
  * ツリー化の対象は上位N行だけ。全行だと系統が40個に割れ、クラスタリングも 600ms 超で実用外。
@@ -227,23 +235,36 @@ function spanOf(xs: number[]): Span {
 }
 
 /**
- * コアだけで発動している特性（コアユニットの所持特性 ＋ 活用紋章の付与分）。
+ * コアだけで発動している特性（コアユニットの所持特性 ＋ 活用紋章の付与分 ＋ 上乗せ特性）。
  * 派生の「伸びる特性」は、これを基準にした差分として出す。
+ *
+ * 上乗せ（ラックスの選択特性等）は**付与元がコアに居るぶんだけ**足す。ここで足さないと、
+ * コアにも派生にも同じ駒が居るのに派生側だけ数が増え、「この駒を足すと伸びる」に
+ * 出てはいけない特性が出る。
  */
 function coreTraitCounts(
   backbone: number[],
-  used: number[],
+  best: Row,
   units: UnitInfo[],
   emblems: EmblemInfo[],
+  granters: TraitGranter[],
 ): Map<number, number> {
   const counts = new Map<number, number>()
   for (const ui of backbone) {
     for (const ti of units[ui]?.traits ?? []) counts.set(ti, (counts.get(ti) ?? 0) + 1)
   }
-  for (const ei of used) {
+  for (const ei of best.row.used) {
     const ti = emblems[ei]?.trait
     if (ti == null) continue
     counts.set(ti, (counts.get(ti) ?? 0) + 1)
+  }
+  const bset = new Set(backbone)
+  for (const [ui, grants] of grantsByUnit(best.comp, granters)) {
+    if (!bset.has(ui)) continue
+    for (const g of grants) {
+      if (g.share < GRANT_APPLY_SHARE) continue
+      counts.set(g.trait, (counts.get(g.trait) ?? 0) + g.delta)
+    }
   }
   return counts
 }
@@ -317,8 +338,9 @@ function buildLanes(groups: UnitGroup[], units: UnitInfo[]): Lane[] {
  *    （＝共起グラフの彩色）ので、出現派生数の多い駒から順に、置ける一番左の列へ入れる。
  *    A,B,C と A,B,D なら A・B はそろい、C と D は同居しないので同じ列に詰まる。
  *
- * 列数の下限はその体数そのもの（どの派生も体数ぶんの列を同時に使うため）で、貪欲法が
- * それを超えるのは駒の重なり方が悪いときだけ。空きマスは選ぶ枠にしか出ない。
+ * 列数の下限は1派生が置く駒の数そのもの（どの派生も同時にそれだけの列を使うため）で、
+ * 貪欲法がそれを超えるのは駒の重なり方が悪いときだけ。空きマスは選ぶ枠にしか出ない。
+ * グループのキー（`units`）は実効の盤面サイズなので、1駒で2枠を取る駒が居ると列数より多い。
  */
 function buildGroupLanes(g: UnitGroup, order: Map<number, number>): GroupLane[] {
   const rank = (u: number) => order.get(u) ?? Number.MAX_SAFE_INTEGER
@@ -370,6 +392,7 @@ export function buildTree(
   units: UnitInfo[] = [],
   emblems: EmblemInfo[] = [],
   traits: TraitInfo[] = [],
+  granters: TraitGranter[] = [],
   topN: number = TOP_N,
 ): Tree {
   const head = sorted.slice(0, topN)
@@ -393,7 +416,7 @@ export function buildTree(
     const bset = new Set(backbone)
 
     // コアだけの発動特性。系統の最良行が使う紋章を前提にする（紋章は系統内で共通）。
-    const coreCounts = coreTraitCounts(backbone, members[0].row.used, units, emblems)
+    const coreCounts = coreTraitCounts(backbone, members[0], units, emblems, granters)
 
     const derivs: Deriv[] = []
     const dropped: number[] = []
@@ -428,7 +451,7 @@ export function buildTree(
     // 平均順位の幅が「構成の差」ではなく生存バイアスそのものになってしまう。
     const byUnits = new Map<number, Deriv[]>()
     for (const d of derivs) {
-      const k = d.comp.units.length
+      const k = effectiveUnits(d.comp)
       if (!byUnits.has(k)) byUnits.set(k, [])
       byUnits.get(k)!.push(d)
     }

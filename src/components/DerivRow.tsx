@@ -1,7 +1,15 @@
 import { useState, type CSSProperties } from 'react'
 import type { StatsFile } from '../../shared/types'
 import type { Deriv, GroupLane } from '../lib/backbone'
-import { activeTier, buildPlannerCode, holderMap, styleClasses, tierOfEdge } from '../lib/format'
+import {
+  activeTier,
+  buildPlannerCode,
+  effectiveUnits,
+  grantsByUnit,
+  holderMap,
+  styleClasses,
+  tierOfEdge,
+} from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { LaneUnit } from './LaneUnit'
 import { RecipeLabel } from './RecipeLabel'
@@ -49,7 +57,7 @@ export function DerivRow({
   const { comp, row, synergy } = deriv
   const [copied, setCopied] = useState(false)
 
-  const unitCount = comp.units.length
+  const unitCount = effectiveUnits(comp)
   const avgPlace = row.n > 0 ? row.p / row.n : NaN
   const hasPlace = Number.isFinite(avgPlace)
   const tier = hasPlace
@@ -60,6 +68,8 @@ export function DerivRow({
   const winRate = row.n > 0 ? (row.win / row.n) * 100 : 0
 
   const holders = holderMap(comp, row.used)
+  // 静的データに出ない上乗せ特性の付与元（unitIdx → その駒が持ち込む特性）。
+  const unitGrants = grantsByUnit(comp, stats.granters)
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
 
   // この盤面の全発動特性。[traitIdx, style, 発動段, この派生で伸びたか]
@@ -114,6 +124,7 @@ export function DerivRow({
                 pick={lane.fixed === null}
                 comp={comp}
                 holders={holders}
+                grants={unitGrants}
                 lang={lang}
               />
             ))}

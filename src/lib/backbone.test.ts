@@ -18,6 +18,8 @@ const row = (
     unitItems: [],
     holders: [],
     sigs: [],
+    grants: [],
+    slotExtra: 0,
   }
   const s = stats ?? { top4: 0.8, win: 0.3, place: 3 }
   return {

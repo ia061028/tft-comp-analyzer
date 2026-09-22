@@ -5,6 +5,8 @@ import {
   activeTier,
   buildPlannerCode,
   costBorder,
+  effectiveUnits,
+  grantsByUnit,
   holderMap,
   starColor,
   styleClasses,
@@ -14,6 +16,7 @@ import { pickName, t, type Lang } from '../lib/i18n'
 import { RecipeLabel } from './RecipeLabel'
 import { SampleMeter } from './SampleMeter'
 import { Tip } from './Tip'
+import { GrantBadges } from './GrantBadges'
 
 export type SortKey = 'place' | 'top4' | 'win' | 'adopt'
 
@@ -72,6 +75,8 @@ export function CompCard({
 
   // 装備者の割り当て（unitIdx → 載せている紋章）。詳細は format.ts の holderMap。
   const holderEmblems = holderMap(comp, row.used)
+  // 静的データに出ない上乗せ特性の付与元（unitIdx → その駒が持ち込む特性）。
+  const unitGrants = grantsByUnit(comp, stats.granters)
 
   const avgPlace = row.n > 0 ? row.p / row.n : NaN
   const hasPlace = Number.isFinite(avgPlace)
@@ -80,7 +85,7 @@ export function CompCard({
   // 10体構成が全部 S になり色が情報を運ばなくなる。派生行（DerivRow）と一覧の並び順
   // （CompList の 'place'）が既にこの基準なので、カードだけ絶対値だと表示と順序が食い違う。
   const tier = hasPlace
-    ? tierOfEdge(avgPlace, comp.units.length, cohort)
+    ? tierOfEdge(avgPlace, effectiveUnits(comp), cohort)
     : { label: '?', color: '#707682', classes: 'bg-line-strong text-muted' }
   const code = buildPlannerCode(comp.units, units, stats.setNumber)
 
@@ -232,6 +237,13 @@ export function CompCard({
                       }
                     />
                   </Tip>
+                  {/* 上乗せ特性バッジ（左上）。紋章とは別機構なので金リングは使わない */}
+                  <GrantBadges
+                    grants={unitGrants.get(unitIdx) ?? []}
+                    traits={traits}
+                    lang={lang}
+                    size={21}
+                  />
                   {/* 紋章バッジ（右上）。複数紋章なら複数出る＝どれをどこに載せるかが分かる */}
                   {heldEmblems.length > 0 && (
                     <div className="absolute -right-1.5 -top-1.5 z-10 flex gap-0.5">

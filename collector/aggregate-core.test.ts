@@ -12,6 +12,10 @@ import {
   pickTargetSetFromCounts,
   buildStats,
   createStatsBuilder,
+  expectedTraitCounts,
+  inferTraitGrants,
+  slotExtraOf,
+  MAX_SLOT_EXTRA,
   type LoadedRecord,
 } from './aggregate-core.ts'
 
@@ -204,13 +208,16 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
   const sd = makeStaticData()
 
   // 構成1: 盤面 {UnitA, UnitB}。4レコード（うち3件が EmblemA を +1 活用）。
+  // tc と lv は盤面と整合させる: TraitA は UnitA+UnitB+紋章 の3、TraitB は UnitB だけで
+  // 未発動なので tc に出ない。lv=2 なので追加盤面枠も 0。
   const comp1Emblem = (m: string, p: number): LoadedRecord => ({
     route: 'sea',
     rec: rec({
       m,
       p,
-      t: { TraitA: 3, TraitB: 1 },
-      tc: { TraitA: 2, TraitB: 2 },
+      lv: 2,
+      t: { TraitA: 3 },
+      tc: { TraitA: 3 },
       e: ['TFT_Item_EmblemA'],
       eh: ['TFT_UnitB'],
       u: ['TFT_UnitA', 'TFT_UnitB'],
@@ -228,6 +235,7 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
       rec: rec({
         m: 'M4',
         p: 4,
+        lv: 2,
         t: { TraitA: 3 },
         tc: { TraitA: 2 },
         u: ['TFT_UnitA', 'TFT_UnitB'],
@@ -236,8 +244,8 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
       }),
     },
     // 構成2: 盤面 {UnitC, UnitD}。2レコード → n<MIN_OUTPUT_N で出力除外。
-    { route: 'sea', rec: rec({ m: 'M5', p: 1, t: { TraitB: 3 }, tc: { TraitB: 2 }, u: ['TFT_UnitC', 'TFT_UnitD'], us: [1, 1] }) },
-    { route: 'sea', rec: rec({ m: 'M6', p: 2, t: { TraitB: 3 }, tc: { TraitB: 2 }, u: ['TFT_UnitC', 'TFT_UnitD'], us: [1, 1] }) },
+    { route: 'sea', rec: rec({ m: 'M5', p: 1, lv: 2, t: { TraitB: 3 }, tc: { TraitB: 1 }, u: ['TFT_UnitC', 'TFT_UnitD'], us: [1, 1] }) },
+    { route: 'sea', rec: rec({ m: 'M6', p: 2, lv: 2, t: { TraitB: 3 }, tc: { TraitB: 1 }, u: ['TFT_UnitC', 'TFT_UnitD'], us: [1, 1] }) },
   ]
 
   const { out, diag } = buildStats(target, sd, {
@@ -247,7 +255,7 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
   })
 
   assert.deepStrictEqual(out, {
-    schemaVersion: 4,
+    schemaVersion: 5,
     generatedAt: 'FIXED_TS',
     patch: '16.12',
     tftPatch: '17.5',
@@ -270,6 +278,7 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
     comps: [
       { u: [0, 1], n: 4, g: [[[0], 3, 2, 1, 13]], k: [2, 3], i: [[1, 0, 4]], h: [[0, 1, 3]] },
     ],
+    granters: [],
     baseItemIcons: { spatula: 'spat.png', fryingPan: 'pan.png' },
   })
 
@@ -470,4 +479,192 @@ test('buildStats: 紋章活用レコード数が同数なら総レコード数�
   const { out } = buildStats(target, sd, { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T' })
   // 紋章活用はどちらも3。総レコード数で X(5) が先。
   assert.deepEqual(out.comps.map((c) => c.n), [5, 3])
+})
+
+// ---- 静的データ外の特性上乗せ（ラックス/カ＝ジックス/エルダードラゴン型の機構） ----
+
+test('expectedTraitCounts: 盤面ユニットの所持トレイト ＋ 装備紋章の付与', () => {
+  const sd = makeStaticData()
+  const r = rec({ m: 'M', u: ['TFT_UnitA', 'TFT_UnitB'], e: ['TFT_Item_EmblemA'] })
+  const { boardSet } = splitBoardUnits(r, sd)
+  const exp = expectedTraitCounts(r, sd, boardSet)
+  assert.equal(exp.get('TraitA'), 3) // UnitA + UnitB + 紋章A
+  assert.equal(exp.get('TraitB'), 1) // UnitB のみ
+})
+
+test('expectedTraitCounts: 重複紋章は canonical の付与トレイトで数える', () => {
+  const sd = makeStaticData()
+  const r = rec({ m: 'M', u: ['TFT_UnitA'], e: ['TFT_Item_EmblemA_Dup'] })
+  const { boardSet } = splitBoardUnits(r, sd)
+  assert.equal(expectedTraitCounts(r, sd, boardSet).get('TraitA'), 2)
+})
+
+test('inferTraitGrants: 期待値を超えた分だけを上乗せとして返す', () => {
+  const sd = makeStaticData()
+  // 盤面 {UnitA, UnitB} の静的期待値は TraitA=2, TraitB=1。
+  // 実測が TraitA=4, TraitB=1 なら TraitA が +2（ラックス型の2体分）。
+  const r = rec({ m: 'M', u: ['TFT_UnitA', 'TFT_UnitB'], tc: { TraitA: 4, TraitB: 1 } })
+  const { boardSet } = splitBoardUnits(r, sd)
+  assert.deepEqual([...inferTraitGrants(r, sd, boardSet)], [['TraitA', 2]])
+})
+
+test('inferTraitGrants: 期待値以下・tc 欠落・未知トレイトは拾わない', () => {
+  const sd = makeStaticData()
+  const board = splitBoardUnits(rec({ m: 'M', u: ['TFT_UnitA', 'TFT_UnitB'] }), sd).boardSet
+  // 期待値ちょうど / 下回る → 上乗せなし。
+  const same = rec({ m: 'M', u: ['TFT_UnitA', 'TFT_UnitB'], tc: { TraitA: 2, TraitB: 1 } })
+  assert.equal(inferTraitGrants(same, sd, board).size, 0)
+  const fewer = rec({ m: 'M', u: ['TFT_UnitA', 'TFT_UnitB'], tc: { TraitA: 1 } })
+  assert.equal(inferTraitGrants(fewer, sd, board).size, 0)
+  // tc 欠落（旧レコード）→ 逆算できない。
+  const old = rec({ m: 'M', u: ['TFT_UnitA', 'TFT_UnitB'] })
+  assert.equal(inferTraitGrants(old, sd, board).size, 0)
+  // 静的データが知らないトレイトは無視（セット跨ぎの混入対策）。
+  const unknown = rec({ m: 'M', u: ['TFT_UnitA', 'TFT_UnitB'], tc: { Unknown: 5 } })
+  assert.equal(inferTraitGrants(unknown, sd, board).size, 0)
+})
+
+test('slotExtraOf: レベルと盤面ユニット数の差をクランプして返す', () => {
+  const r = (lv: number): ParticipantRecord => rec({ m: 'M', lv })
+  assert.equal(slotExtraOf(r(9), 8), 1) // エルダードラゴン型（1体で2枠）
+  assert.equal(slotExtraOf(r(9), 9), 0)
+  assert.equal(slotExtraOf(r(8), 9), 0) // 召喚の取りこぼし等で負になっても 0
+  assert.equal(slotExtraOf(r(9), 2), MAX_SLOT_EXTRA)
+  assert.equal(slotExtraOf(rec({ m: 'M', lv: 0 }), 8), 0)
+  assert.equal(slotExtraOf(r(9), 0), 0)
+})
+
+test('buildStats: 上乗せ特性・付与元ユニット・追加盤面枠を出力する', () => {
+  const sd = makeStaticData()
+  // 盤面 {UnitA, UnitB}（静的 TraitA=2, TraitB=1）。UnitB が TraitB を1体分上乗せする想定。
+  // 4件中3件で上乗せ（share 0.75）、1件は上乗せなし。lv=3/ユニット2体で追加枠1。
+  const withGrant = (m: string, p: number): LoadedRecord => ({
+    route: 'sea',
+    rec: rec({
+      m,
+      p,
+      lv: 3,
+      t: { TraitA: 1, TraitB: 1 },
+      tc: { TraitA: 2, TraitB: 2 },
+      e: ['TFT_Item_EmblemA'],
+      eh: ['TFT_UnitB'],
+      u: ['TFT_UnitA', 'TFT_UnitB'],
+    }),
+  })
+  const target: LoadedRecord[] = [
+    withGrant('M1', 1),
+    withGrant('M2', 2),
+    withGrant('M3', 3),
+    {
+      route: 'sea',
+      rec: rec({
+        m: 'M4',
+        p: 4,
+        lv: 3,
+        t: { TraitA: 1 },
+        tc: { TraitA: 2 },
+        e: ['TFT_Item_EmblemA'],
+        eh: ['TFT_UnitB'],
+        u: ['TFT_UnitA', 'TFT_UnitB'],
+      }),
+    },
+  ]
+  const { out } = buildStats(target, sd, {
+    targetPatch: '16.12',
+    tftPatch: '17.5',
+    generatedAt: 'FIXED_TS',
+  })
+
+  const traitB = out.traits.findIndex((t) => t.api === 'TraitB')
+  // 紋章A は TraitA を +1 するので TraitA 側は期待どおりで上乗せなし。TraitB だけが出る。
+  assert.deepEqual(out.comps[0].x, [[traitB, 1, 3]])
+  assert.equal(out.comps[0].s, 1)
+})
+
+test('buildStats: 付与元は上乗せと必ず同時に盤面に居たユニットに絞られる', () => {
+  const sd = makeStaticData()
+  // 盤面1 {UnitA, UnitB} と 盤面2 {UnitB, UnitC} の両方で TraitB が +1 される。
+  // 両方に居るのは UnitB だけなので、カバレッジで UnitB が一意に決まる。
+  const board1 = (m: string): LoadedRecord => ({
+    route: 'sea',
+    rec: rec({
+      m,
+      lv: 2,
+      t: { TraitA: 1, TraitB: 1 },
+      tc: { TraitA: 3, TraitB: 2 },
+      e: ['TFT_Item_EmblemA'],
+      eh: ['TFT_UnitB'],
+      u: ['TFT_UnitA', 'TFT_UnitB'],
+    }),
+  })
+  const board2 = (m: string): LoadedRecord => ({
+    route: 'sea',
+    rec: rec({
+      m,
+      lv: 2,
+      t: { TraitA: 1, TraitB: 1 },
+      tc: { TraitA: 2, TraitB: 3 },
+      e: ['TFT_Item_EmblemA'],
+      eh: ['TFT_UnitB'],
+      u: ['TFT_UnitB', 'TFT_UnitC'],
+    }),
+  })
+  const target: LoadedRecord[] = [
+    board1('M1'),
+    board1('M2'),
+    board1('M3'),
+    board2('M4'),
+    board2('M5'),
+    board2('M6'),
+  ]
+  const { out } = buildStats(target, sd, {
+    targetPatch: '16.12',
+    tftPatch: '17.5',
+    generatedAt: 'FIXED_TS',
+  })
+
+  const traitB = out.traits.findIndex((t) => t.api === 'TraitB')
+  const unitB = out.units.findIndex((u) => u.api === 'TFT_UnitB')
+  assert.deepEqual(
+    out.granters!.filter(([, t]) => t === traitB),
+    [[unitB, traitB]],
+  )
+})
+
+test('buildStats: 上乗せのシェアが GRANT_MIN_SHARE 未満なら出力しない', () => {
+  const sd = makeStaticData()
+  const plain = (m: string): LoadedRecord => ({
+    route: 'sea',
+    rec: rec({
+      m,
+      lv: 2,
+      t: { TraitA: 1 },
+      tc: { TraitA: 3 },
+      e: ['TFT_Item_EmblemA'],
+      eh: ['TFT_UnitB'],
+      u: ['TFT_UnitA', 'TFT_UnitB'],
+    }),
+  })
+  // 10件中1件だけ TraitB が上乗せ（share 0.1 < GRANT_MIN_SHARE）。
+  const target: LoadedRecord[] = []
+  for (let i = 0; i < 9; i++) target.push(plain(`M${i}`))
+  target.push({
+    route: 'sea',
+    rec: rec({
+      m: 'M9',
+      lv: 2,
+      t: { TraitA: 1, TraitB: 1 },
+      tc: { TraitA: 3, TraitB: 2 },
+      e: ['TFT_Item_EmblemA'],
+      eh: ['TFT_UnitB'],
+      u: ['TFT_UnitA', 'TFT_UnitB'],
+    }),
+  })
+  const { out } = buildStats(target, sd, {
+    targetPatch: '16.12',
+    tftPatch: '17.5',
+    generatedAt: 'FIXED_TS',
+  })
+  assert.equal(out.comps[0].x, undefined)
+  assert.equal(out.comps[0].s, undefined)
 })

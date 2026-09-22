@@ -10,6 +10,7 @@ import type {
   EmblemInfo,
   UnitInfo,
   ItemInfo,
+  TraitGranter,
 } from '../shared/types.ts'
 
 // 召喚・非ショップユニット（apiName が _Summon で終わる／Minion・PVE・Enemy_・TrainingDummy を含む）は
@@ -29,6 +30,19 @@ export const ITEMS_PER_UNIT = 3
 export const HOLDERS_PER_EMBLEM = 3
 /** 装備者採用の最小シェア（先頭は無条件採用）。 */
 export const HOLDER_MIN_SHARE = 0.2
+/** 上乗せ特性を構成に載せる最小シェア。これ未満は「たまたまその選択だった」ノイズ。 */
+export const GRANT_MIN_SHARE = 0.15
+/** 1構成あたりに出力する上乗せ特性の上限（ファイルサイズの歯止め）。 */
+export const GRANTS_PER_COMP = 8
+/**
+ * 付与元ユニットと認めるカバレッジ下限。
+ * 「トレイト t の上乗せが観測されたレコードのうち、ユニット u が盤面に居た割合」。
+ * 1トレイトを複数ユニットが付与するセットではどのユニットも閾値に届かず、
+ * 付与元なし（＝数は正しいが誰の分か出さない）に自然に縮退する。
+ */
+export const GRANTER_MIN_COVERAGE = 0.9
+/** 追加盤面枠の上限（レベルとユニット数のズレはノイズも含むのでクランプする）。 */
+export const MAX_SLOT_EXTRA = 2
 
 export interface LoadedRecord {
   rec: ParticipantRecord
@@ -136,6 +150,70 @@ export function classifyEmblems(
   return { active, activeEmblemApis: new Set(active), unresolvedEmblems }
 }
 
+/**
+ * 静的データから期待されるトレイト発動数（トレイト apiName → ユニット数）。
+ *
+ * 盤面ユニットの所持トレイト ＋ 装備紋章の付与分。紋章は装備者が既に持つトレイトには
+ * 装備できない（incompatibleTraits）ので、枚数ぶんそのまま +1 して良い。
+ */
+export function expectedTraitCounts(
+  rec: ParticipantRecord,
+  staticData: StaticData,
+  boardSet: ReadonlySet<string>,
+): Map<string, number> {
+  const exp = new Map<string, number>()
+  const bump = (tApi: string): void => {
+    exp.set(tApi, (exp.get(tApi) ?? 0) + 1)
+  }
+  for (const uApi of boardSet) {
+    for (const tApi of staticData.units.get(uApi)?.traits ?? []) bump(tApi)
+  }
+  for (const rawApi of rec.e) {
+    const eApi = staticData.emblemAliases.get(rawApi) ?? rawApi
+    const emb = staticData.emblems.get(eApi)
+    if (emb) bump(emb.traitApi)
+  }
+  return exp
+}
+
+/**
+ * 静的データ・紋章では説明できない特性の上乗せを逆算する（トレイト apiName → 上乗せ数）。
+ *
+ * セット18 では ラックス（選択特性が2体分）・カ＝ジックス（進化で最大4特性）・
+ * エルダードラゴン（リフトビースト2体分）がこれに当たる。ユニット名を決め打ちせず、
+ * 実レコードの num_units と期待値の差だけで拾うので、同種の機構が増えても追従する。
+ *
+ * **限界**: rec.tc は発動済みトレイト（tier_current>=1）しか持たないので、
+ * 発動していない付与は見えない。上乗せは常に過小評価になる。
+ */
+export function inferTraitGrants(
+  rec: ParticipantRecord,
+  staticData: StaticData,
+  boardSet: ReadonlySet<string>,
+): Map<string, number> {
+  const grants = new Map<string, number>()
+  if (!rec.tc) return grants
+  const exp = expectedTraitCounts(rec, staticData, boardSet)
+  for (const [tApi, actual] of Object.entries(rec.tc)) {
+    if (!staticData.traits.has(tApi)) continue
+    const delta = actual - (exp.get(tApi) ?? 0)
+    if (delta > 0) grants.set(tApi, delta)
+  }
+  return grants
+}
+
+/**
+ * 盤面ユニット数に対する追加の盤面枠。
+ * エルダードラゴンのように1体で2枠使うユニットが居ると、プレイヤーレベルより
+ * 盤面ユニット数が少なくなる。レベル未記録・想定外の値は 0 に落とす。
+ */
+export function slotExtraOf(rec: ParticipantRecord, boardCount: number): number {
+  if (!rec.lv || boardCount <= 0) return 0
+  const extra = rec.lv - boardCount
+  if (extra <= 0) return 0
+  return Math.min(extra, MAX_SLOT_EXTRA)
+}
+
 export interface AggregateDiag {
   /** 盤面ユニットが1体も無く除外したレコード数。 */
   noBoard: number
@@ -222,9 +300,19 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
     holderCounts: Map<string, Map<string, number>>
     // 紋章活用シグネチャ
     sigs: Map<string, SigAcc>
+    /** トレイト apiName → 上乗せ数 → 件数。 */
+    grantCounts: Map<string, Map<number, number>>
+    /** 上乗せを逆算できたレコード数（tc を持つレコード）。share の分母。 */
+    grantRecords: number
+    /** 追加盤面枠 → 件数。 */
+    slotExtraCounts: Map<number, number>
   }
 
   const map = new Map<string, CompAcc>()
+  // 付与元ユニットの推定用。トレイト apiName → ユニット apiName → 同時出現数。
+  const granterCo = new Map<string, Map<string, number>>()
+  // トレイト apiName → 上乗せが観測されたレコード数（granterCo の分母）。
+  const granterTotal = new Map<string, number>()
   let noBoard = 0
   let excludedUnresolvedTrait = 0
   const byRoute: Record<string, number> = {}
@@ -259,10 +347,39 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
         itemCounts: new Map(),
         holderCounts: new Map(),
         sigs: new Map(),
+        grantCounts: new Map(),
+        grantRecords: 0,
+        slotExtraCounts: new Map(),
       }
       map.set(boardKey, acc)
     }
     acc.n++
+
+    // 追加盤面枠（エルダードラゴンのような複数枠ユニットの検出）。
+    const slotExtra = slotExtraOf(rec, boardSet.size)
+    acc.slotExtraCounts.set(slotExtra, (acc.slotExtraCounts.get(slotExtra) ?? 0) + 1)
+
+    // 静的データ外の特性上乗せ（tc を持つレコードのみ）。
+    if (rec.tc) {
+      acc.grantRecords++
+      for (const [tApi, delta] of inferTraitGrants(rec, staticData, boardSet)) {
+        let dc = acc.grantCounts.get(tApi)
+        if (!dc) {
+          dc = new Map()
+          acc.grantCounts.set(tApi, dc)
+        }
+        dc.set(delta, (dc.get(delta) ?? 0) + 1)
+
+        // 付与元の推定材料: この上乗せと同時に盤面に居たユニット。
+        granterTotal.set(tApi, (granterTotal.get(tApi) ?? 0) + 1)
+        let co = granterCo.get(tApi)
+        if (!co) {
+          co = new Map()
+          granterCo.set(tApi, co)
+        }
+        for (const uApi of boardSet) co.set(uApi, (co.get(uApi) ?? 0) + 1)
+      }
+    }
 
     // ユニット別スター・完成アイテム（盤面ユニットのみ）。
     for (let i = 0; i < rec.u.length; i++) {
@@ -375,6 +492,8 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       unitItems: [string, string, number][] // [unitApi, itemApi, count]
       holders: [string, string, number][] // [emblemApi, unitApi, count]
       sigs: SigAcc[]
+      grants: [string, number, number][] // [traitApi, delta, count]
+      slotExtra: number
     }
 
     const preComps: PreComp[] = []
@@ -440,6 +559,23 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       const sigs = [...acc.sigs.values()]
       for (const s of sigs) for (const e of s.e) usedEmblemApis.add(e)
 
+      // 上乗せ特性。トレイトごとに最頻の上乗せ数を1件だけ採り、シェアの高い順に並べる。
+      // 「最頻」を 0 込みで採らないのは、ラックスのように選択が割れる構成でも
+      // 上位の選択肢を出したいため（採用数の少ない選択は GRANT_MIN_SHARE で落ちる）。
+      const grants: [string, number, number][] = []
+      if (acc.grantRecords > 0) {
+        for (const [tApi, dc] of acc.grantCounts) {
+          const delta = modeMaxFromCounts(dc)
+          if (delta === undefined) continue
+          const count = dc.get(delta)!
+          if (count / acc.grantRecords < GRANT_MIN_SHARE) continue
+          grants.push([tApi, delta, count])
+          usedTraitApis.add(tApi)
+        }
+        grants.sort((a, b) => b[2] - a[2] || (a[0] < b[0] ? -1 : 1))
+        grants.length = Math.min(grants.length, GRANTS_PER_COMP)
+      }
+
       preComps.push({
         unitApis: acc.unitApis,
         n: acc.n,
@@ -447,6 +583,8 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
         unitItems,
         holders,
         sigs,
+        grants,
+        slotExtra: modeMaxFromCounts(acc.slotExtraCounts) ?? 0,
       })
     }
 
@@ -548,10 +686,20 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
         ])
         .sort((a, b) => b[1] - a[1])
 
+      const grants: [number, number, number][] = pc.grants
+        .map(([traitApi, delta, count]): [number, number, number] => [
+          traitIndex.get(traitApi)!,
+          delta,
+          count,
+        ])
+        .sort((a, b) => b[2] - a[2] || a[0] - b[0])
+
       const wire: WireComp = { u: unitIdxs, n: pc.n, g }
       if (unitStars.some((s) => s > 0)) wire.k = unitStars
       if (unitItems.length) wire.i = unitItems
       if (holders.length) wire.h = holders
+      if (grants.length) wire.x = grants
+      if (pc.slotExtra > 0) wire.s = pc.slotExtra
       return wire
     }
 
@@ -559,8 +707,32 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
     // フロントは一覧を自前で並べ替えるので、この順序は決定性のためだけのもの。
     const comps: WireComp[] = preComps.map(toWire)
 
+    // 付与元ユニットの推定。トレイトごとにカバレッジ最大のユニットを1体だけ採る。
+    // 実データ（セット18）ではカ＝ジックス・ラックス・エルダードラゴンがそれぞれ
+    // 別のトレイトを付与するので1対1に決まる。決まらないセットでは閾値に届かず空になる。
+    const granters: TraitGranter[] = []
+    for (const [tApi, co] of granterCo) {
+      const ti = traitIndex.get(tApi)
+      if (ti === undefined) continue
+      const total = granterTotal.get(tApi) ?? 0
+      if (total === 0) continue
+      let bestApi: string | undefined
+      let bestCo = -1
+      for (const [uApi, c] of co) {
+        if (c > bestCo || (c === bestCo && bestApi !== undefined && uApi < bestApi)) {
+          bestCo = c
+          bestApi = uApi
+        }
+      }
+      if (bestApi === undefined || bestCo / total < GRANTER_MIN_COVERAGE) continue
+      const ui = unitIndex.get(bestApi)
+      if (ui === undefined) continue
+      granters.push([ui, ti])
+    }
+    granters.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+
     const out: WireStatsFile = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       generatedAt: opts.generatedAt,
       patch: opts.targetPatch,
       tftPatch: opts.tftPatch,
@@ -575,6 +747,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       units: unitsOut,
       items: itemsOut,
       comps,
+      granters,
       baseItemIcons: staticData.baseItemIcons,
     }
 
