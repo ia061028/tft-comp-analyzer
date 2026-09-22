@@ -6,7 +6,8 @@ import {
   buildPlannerCode,
   costBorder,
   effectiveUnits,
-  grantsByUnit,
+  granterOfTrait,
+  granterTip,
   holderMap,
   starColor,
   styleClasses,
@@ -16,7 +17,7 @@ import { pickName, t, type Lang } from '../lib/i18n'
 import { RecipeLabel } from './RecipeLabel'
 import { SampleMeter } from './SampleMeter'
 import { Tip } from './Tip'
-import { GrantBadges } from './GrantBadges'
+import { GranterFace } from './GranterFace'
 
 export type SortKey = 'place' | 'top4' | 'win' | 'adopt'
 
@@ -76,7 +77,7 @@ export function CompCard({
   // 装備者の割り当て（unitIdx → 載せている紋章）。詳細は format.ts の holderMap。
   const holderEmblems = holderMap(comp, row.used)
   // 静的データに出ない上乗せ特性の付与元（unitIdx → その駒が持ち込む特性）。
-  const unitGrants = grantsByUnit(comp, stats.granters)
+  const traitGranters = granterOfTrait(comp, stats.granters)
 
   const avgPlace = row.n > 0 ? row.p / row.n : NaN
   const hasPlace = Number.isFinite(avgPlace)
@@ -237,13 +238,6 @@ export function CompCard({
                       }
                     />
                   </Tip>
-                  {/* 上乗せ特性バッジ（左上）。紋章とは別機構なので金リングは使わない */}
-                  <GrantBadges
-                    grants={unitGrants.get(unitIdx) ?? []}
-                    traits={traits}
-                    lang={lang}
-                    size={21}
-                  />
                   {/* 紋章バッジ（右上）。複数紋章なら複数出る＝どれをどこに載せるかが分かる */}
                   {heldEmblems.length > 0 && (
                     <div className="absolute -right-1.5 -top-1.5 z-10 flex gap-0.5">
@@ -285,17 +279,20 @@ export function CompCard({
           {traitChips.map(([traitIdx, style, count]) => {
             const trait = traits[traitIdx]
             const fromEmblem = emblemTraits.has(traitIdx)
+            const src = traitGranters.get(traitIdx)
+            const name = trait ? pickName(lang, trait) : `#${traitIdx}`
             return (
-              <Tip key={traitIdx} label={trait ? pickName(lang, trait) : `#${traitIdx}`}>
+              <Tip key={traitIdx} label={`${name}${granterTip(src, units, lang)}`}>
                 <span
                   className={`inline-flex items-center gap-1 rounded-md border px-1.5 text-[11px] tabular-nums ${styleClasses(
                     style,
                   )} ${
                     fromEmblem
                       ? 'h-[22px] font-bold ring-1 ring-gold/60'
-                      : 'h-[19px] font-semibold opacity-80'
+                      : 'h-[19px] font-semibold'
                   }`}
                 >
+                  <GranterFace source={src} units={units} lang={lang} />
                   {trait?.icon && (
                     <img
                       src={trait.icon}

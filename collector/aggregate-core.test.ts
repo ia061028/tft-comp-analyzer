@@ -16,6 +16,7 @@ import {
   inferTraitGrants,
   slotExtraOf,
   MAX_SLOT_EXTRA,
+  GRANTER_MIN_RECORDS,
   type LoadedRecord,
 } from './aggregate-core.ts'
 
@@ -255,7 +256,7 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
   })
 
   assert.deepStrictEqual(out, {
-    schemaVersion: 5,
+    schemaVersion: 6,
     generatedAt: 'FIXED_TS',
     patch: '16.12',
     tftPatch: '17.5',
@@ -609,14 +610,11 @@ test('buildStats: 付与元は上乗せと必ず同時に盤面に居たユニ�
       u: ['TFT_UnitB', 'TFT_UnitC'],
     }),
   })
-  const target: LoadedRecord[] = [
-    board1('M1'),
-    board1('M2'),
-    board1('M3'),
-    board2('M4'),
-    board2('M5'),
-    board2('M6'),
-  ]
+  // GRANTER_MIN_RECORDS を超える件数を作る（少数の偶然の一致は推定に使わないため）。
+  const target: LoadedRecord[] = []
+  for (let i = 0; i < GRANTER_MIN_RECORDS + 20; i++) {
+    target.push(board1(`A${i}`), board2(`B${i}`))
+  }
   const { out } = buildStats(target, sd, {
     targetPatch: '16.12',
     tftPatch: '17.5',
@@ -627,8 +625,58 @@ test('buildStats: 付与元は上乗せと必ず同時に盤面に居たユニ�
   const unitB = out.units.findIndex((u) => u.api === 'TFT_UnitB')
   assert.deepEqual(
     out.granters!.filter(([, t]) => t === traitB),
-    [[unitB, traitB]],
+    [[unitB, traitB, 1]],
   )
+})
+
+test('buildStats: 付与元は上乗せ数ごとに分けて推定する', () => {
+  const sd = makeStaticData()
+  // 同じ TraitB が、盤面1では +1（UnitA が居る）、盤面2では +2（UnitA は居ない）。
+  // 上乗せ数を混ぜて数えると UnitA のカバレッジが薄まり、+1 の付与元も落ちてしまう。
+  const plusOne = (m: string): LoadedRecord => ({
+    route: 'sea',
+    rec: rec({
+      m,
+      lv: 2,
+      t: { TraitA: 1, TraitB: 1 },
+      tc: { TraitA: 3, TraitB: 2 },
+      e: ['TFT_Item_EmblemA'],
+      eh: ['TFT_UnitB'],
+      u: ['TFT_UnitA', 'TFT_UnitB'],
+    }),
+  })
+  const plusTwo = (m: string): LoadedRecord => ({
+    route: 'sea',
+    rec: rec({
+      m,
+      lv: 2,
+      t: { TraitA: 1, TraitB: 1 },
+      tc: { TraitA: 2, TraitB: 4 },
+      e: ['TFT_Item_EmblemA'],
+      eh: ['TFT_UnitB'],
+      u: ['TFT_UnitB', 'TFT_UnitC'],
+    }),
+  })
+  const target: LoadedRecord[] = []
+  // +2 の方を多くして、混ぜたときに UnitA のカバレッジが閾値を割るようにする。
+  // どちらの組も GRANTER_MIN_RECORDS を超えるようにする。
+  for (let i = 0; i < GRANTER_MIN_RECORDS + 20; i++) target.push(plusOne(`A${i}`))
+  for (let i = 0; i < (GRANTER_MIN_RECORDS + 20) * 3; i++) target.push(plusTwo(`B${i}`))
+
+  const { out } = buildStats(target, sd, {
+    targetPatch: '16.12',
+    tftPatch: '17.5',
+    generatedAt: 'FIXED_TS',
+  })
+  const traitB = out.traits.findIndex((t) => t.api === 'TraitB')
+  const unitA = out.units.findIndex((u) => u.api === 'TFT_UnitA')
+  const unitB = out.units.findIndex((u) => u.api === 'TFT_UnitB')
+  const forB = out.granters!.filter(([, t]) => t === traitB).sort((a, b) => (a[2] ?? 0) - (b[2] ?? 0))
+  // +1 は UnitA（3件すべてに同席）、+2 は UnitB（UnitA は1件も居ない）。
+  assert.deepEqual(forB, [
+    [unitA, traitB, 1],
+    [unitB, traitB, 2],
+  ])
 })
 
 test('buildStats: 上乗せのシェアが GRANT_MIN_SHARE 未満なら出力しない', () => {
