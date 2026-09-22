@@ -78,6 +78,7 @@
   --lane-w: calc(var(--unit-size) + 4px);
   --lane-item: 15px; /* 列に収まるアイテムアイコン（3個で1列に収まる大きさ） */
   --lane-head: 30px; /* 列見出しの顔 */
+  --lane-star: 10px; /* 列に収まる星（3つで1列に収まる大きさ） */
   --ember-rail: 3px; /* 灯バーの幅 */
   --radius: 10px;
   --radius-sm: 6px;
@@ -111,6 +112,7 @@
     --unit-size: 30px;
     --unit-holder: 36px;
     --lane-head: 24px;
+    --lane-star: 8px;
     --ember-rail: 4px;
   }
 }

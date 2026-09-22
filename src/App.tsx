@@ -4,6 +4,7 @@ import { t, type Lang } from './lib/i18n'
 import { loadStats, remapSelection, DEFAULT_STATS_FILE, ALL_PATCHES_KEY } from './lib/data'
 import { maxEmblemMultiplicity } from './lib/multiset'
 import { DIM_SAMPLE_MAX } from './lib/format'
+import { EmblemDock } from './components/EmblemDock'
 import { EmblemGrid } from './components/EmblemGrid'
 import { SelectionBar } from './components/SelectionBar'
 import { CompList } from './components/CompList'
@@ -42,6 +43,8 @@ function App() {
     return saved === 'ja' || saved === 'en' ? saved : 'ja'
   })
   const [size, setSize] = useState<SizeKey>('all')
+  // モバイルの紋章シート。ドックの帯から1タップで選べるので、既定は閉じたまま。
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [bronzeMode, setBronzeMode] = useState(false)
 
   useEffect(() => {
@@ -336,7 +339,8 @@ function App() {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-[360px] shrink-0 overflow-y-auto border-r border-line bg-surface/40 p-4">
+        {/* デスクトップのレール。モバイルは下の EmblemDock（ドック＋シート）に置き換わる。 */}
+        <aside className="hidden w-[360px] shrink-0 overflow-y-auto border-r border-line bg-surface/40 p-4 md:block">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase tracking-wide text-faint">
               {t(lang, 'emblems')}
@@ -382,6 +386,19 @@ function App() {
           />
         </main>
       </div>
+
+      {/* モバイルの紋章選択面。48rem 以上では CSS 側で消える。 */}
+      <EmblemDock
+        emblems={stats.emblems}
+        counts={counts}
+        lang={lang}
+        onAdd={addEmblem}
+        onRemove={removeEmblem}
+        onClear={clear}
+        baseItemIcons={stats.baseItemIcons}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+      />
 
       {/* Riot の Legal Jibber Jabber。ポリシー上「プレイヤーが見つけやすい場所」への掲示が必須。 */}
       <footer className="shrink-0 border-t border-line bg-surface px-4 py-1.5 sm:px-5 sm:py-2">

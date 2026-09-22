@@ -49,12 +49,7 @@ export function LaneUnit({ stats, lane, use, comp, holders, lang }: LaneUnitProp
 
   return (
     <div className={`flex flex-col items-center gap-0.5 ${pick ? 'lane--pick' : ''}`}>
-      {/* 星は列の幅からはみ出させない。はみ出すと隣の列と繋がって帯に見え、列そろえが壊れる。 */}
-      <div
-        className={`h-3 w-full overflow-hidden text-center text-[10px] leading-none tracking-tighter ${starColor(star)}`}
-      >
-        {star > 0 ? '★'.repeat(star) : ''}
-      </div>
+      <div className={`lane__star ${starColor(star)}`}>{star > 0 ? '★'.repeat(star) : ''}</div>
       <div className="relative">
         <Tip label={star > 0 ? `${unitName} ★${star}` : unitName}>
           <img

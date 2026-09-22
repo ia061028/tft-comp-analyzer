@@ -100,8 +100,12 @@ export function DerivRow({
         dim ? 'opacity-55 hover:opacity-100' : ''
       }`}
     >
-      {/* 列そろえの盤面。共通駒は縦にそろい、変わるのは帯を敷いた「選ぶ枠」の列だけ。 */}
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      {/*
+       * 列そろえの盤面。共通駒は縦にそろい、変わるのは帯を敷いた「選ぶ枠」の列だけ。
+       * 狭い画面では盤面に1行まるごと使う（順位と率は下に回す）。列をそろえる以上、
+       * 盤面の幅を削ると駒が潰れて読めなくなるので、そちらを優先する。
+       */}
+      <div className="flex w-full min-w-0 flex-col gap-1.5 md:w-auto md:flex-1">
         {/* 1段目: 列そろえの盤面と、この行が活用している紋章 */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="lanes" style={{ '--lane-n': lanes.length } as CSSProperties}>

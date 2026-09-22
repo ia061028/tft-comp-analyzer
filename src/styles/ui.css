@@ -1064,6 +1064,20 @@
   .lane__mark--none {
     background: transparent;
   }
+  /*
+   * 星は列の幅からはみ出させない。はみ出すと隣の列と繋がって一本の帯に見え、
+   * 列そろえそのものが壊れて読めなくなる。狭い画面では字も一段小さくする。
+   */
+  .lane__star {
+    width: 100%;
+    height: 0.75rem;
+    overflow: hidden;
+    text-align: center;
+    font-size: var(--lane-star);
+    line-height: 1;
+    letter-spacing: -0.05em;
+  }
+
   /* アイテムは必ず3個ぶんが1列に収まる幅にする（欄が広いときだけ --lane-item で頭打ち）。 */
   .lane__item {
     width: calc((100% - 2px) / 3);
