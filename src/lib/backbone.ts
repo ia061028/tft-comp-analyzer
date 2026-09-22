@@ -9,9 +9,17 @@
 // 8体 → 9体 を「改善」として見せてはいけない（9体まで生き残れた人の成績なだけ）。
 // **比較可能なのは同じ体数の兄弟だけ。**
 
-import type { CompStats, EmblemInfo, TraitInfo, UnitInfo } from '../../shared/types'
+import type { CompStats, EmblemInfo, TraitGranter, TraitInfo, UnitInfo } from '../../shared/types'
 import type { CompRow } from './multiset'
-import { activeTier, activeTraitCounts, bronzeTraitCount, holderMap } from './format'
+import {
+  GRANT_APPLY_SHARE,
+  activeTier,
+  activeTraitCounts,
+  bronzeTraitCount,
+  effectiveUnits,
+  grantsByUnit,
+  holderMap,
+} from './format'
 
 /** ツリー化の対象は上位N行だけ。全行だと系統が40個に割れ、クラスタリングも 600ms 超で実用外。 */
 export const TOP_N = 20
@@ -181,23 +189,36 @@ function spanOf(xs: number[]): Span {
 }
 
 /**
- * コアだけで発動している特性（コアユニットの所持特性 ＋ 活用紋章の付与分）。
+ * コアだけで発動している特性（コアユニットの所持特性 ＋ 活用紋章の付与分 ＋ 上乗せ特性）。
  * 派生の「伸びる特性」は、これを基準にした差分として出す。
+ *
+ * 上乗せ（ラックスの選択特性等）は**付与元がコアに居るぶんだけ**足す。ここで足さないと、
+ * コアにも派生にも同じ駒が居るのに派生側だけ数が増え、「この駒を足すと伸びる」に
+ * 出てはいけない特性が出る。
  */
 function coreTraitCounts(
   backbone: number[],
-  used: number[],
+  best: Row,
   units: UnitInfo[],
   emblems: EmblemInfo[],
+  granters: TraitGranter[],
 ): Map<number, number> {
   const counts = new Map<number, number>()
   for (const ui of backbone) {
     for (const ti of units[ui]?.traits ?? []) counts.set(ti, (counts.get(ti) ?? 0) + 1)
   }
-  for (const ei of used) {
+  for (const ei of best.row.used) {
     const ti = emblems[ei]?.trait
     if (ti == null) continue
     counts.set(ti, (counts.get(ti) ?? 0) + 1)
+  }
+  const bset = new Set(backbone)
+  for (const [ui, grants] of grantsByUnit(best.comp, granters)) {
+    if (!bset.has(ui)) continue
+    for (const g of grants) {
+      if (g.share < GRANT_APPLY_SHARE) continue
+      counts.set(g.trait, (counts.get(g.trait) ?? 0) + g.delta)
+    }
   }
   return counts
 }
@@ -235,6 +256,7 @@ export function buildTree(
   units: UnitInfo[] = [],
   emblems: EmblemInfo[] = [],
   traits: TraitInfo[] = [],
+  granters: TraitGranter[] = [],
 ): Tree {
   const head = sorted.slice(0, TOP_N)
   if (head.length < MIN_FAMILY) return { families: [], flat: sorted }
@@ -257,7 +279,7 @@ export function buildTree(
     const bset = new Set(backbone)
 
     // コアだけの発動特性。系統の最良行が使う紋章を前提にする（紋章は系統内で共通）。
-    const coreCounts = coreTraitCounts(backbone, members[0].row.used, units, emblems)
+    const coreCounts = coreTraitCounts(backbone, members[0], units, emblems, granters)
 
     const derivs: Deriv[] = []
     const dropped: number[] = []
@@ -291,7 +313,7 @@ export function buildTree(
     // 平均順位の幅が「構成の差」ではなく生存バイアスそのものになってしまう。
     const byUnits = new Map<number, Deriv[]>()
     for (const d of derivs) {
-      const k = d.comp.units.length
+      const k = effectiveUnits(d.comp)
       if (!byUnits.has(k)) byUnits.set(k, [])
       byUnits.get(k)!.push(d)
     }

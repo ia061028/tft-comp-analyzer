@@ -12,6 +12,11 @@ import {
   PRIOR_TOP4,
   PRIOR_PLACE,
   PRIOR_WEIGHT,
+  GRANT_APPLY_SHARE,
+  appliedGrants,
+  effectiveUnits,
+  grantsByUnit,
+  cohortPlace,
 } from './format'
 
 // trait idx: 0=Brawler型(複数ティア), 1=固有(単一ティア), 2=Space Groove型(minUnits=1だが複数ティア)
@@ -61,7 +66,7 @@ const emblems: EmblemInfo[] = [
   { api: 'e0', name: 'e0', nameJa: 'e0', trait: 0, icon: '', base: 'none' }, // → Brawler
   { api: 'e1', name: 'e1', nameJa: 'e1', trait: 2, icon: '', base: 'none' }, // → SpaceGroove
 ]
-const comp: CompStats = { units: [0, 1], n: 1, unitStars: [], unitItems: [], holders: [], sigs: [] }
+const comp: CompStats = { units: [0, 1], n: 1, unitStars: [], unitItems: [], holders: [], sigs: [], grants: [], slotExtra: 0 }
 
 test('activeTraitCounts: 盤面の所持特性を集計', () => {
   const c = activeTraitCounts(comp, [], units, emblems)
@@ -146,4 +151,86 @@ test('SAMPLE_TONE: 全ての段に配色がある', () => {
 test('薄く描く上限は最下段に収まる（淡い行が「十分」段に混ざらない）', () => {
   assert.equal(sampleLevel(DIM_SAMPLE_MAX), 1)
   assert.ok(sampleLevel(DIM_SAMPLE_MAX) < sampleLevel(LOW_SAMPLE))
+})
+
+// ---- 静的データ外の上乗せ特性（ラックス/カ＝ジックス/エルダードラゴン型） ----
+
+/** comp に上乗せ特性を付けたコピー。 */
+const withGrants = (grants: CompStats['grants'], slotExtra = 0): CompStats => ({
+  ...comp,
+  grants,
+  slotExtra,
+})
+
+test('activeTraitCounts: 過半の上乗せは発動数に足す', () => {
+  // 盤面は Brawler 2。上乗せで Brawler +2（ラックス型）。
+  const c = activeTraitCounts(
+    withGrants([{ trait: 0, delta: 2, n: 8, share: 0.8 }]),
+    [],
+    units,
+    emblems,
+  )
+  assert.equal(c.get(0), 4)
+})
+
+test('activeTraitCounts: 過半に満たない上乗せは発動数に足さない', () => {
+  const c = activeTraitCounts(
+    withGrants([{ trait: 0, delta: 2, n: 3, share: 0.3 }]),
+    [],
+    units,
+    emblems,
+  )
+  assert.equal(c.get(0), 2) // 盤面ぶんだけ
+})
+
+test('appliedGrants: しきい値ちょうどは採用する', () => {
+  const grants = [
+    { trait: 0, delta: 1, n: 5, share: GRANT_APPLY_SHARE },
+    { trait: 1, delta: 1, n: 4, share: GRANT_APPLY_SHARE - 0.01 },
+  ]
+  assert.deepEqual(
+    appliedGrants(withGrants(grants)).map((g) => g.trait),
+    [0],
+  )
+})
+
+test('grantsByUnit: 付与元が盤面に居る上乗せだけを振り分ける', () => {
+  const grants = [
+    { trait: 0, delta: 2, n: 8, share: 0.8 }, // 付与元 u0（盤面に居る）
+    { trait: 1, delta: 1, n: 6, share: 0.6 }, // 付与元 u9（盤面に居ない）
+    { trait: 2, delta: 1, n: 6, share: 0.6 }, // 付与元の推定なし
+  ]
+  const byUnit = grantsByUnit(withGrants(grants), [
+    [0, 0],
+    [9, 1],
+  ])
+  assert.deepEqual([...byUnit.keys()], [0])
+  assert.deepEqual(byUnit.get(0)!.map((g) => g.trait), [0])
+})
+
+test('grantsByUnit: 同じユニットの複数の上乗せは share 降順', () => {
+  const grants = [
+    { trait: 1, delta: 1, n: 3, share: 0.3 },
+    { trait: 0, delta: 1, n: 9, share: 0.9 },
+  ]
+  const byUnit = grantsByUnit(withGrants(grants), [
+    [0, 0],
+    [0, 1],
+  ])
+  assert.deepEqual(byUnit.get(0)!.map((g) => g.trait), [0, 1])
+})
+
+test('effectiveUnits: 複数枠ユニットのぶんだけ盤面サイズが増える', () => {
+  assert.equal(effectiveUnits(comp), 2)
+  assert.equal(effectiveUnits(withGrants([], 1)), 3)
+})
+
+test('cohortPlace: コホートは実効盤面サイズで切る', () => {
+  const sig = (n: number, p: number) => ({ e: [], n, top4: 0, win: 0, p })
+  // 同じ2体でも、1体で2枠使う構成は3枠コホートに入る。
+  const plain: CompStats = { ...comp, sigs: [sig(10, 50)] }
+  const twoSlot: CompStats = { ...comp, sigs: [sig(10, 20)], slotExtra: 1 }
+  const cohort = cohortPlace([plain, twoSlot])
+  assert.equal(cohort.get(2), 5)
+  assert.equal(cohort.get(3), 2)
 })

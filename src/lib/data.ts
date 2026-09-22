@@ -1,4 +1,12 @@
-import type { StatsFile, WireStatsFile, WireComp, CompStats, EmblemSig, PatchIndexEntry } from '../../shared/types'
+import type {
+  StatsFile,
+  WireStatsFile,
+  WireComp,
+  CompStats,
+  EmblemSig,
+  PatchIndexEntry,
+  TraitGrant,
+} from '../../shared/types'
 
 /** フロントが最初に読む既定ビューのファイル名（集計側の既定パッチ）。 */
 export const DEFAULT_STATS_FILE = 'stats.json'
@@ -8,6 +16,15 @@ export const ALL_PATCHES_KEY = 'all'
 
 function decodeComp(c: WireComp): CompStats {
   const sigs: EmblemSig[] = c.g.map(([e, n, top4, win, p]) => ({ e, n, top4, win, p }))
+  // share の分母は「上乗せを逆算できたレコード数」だが、オンディスクでは持たない。
+  // 逆算できないのは tc を持たない旧レコードだけで実データでは 1% 未満なので、
+  // 構成の総レコード数で割る（share がわずかに小さめに出るだけで順序は変わらない）。
+  const grants: TraitGrant[] = (c.x ?? []).map(([trait, delta, n]) => ({
+    trait,
+    delta,
+    n,
+    share: c.n > 0 ? n / c.n : 0,
+  }))
   return {
     units: c.u,
     n: c.n,
@@ -15,6 +32,8 @@ function decodeComp(c: WireComp): CompStats {
     unitItems: c.i ?? [],
     holders: c.h ?? [],
     sigs,
+    grants,
+    slotExtra: c.s ?? 0,
   }
 }
 
@@ -41,6 +60,7 @@ function decodeStats(w: WireStatsFile, file: string): StatsFile {
     units: w.units,
     items: w.items,
     comps: w.comps.map(decodeComp),
+    granters: w.granters ?? [],
     baseItemIcons: w.baseItemIcons,
     patches: decodePatches(w, file),
   }

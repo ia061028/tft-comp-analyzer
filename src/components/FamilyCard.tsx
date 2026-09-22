@@ -1,10 +1,18 @@
 import type { StatsFile } from '../../shared/types'
 import type { Family, Span } from '../lib/backbone'
-import { activeTier, costBorder, starColor, styleClasses, DIM_SAMPLE_MAX } from '../lib/format'
+import {
+  DIM_SAMPLE_MAX,
+  activeTier,
+  costBorder,
+  grantsByUnit,
+  starColor,
+  styleClasses,
+} from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { DerivRow } from './DerivRow'
 import { RecipeLabel } from './RecipeLabel'
 import { Tip } from './Tip'
+import { GrantBadges } from './GrantBadges'
 
 interface FamilyCardProps {
   stats: StatsFile
@@ -24,10 +32,12 @@ interface FamilyCardProps {
  * 比較が正当なのは**同じ体数の兄弟の間だけ**。
  */
 export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: FamilyCardProps) {
-  const { traits, units, emblems, items } = stats
+  const { traits, units, emblems, items, granters } = stats
   const { backbone, holders, traitCount, used, groups } = family
   // コアユニットのスター・アイテムは系統の最良行のものを代表値として使う。
   const bestComp = groups.flatMap((g) => g.derivs).reduce((a, b) => (a.rank <= b.rank ? a : b)).comp
+  // 上乗せ特性の付与元（unitIdx → その駒が持ち込む特性）。コアの駒にだけ出る。
+  const unitGrants = grantsByUnit(bestComp, granters)
 
   // 紋章由来の特性は、この系統を選ぶ理由そのものなので先頭に出して金リングで区別する。
   const emblemTraits = new Set(
@@ -91,6 +101,7 @@ export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: Family
               .map((ui) => items?.[ui[1]])
               .filter(Boolean)
             const held = (holders.get(unitIdx) ?? []).map((ei) => emblems[ei]).filter(Boolean)
+            const grants = unitGrants.get(unitIdx) ?? []
 
             return (
               <div key={unitIdx} className="flex w-[50px] flex-col items-center gap-0.5">
@@ -111,6 +122,7 @@ export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: Family
                       }
                     />
                   </Tip>
+                  <GrantBadges grants={grants} traits={traits} lang={lang} size={19} />
                   {held.length > 0 && (
                     <div className="absolute -right-1.5 -top-1.5 z-10 flex gap-0.5">
                       {held.map((e, j) => (
