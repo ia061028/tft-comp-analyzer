@@ -51,6 +51,7 @@ export function activeTraitCounts(
   used: number[],
   units: UnitInfo[],
   emblems: EmblemInfo[],
+  granters: TraitGranter[] = [],
 ): Map<number, number> {
   const counts = new Map<number, number>()
   for (const ui of comp.units) {
@@ -64,15 +65,28 @@ export function activeTraitCounts(
   }
   // 静的データに出ない上乗せ（ラックスの選択特性2体分・カ＝ジックスの進化・
   // エルダードラゴンのリフトビースト2体分）。実レコードからの逆算。
-  for (const g of appliedGrants(comp)) {
+  for (const g of appliedGrants(comp, granters)) {
     counts.set(g.trait, (counts.get(g.trait) ?? 0) + g.delta)
   }
   return counts
 }
 
-/** 発動数に反映する上乗せ（過半のレコードでその選択だったもの）。 */
-export function appliedGrants(comp: CompStats): TraitGrant[] {
-  return (comp.grants ?? []).filter((g) => g.share >= GRANT_APPLY_SHARE)
+/**
+ * 発動数に反映する上乗せ。
+ *
+ * 1. 過半のレコードでその選択だったもの（`GRANT_APPLY_SHARE`）。
+ * 2. 付与元ユニットが分かっているなら、そのユニットの**最頻の選択**は過半に届かなくても足す。
+ *
+ * 2 が要るのは、ラックスのように「N 択から1つ」の機構は構成の中で選択が割れるから。
+ * 実データで ブラックソーン 43% / エルダーウッド 21% / ルナー 18% と割れた構成では
+ * 過半の条件だけだと何も足されず、ラックスが盤面に居るのに特性が1つも伸びない盤面になる。
+ * IPPEI の決定は「構成キーは分けず、最頻の選択を表示する」なので最頻を採る。
+ * カ＝ジックスのように複数同時に取れる機構は、最頻以外も 1 の条件で個別に足される。
+ */
+export function appliedGrants(comp: CompStats, granters: TraitGranter[] = []): TraitGrant[] {
+  const top = new Set<TraitGrant>()
+  for (const list of grantsByUnit(comp, granters).values()) if (list[0]) top.add(list[0])
+  return (comp.grants ?? []).filter((g) => g.share >= GRANT_APPLY_SHARE || top.has(g))
 }
 
 /**
@@ -93,18 +107,37 @@ export interface GrantSource {
 /**
  * 上乗せ特性を「伸ばされた特性」から引く（traitIdx → 付与元ユニットと上乗せ）。
  *
- * 発動特性チップに「この数はこの駒のおかげ」を出すためのもの。付与元を推定できなかった
- * 上乗せは入らない（発動数は正しいまま、付与元の表示だけが落ちる）。
+ * 発動特性チップに「この数はこの駒のおかげ」を出すためのもの。**発動数に足したものだけ**
+ * 入れる（顔が出ている＝その数に入っている、を崩さない）。付与元を推定できなかった
+ * 上乗せも入らない（発動数は正しいまま、付与元の表示だけが落ちる）。
  */
 export function granterOfTrait(
   comp: CompStats,
   granters: TraitGranter[],
 ): Map<number, GrantSource> {
+  const applied = new Set(appliedGrants(comp, granters))
   const out = new Map<number, GrantSource>()
   for (const [unit, list] of grantsByUnit(comp, granters)) {
-    for (const grant of list) out.set(grant.trait, { unit, grant })
+    for (const grant of list) if (applied.has(grant)) out.set(grant.trait, { unit, grant })
   }
   return out
+}
+
+/**
+ * 駒の吹き出しに足す「この駒の選択の割れ方」。ブラックソーン 43% / エルダーウッド 21% のように、
+ * 数に入れなかった選択もここで見える（データを隠さない）。上乗せが無ければ空文字。
+ */
+export function grantChoicesTip(grants: TraitGrant[], traits: TraitInfo[], lang: Lang): string {
+  if (grants.length === 0) return ''
+  return (
+    ' · ' +
+    grants
+      .map((g) => {
+        const t = traits[g.trait]
+        return `${t ? pickName(lang, t) : `#${g.trait}`} +${g.delta} ${Math.round(g.share * 100)}%`
+      })
+      .join(' / ')
+  )
 }
 
 /** チップの吹き出しに足す「誰が何体分ぶん伸ばしたか」。付与元が無ければ空文字。 */
