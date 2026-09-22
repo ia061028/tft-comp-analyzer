@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { StatsFile } from '../../shared/types'
 import type { Family, Span } from '../lib/backbone'
-import { costBorder, DIM_SAMPLE_MAX } from '../lib/format'
+import { DIM_SAMPLE_MAX } from '../lib/format'
 import { pickName, t, type Lang } from '../lib/i18n'
 import { DerivRow } from './DerivRow'
 import { RecipeLabel } from './RecipeLabel'
@@ -17,11 +17,11 @@ interface FamilyCardProps {
 }
 
 /**
- * 1系統 ＝ 列見出し（1回だけ）＋ 体数グループ。
+ * 1系統 ＝ 体数グループの束。
  *
  * 列は系統ぜんぶで共通で、1列＝1ユニット。どの派生も同じ横位置に同じ駒が来るので、
- * 共通駒は縦にそろい、目が動くのは「選ぶ枠」の列だけになる。ユニットの名前はこの見出しが
- * 1回だけ名乗り、各行は駒そのものに集中する。
+ * 共通駒は縦にそろい、目が動くのは「選ぶ枠」の列だけになる。列が誰かは駒の顔が語るので、
+ * 見出しで名前を並べたりはしない（21列まで伸びると潰れて読めないうえ、縦も食う）。
  *
  * **見出しはアイテムも紋章の装備者も主張しない。** 同じ系統でも派生によって装備者そのものが
  * 変わる（実データで確認済み）ので、代表値を置くと嘘になる。それらは行ごとに描く。
@@ -31,7 +31,7 @@ interface FamilyCardProps {
  * 親→子の関係として見せると最も誤解を招く。比較が正当なのは**同じ体数の兄弟の間だけ**。
  */
 export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: FamilyCardProps) {
-  const { units, emblems } = stats
+  const { emblems } = stats
   const { used, groups, lanes } = family
   const laneVars = { '--lane-n': lanes.length } as CSSProperties
 
@@ -39,60 +39,39 @@ export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: Family
   // カードの縁で切られて読めなくなる。角丸は子側で処理する。
   return (
     <div className="rounded-xl border border-line bg-surface">
-      {/* ───── 列見出し: 1列＝1ユニット。この系統のどの行でもこの並びで駒が立つ ───── */}
-      <div className="rounded-t-xl border-b-2 border-line bg-gradient-to-b from-gold/[0.06] to-black/20 px-4 py-3">
-        {used.length > 0 && (
-          <div className="mb-2 flex items-center justify-end gap-1.5">
-            {used.map((ei, i) => {
-              const e = emblems[ei]
-              if (!e) return null
-              return (
-                <Tip key={i} label={<RecipeLabel label={pickName(lang, e)} recipe={e.recipe} />}>
-                  <span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line-strong bg-surface-2 pl-1 pr-2 text-[11px] font-medium text-muted">
-                    <img
-                      src={e.icon}
-                      alt=""
-                      loading="lazy"
-                      className="h-[17px] w-[17px] rounded bg-base object-contain ring-1 ring-gold"
-                    />
-                    {pickName(lang, e)}
-                  </span>
-                </Tip>
-              )
-            })}
-          </div>
-        )}
-
-        <div className="lanes" style={laneVars}>
-          {lanes.map((lane) => {
-            const unit = units[lane.unitIdx]
-            if (!unit) return <div key={lane.unitIdx} />
-            const unitName = pickName(lang, unit)
+      {/*
+       * 列の見出し（ユニットの顔と名前）は置かない。21列まで伸びると名前は「リ..」「カ..」まで
+       * 潰れて読めず、縦も食うだけだった。駒は顔で分かるので、名前はツールチップに任せる。
+       * 使っている紋章も、複数を積む系統のときだけ出す（1枚なら上の選択バーと同じことを言う）。
+       */}
+      {used.length > 1 && (
+        <div className="flex items-center justify-end gap-1.5 rounded-t-xl border-b border-line bg-gradient-to-b from-gold/[0.06] to-black/20 px-4 py-2">
+          {used.map((ei, i) => {
+            const e = emblems[ei]
+            if (!e) return null
             return (
-              <div key={lane.unitIdx} className="flex flex-col items-center gap-1">
-                <Tip label={unitName}>
+              <Tip key={i} label={<RecipeLabel label={pickName(lang, e)} recipe={e.recipe} />}>
+                <span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line-strong bg-surface-2 pl-1 pr-2 text-[11px] font-medium text-muted">
                   <img
-                    src={unit.icon}
-                    alt={unitName}
+                    src={e.icon}
+                    alt=""
                     loading="lazy"
-                    className={`lane__head rounded-md border object-cover ${costBorder(unit.cost)}`}
+                    className="h-[17px] w-[17px] rounded bg-base object-contain ring-1 ring-gold"
                   />
-                </Tip>
-                <span className="w-full truncate text-center text-[9px] leading-none text-muted">
-                  {unitName}
+                  {pickName(lang, e)}
                 </span>
-              </div>
+              </Tip>
             )
           })}
         </div>
-      </div>
+      )}
 
       {/* ───── 体数グループ。常に開いた状態で出す（畳まない） ───── */}
       {groups.map((g) => (
         <div key={g.units}>
           <div
             title={t(lang, 'compareWithin')}
-            className="flex w-full items-center gap-x-3 gap-y-1 border-t border-line bg-black/20 px-4 pb-1.5 pt-2.5 text-left"
+            className="flex w-full items-center gap-x-3 gap-y-1 rounded-t-xl border-t border-line bg-black/20 px-4 pb-1.5 pt-2.5 text-left first:border-t-0"
           >
             <span className="w-[52px] shrink-0 text-[15px] font-extrabold text-ink">
               {t(lang, 'unitsGroup', { n: g.units })}

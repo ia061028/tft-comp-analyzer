@@ -21,7 +21,7 @@ interface LaneUnitProps {
  *
  * **アイテムも紋章の装備者も、必ずこの行のものを描く。** 同じ系統でも派生によって
  * 装備者そのものが変わる（実データで確認済み）ので、系統の見出しで代表させると嘘になる。
- * ユニットの名前は列見出しが出すので、ここでは出さない。
+ * ユニットの名前は出さない（21列まで伸びると潰れて読めない）。名前はツールチップで拾う。
  */
 export function LaneUnit({ stats, lane, use, comp, holders, lang }: LaneUnitProps) {
   const { units, emblems, items } = stats
@@ -48,9 +48,10 @@ export function LaneUnit({ stats, lane, use, comp, holders, lang }: LaneUnitProp
   const held = (holders.get(lane.unitIdx) ?? []).map((ei) => emblems[ei]).filter(Boolean)
 
   return (
-    <div className={`flex flex-col items-center gap-0.5 ${pick ? 'lane--pick' : ''}`}>
+    <div className={`flex min-w-0 flex-col items-center gap-0.5 ${pick ? 'lane--pick' : ''}`}>
       <div className={`lane__star ${starColor(star)}`}>{star > 0 ? '★'.repeat(star) : ''}</div>
-      <div className="relative">
+      {/* w-full が要る。auto 幅だと画像の固有幅が親を広げ、狭い画面で列からはみ出す。 */}
+      <div className="relative flex w-full justify-center">
         <Tip label={star > 0 ? `${unitName} ★${star}` : unitName}>
           <img
             src={unit.icon}
