@@ -12,6 +12,8 @@ interface EmblemDockProps {
   onRemove: (index: number) => void
   onClear: () => void
   baseItemIcons?: { spatula: string; fryingPan: string }
+  /** 紋章ごとの最大同時活用枚数。超えた選択はタイルの個数バッジを銅にして知らせる。 */
+  maxMult?: number[]
   /** シートが開いているか（状態は App が持つ）。 */
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -34,6 +36,7 @@ export function EmblemDock({
   onRemove,
   onClear,
   baseItemIcons,
+  maxMult,
   open,
   onOpenChange,
 }: EmblemDockProps) {
@@ -143,6 +146,7 @@ export function EmblemDock({
                 onAdd={onAdd}
                 onRemove={onRemove}
                 baseItemIcons={baseItemIcons}
+                maxMult={maxMult}
               />
             </div>
           </div>

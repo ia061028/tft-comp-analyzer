@@ -33,6 +33,14 @@ interface DerivRowProps {
   showEmblems: boolean
   /** 採用数が薄い行を淡く描く（「少数を薄く」ON のとき）。消さずに弱めるだけ。 */
   dim?: boolean
+  /** 「活用紋章 n/k」を出すか。分母は `total`。1枚しか選んでいなければ常に 1/1 なので出さない。 */
+  showUtilization?: boolean
+  /** 選択紋章の総数（活用度の分母）。 */
+  total?: number
+  /** 生涯ブロンズモード: ブロンズ数を出す（並べ替えの第1キーなので数字を見せる）。 */
+  bronzeMode?: boolean
+  /** 特性ラダーモード: 発動特性の種類数を出す（並べ替えの第1キーなので数字を見せる）。 */
+  ladderMode?: boolean
   lang: Lang
 }
 
@@ -54,6 +62,10 @@ export function DerivRow({
   cohort,
   showEmblems,
   dim,
+  showUtilization,
+  total = 0,
+  bronzeMode,
+  ladderMode,
   lang,
 }: DerivRowProps) {
   const { traits, units, emblems } = stats
@@ -208,7 +220,7 @@ export function DerivRow({
       </span>
 
       {/* Top4 / 1位 / 採用 */}
-      <div className="w-[86px] shrink-0 text-[11px] leading-tight">
+      <div className="w-[96px] shrink-0 text-[11px] leading-tight">
         <div className="text-faint">
           {t(lang, 'metricTop4')} <b className="text-ink tabular-nums">{top4Rate.toFixed(1)}%</b>
         </div>
@@ -219,6 +231,28 @@ export function DerivRow({
         <div className="flex items-center gap-1 text-faint">
           {t(lang, 'metricSample')} <SampleMeter n={row.n} lang={lang} />
         </div>
+        {/*
+         * 並べ替えの第1キーになっている数（活用度・ラダー・ブロンズ）だけを足す。
+         * 同じ 11px の行に積むので、モードを切り替えても行の言語は変わらない。
+         */}
+        {showUtilization && (
+          <div className="text-faint" title={t(lang, 'utilizationTitle')}>
+            {t(lang, 'utilizationLabel')}{' '}
+            <b className="text-ink tabular-nums">
+              {row.match}/{total}
+            </b>
+          </div>
+        )}
+        {ladderMode && (
+          <div className="text-faint">
+            {t(lang, 'ladderMode')} <b className="text-gold tabular-nums">{deriv.active}</b>
+          </div>
+        )}
+        {bronzeMode && (
+          <div className="text-faint">
+            {t(lang, 'bronzeMode')} <b className="text-bronze tabular-nums">{deriv.bronze}</b>
+          </div>
+        )}
       </div>
 
       <button

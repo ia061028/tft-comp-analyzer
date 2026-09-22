@@ -14,13 +14,19 @@ interface EmblemGridProps {
   onRemove: (index: number) => void
   /** 合成素材アイテムアイコン（カテゴリヘッダ用） */
   baseItemIcons?: { spatula: string; fryingPan: string }
+  /**
+   * 紋章ごとの「データ上1レコードで同時活用された最大枚数」。これを超えて選んだ紋章は
+   * 個数バッジを銅にして知らせる。以前は一覧の上に選択紋章の帯を置いて警告していたが、
+   * 帯そのものが不要になったので、選択が見えている場所＝タイル側で示す。
+   */
+  maxMult?: number[]
 }
 
 type EmblemBase = 'spatula' | 'fryingpan' | 'none'
 
 const GROUPS: EmblemBase[] = ['spatula', 'fryingpan', 'none']
 
-export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIcons }: EmblemGridProps) {
+export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIcons, maxMult }: EmblemGridProps) {
   const indexed = emblems.map((emblem, i) => ({ emblem, i }))
 
   return (
@@ -55,6 +61,8 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                 const selected = count > 0
                 const label = pickName(lang, emblem)
                 const ariaLabel = selected ? `${label} ${count}` : label
+                // データ上そこまで同時に活用された試合が無い枚数。消さずに色で知らせる。
+                const over = selected && count > (maxMult?.[i] ?? Infinity)
 
                 return (
                   <Tip
@@ -92,7 +100,12 @@ export function EmblemGrid({ emblems, counts, lang, onAdd, onRemove, baseItemIco
                         className={`h-12 w-12 object-contain transition-opacity ${selected ? '' : 'opacity-85 group-hover:opacity-100'}`}
                       />
                       {selected && (
-                        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-xs font-black text-base shadow-md ring-2 ring-surface">
+                        <span
+                          title={over ? t(lang, 'overCapWarn', { n: count, max: maxMult?.[i] ?? 0 }) : undefined}
+                          className={`absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-black text-base shadow-md ring-2 ring-surface ${
+                            over ? 'bg-bronze' : 'bg-gold'
+                          }`}
+                        >
                           {count}
                         </span>
                       )}

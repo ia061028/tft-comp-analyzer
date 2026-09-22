@@ -14,8 +14,10 @@ import {
   shrunk,
 } from '../lib/format'
 import { TOP_N, buildTree } from '../lib/backbone'
+import type { Deriv, GroupLane, Row } from '../lib/backbone'
 import { t, type Lang } from '../lib/i18n'
-import { CompCard, type SortKey } from './CompCard'
+import type { SortKey } from '../lib/format'
+import { DerivRow } from './DerivRow'
 import { FamilyCard } from './FamilyCard'
 
 interface CompListProps {
@@ -31,6 +33,14 @@ interface CompListProps {
   bronzeMode: boolean
   /** 特性ラダーモード: 発動している特性の種類数の多い順にまとめ、その中を Tier 順に並べる。 */
   ladderMode: boolean
+  /**
+   * 採用数の下限。これに満たない行は一覧から外す。
+   *
+   * 既定は 1 ＝**何も外れない**。かつてここは既定 5 で、紋章を2枚以上使う構成をほぼ全部
+   * 消していた（18.2b で2枚使う行 14,121 件のうち 76% が採用数1）。既定で隠さないまま、
+   * 絞りたい人が自分で上げられるようにするための下限。
+   */
+  minN: number
 }
 
 /**
@@ -42,17 +52,6 @@ interface CompListProps {
  */
 export const PAGE_SIZE = 50
 
-type Row = {
-  comp: CompStats
-  row: CompRow
-  /** 発動特性数（盤面所持 ＋ 活用紋章の付与分）。CompCard と共有し二重計算を避ける。 */
-  traitCount: Map<number, number>
-  /** 生涯ブロンズ数。CompCard と共有し二重計算を避ける。 */
-  bronze: number
-  /** 発動特性の種類数（固有特性込み）。CompCard と共有し二重計算を避ける。 */
-  active: number
-}
-
 export function CompList({
   stats,
   comps,
@@ -62,6 +61,7 @@ export function CompList({
   lang,
   bronzeMode,
   ladderMode,
+  minN,
 }: CompListProps) {
   const { units, emblems, traits, granters } = stats
 
@@ -79,13 +79,15 @@ export function CompList({
     const out: Row[] = []
     for (const comp of comps) {
       for (const row of compRows(comp, sel)) {
+        // 下限は特性やブロンズを数える前に効かせる（外す行の計算をしない）。
+        if (row.n < minN) continue
         const traitCount = activeTraitCounts(comp, row.used, units, emblems, granters)
         const bronze = bronzeTraitCount(traitCount, traits)
         out.push({ comp, row, traitCount, bronze, active: activeTraitTotal(traitCount, traits) })
       }
     }
     return out
-  }, [comps, sel, units, emblems, traits, granters])
+  }, [comps, sel, units, emblems, traits, granters, minN])
 
   // 同体数コホートの平均順位。Tier バッジの色と、Tier順ソートの両方の基準にする。
   // 絶対値で切ると 10体グループが全部 S になり、色も順位も情報を運ばなくなる。
@@ -99,7 +101,7 @@ export function CompList({
   //
   // 'place'（＝Tier）は**同体数コホートからの差**で測る。素の平均順位で並べると体数の多い順に
   // なるだけで（実測 7体=5.28 … 10体=1.76）、「10体まで揃えろ」以上のことを言わない一覧になる。
-  // カード（CompCard）も派生行（DerivRow）も Tier バッジは同じ基準（tierOfEdge）で描くので、
+  // 系統の行も単独の行も、平均順位の色は同じ基準（tierOfEdge）で描くので、
   // これで表示と並び順が一致する。cohort はその両方に渡す。
   //
   // 率は縮約値で比較する（生の率だと採用5件の 80% が採用500件の 62% より上に来る）。
@@ -184,7 +186,7 @@ export function CompList({
   // セクションごとのフルカード表示件数。選択・並び順・対象構成が変わったら先頭に戻す。
   // リセット用の useEffect を置くと1フレームだけ古い件数で描いてしまうので、
   // 基準キーを state に同梱して読み出し時に比較する。
-  const pageKey = `${sel.join(',')}|${sortKey}|${bronzeMode}|${ladderMode}|${comps.length}`
+  const pageKey = `${sel.join(',')}|${sortKey}|${bronzeMode}|${ladderMode}|${minN}|${comps.length}`
   const [page, setPage] = useState<{ key: string; shown: Record<string, number> }>({
     key: pageKey,
     shown: {},
@@ -213,7 +215,7 @@ export function CompList({
   }
 
   if (sorted.length === 0) {
-    // 下限を撤廃したので、ここに来るのは選択紋章を活用した試合が1件も無いときだけ。
+    // 既定（下限 1）で来るのは、選択紋章を活用した試合が1件も無いときだけ。
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-line bg-surface/40 px-4 py-10 text-center text-sm text-muted">
         {t(lang, 'noComps')}
@@ -269,13 +271,25 @@ export function CompList({
                     family={family}
                     cohort={cohort}
                     dimLowSample={dimLowSample}
+                    showUtilization={sel.length > 1}
+                    total={sel.length}
+                    bronzeMode={bronzeMode}
+                    ladderMode={ladderMode}
                     lang={lang}
                   />
                 ))}
               </div>
             )}
 
-            {/* 背骨が取れなかった行と、上位N件から外れた行。従来のフルカードで描く。 */}
+            {/*
+             * 背骨が取れなかった行と、上位N件から外れた行。
+             *
+             * **系統の派生行とまったく同じ行で描く。** 以前はここだけ大きなカード
+             * （左にティアバッジと大きな平均順位）だったので、1つの一覧に2種類の構成表示が
+             * 混ざり、同じものを見ているのに読み方を切り替えさせられていた。
+             * 列そろえは系統の中でしか意味がないので、単独の行は自分の盤面をそのまま並べる
+             * （＝全列が固定枠）。見た目の言語は共通のまま。
+             */}
             {visible.length > 0 && (
               <div className="flex flex-col gap-2">
                 {tree.families.length > 0 && (
@@ -283,26 +297,25 @@ export function CompList({
                     {t(lang, 'otherComps', { n: tree.flat.length })}
                   </div>
                 )}
-                {/* 同一盤面でも紋章の使われ方（row.used）が違えば別カード。キーに両方を含める。 */}
-                {visible.map(({ comp, row, traitCount, bronze, active }) => (
-                  <CompCard
-                    key={`${comp.units.join(',')}|${row.used.join(',')}`}
-                    stats={stats}
-                    comp={comp}
-                    row={row}
-                    total={sel.length}
-                    traitCount={traitCount}
-                    bronze={bronze}
-                    active={active}
-                    cohort={cohort}
-                    sortKey={sortKey}
-                    lang={lang}
-                    bronzeMode={bronzeMode}
-                    ladderMode={ladderMode}
-                    showUtilization={sel.length > 1}
-                    dim={dimLowSample && row.n <= DIM_SAMPLE_MAX}
-                  />
-                ))}
+                {/* 同一盤面でも紋章の使われ方（row.used）が違えば別行。キーに両方を含める。 */}
+                <div className="rounded-xl border border-line bg-surface [&>*:first-child]:border-t-0">
+                  {visible.map((r) => (
+                    <DerivRow
+                      key={`${r.comp.units.join(',')}|${r.row.used.join(',')}`}
+                      stats={stats}
+                      deriv={soloDeriv(r)}
+                      lanes={soloLanes(r)}
+                      cohort={cohort}
+                      showEmblems={sel.length > 1}
+                      dim={dimLowSample && r.row.n <= DIM_SAMPLE_MAX}
+                      showUtilization={sel.length > 1}
+                      total={sel.length}
+                      bronzeMode={bronzeMode}
+                      ladderMode={ladderMode}
+                      lang={lang}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -320,4 +333,20 @@ export function CompList({
       })}
     </div>
   )
+}
+
+/**
+ * 系統に属さない1行を、派生行と同じ形で描くための詰め物。
+ *
+ * 列そろえは「同じ体数の兄弟を縦にそろえる」ためのものなので、単独の行では意味がない。
+ * 全列を固定枠にして自分の盤面をそのまま並べる（`fixed` が非 null なので「選ぶ枠」の帯も
+ * 出ない）。コアが無いので差分（adds/removes）も伸びた特性（synergy）も空で、DerivRow 側は
+ * 「伸びた特性が1つも無い行」として全チップを等しく描く。
+ */
+function soloDeriv(r: Row): Deriv {
+  return { ...r, adds: [], removes: [], synergy: [], rank: 0, slots: r.comp.units }
+}
+
+function soloLanes(r: Row): GroupLane[] {
+  return r.comp.units.map((unitIdx) => ({ fixed: unitIdx }))
 }

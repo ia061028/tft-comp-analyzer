@@ -6,10 +6,9 @@ import { maxEmblemMultiplicity } from './lib/multiset'
 import { DIM_SAMPLE_MAX, effectiveUnits } from './lib/format'
 import { EmblemDock } from './components/EmblemDock'
 import { EmblemGrid } from './components/EmblemGrid'
-import { SelectionBar } from './components/SelectionBar'
 import { CompList } from './components/CompList'
 import { SegmentedControl } from './components/SegmentedControl'
-import type { SortKey } from './components/CompCard'
+import type { SortKey } from './lib/format'
 
 type SizeKey = 'all' | '7' | '8' | '9' | '10'
 type LoadState =
@@ -52,6 +51,8 @@ function App() {
   // 特性ラダー（ゲーム内機構）用: 発動している特性の種類数でまとめる。生涯ブロンズとは
   // 数える対象が違うだけの近い軸なので、同時に ON にしても意味がない。片方を押すと他方は切る。
   const [ladderMode, setLadderMode] = useState(false)
+  // 採用数の下限。既定は 1 ＝ 何も外れない。絞りたいときだけ自分で上げる。
+  const [minN, setMinN] = useState(1)
 
   useEffect(() => {
     let cancelled = false
@@ -115,8 +116,8 @@ function App() {
       : statsOrNull.comps.filter((c) => effectiveUnits(c) === Number(size))
   }, [statsOrNull, size])
 
-  // 紋章ごとの「データ上1レコードで同時活用された最大枚数」。選択枚数がこれを超えたら
-  // SelectionBar で警告する（構成全体が対象。ユニット数フィルタの影響を受けない）。
+  // 紋章ごとの「データ上1レコードで同時活用された最大枚数」。選択枚数がこれを超えた紋章は
+  // タイルの個数バッジを銅にして知らせる（構成全体が対象。ユニット数フィルタの影響を受けない）。
   const maxMult = useMemo(
     () => (statsOrNull ? maxEmblemMultiplicity(statsOrNull.comps, statsOrNull.emblems.length) : []),
     [statsOrNull],
@@ -208,6 +209,8 @@ function App() {
     patchOptions.find((o) => o.key === shownPatchFile)?.label,
     size === 'all' ? t(lang, 'all') : t(lang, 'unitsGroup', { n: Number(size) }),
     { place: t(lang, 'sortTier'), win: t(lang, 'sortWin'), top4: t(lang, 'sortTop4'), adopt: t(lang, 'sortAdopt') }[sortKey],
+    // 下限は既定の 1 なら何も外していないので、畳んだ帯には出さない。
+    minN > 1 ? `${t(lang, 'minSample')} ${minN}` : null,
   ].filter(Boolean) as string[]
 
   return (
@@ -399,15 +402,42 @@ function App() {
           </button>
 
           {/*
-           * 「少数を薄く」。以前はここが「採用数下限」の入力欄で、既定の 5 が複数紋章の構成を
-           * ほぼ全部消していた。行は常に全部出し、薄いものを淡くするかどうかだけを選ばせる。
+           * 採用数の下限。**既定は 1 なので何も外れない。** かつてここは既定 5 で、紋章を
+           * 2枚以上使う構成をほぼ全部消していた（それが撤廃の理由）。既定で隠さないまま、
+           * 絞りたい人だけが自分で上げられる形に戻す。
+           */}
+          <div className="ml-auto flex items-center gap-2 text-sm">
+            <label
+              htmlFor="min-n"
+              title={t(lang, 'minSampleTitle')}
+              className="cursor-help text-xs font-semibold uppercase tracking-wide text-faint"
+            >
+              {t(lang, 'minSample')}
+            </label>
+            <input
+              id="min-n"
+              type="number"
+              min={1}
+              step={1}
+              value={minN}
+              onChange={(e) => {
+                const v = Math.floor(Number(e.target.value))
+                setMinN(Number.isFinite(v) && v >= 1 ? v : 1)
+              }}
+              className="w-16 rounded-md border border-line bg-surface-2 px-2 py-1 text-sm font-semibold text-ink tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+            />
+          </div>
+
+          {/*
+           * 「少数を薄く」。下限で消す代わりに、薄い行を淡くするだけの弱い手段。
+           * 下限とは役割が違うので両方置く（下限は外す、こちらは残して弱める）。
            */}
           <button
             type="button"
             aria-pressed={dimLowSample}
             onClick={() => setDimLowSample((d) => !d)}
             title={t(lang, 'dimLowSampleTitle', { n: DIM_SAMPLE_MAX })}
-            className={`ml-auto inline-flex items-center gap-1.5 rounded-md border bg-surface-2 px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+            className={`inline-flex items-center gap-1.5 rounded-md border bg-surface-2 px-3 py-1 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
               dimLowSample
                 ? 'border-line-strong text-ink'
                 : 'border-line text-faint hover:border-line-strong hover:text-muted'
@@ -447,18 +477,11 @@ function App() {
             onAdd={addEmblem}
             onRemove={removeEmblem}
             baseItemIcons={stats.baseItemIcons}
+            maxMult={maxMult}
           />
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          <SelectionBar
-            emblems={stats.emblems}
-            counts={counts}
-            lang={lang}
-            onClear={clear}
-            onRemove={removeEmblem}
-            maxMult={maxMult}
-          />
           <CompList
             stats={stats}
             comps={selectedComps}
@@ -468,6 +491,7 @@ function App() {
             lang={lang}
             bronzeMode={bronzeMode}
             ladderMode={ladderMode}
+            minN={minN}
           />
         </main>
       </div>
@@ -481,6 +505,7 @@ function App() {
         onRemove={removeEmblem}
         onClear={clear}
         baseItemIcons={stats.baseItemIcons}
+        maxMult={maxMult}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
       />

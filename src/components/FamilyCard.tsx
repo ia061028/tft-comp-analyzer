@@ -11,6 +11,12 @@ interface FamilyCardProps {
   cohort: Map<number, number>
   /** 採用数が薄い派生行を淡く描く（「少数を薄く」ON のとき）。消さずに弱めるだけ。 */
   dimLowSample: boolean
+  /** 「活用紋章 n/k」を出すか。 */
+  showUtilization?: boolean
+  /** 選択紋章の総数（活用度の分母）。 */
+  total?: number
+  bronzeMode?: boolean
+  ladderMode?: boolean
   lang: Lang
 }
 
@@ -31,7 +37,17 @@ interface FamilyCardProps {
  * 「9体まで生き残れた人の成績」なので（平均順位は実質ユニット数を測っている）、
  * 親→子の関係として見せると最も誤解を招く。比較が正当なのは**同じ体数の兄弟の間だけ**。
  */
-export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: FamilyCardProps) {
+export function FamilyCard({
+  stats,
+  family,
+  cohort,
+  dimLowSample,
+  showUtilization,
+  total,
+  bronzeMode,
+  ladderMode,
+  lang,
+}: FamilyCardProps) {
   const { groups } = family
 
   // overflow-hidden は使わない。角丸のためにクリップすると、ユニット上のツールチップが
@@ -50,22 +66,13 @@ export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: Family
             </span>
 
             {/*
-             * このグループの中央値。**同じ体数の中だけ**で集計しているので、数字が歪まない。
-             * 系統全体で集計すると 7体〜10体が混ざり、生存バイアスそのものを見ることになる。
-             *
-             * 派生が1件のグループでは、この要約は真下の行とまったく同じ数字になるので出さない。
-             * 幅（最小〜最大）も出さない。読む数字が倍になるわりに、行を1つずつ見れば分かる。
-             * 狭い画面では要約ごと出さない。同じ指標名が1枚のカードに3回出てうるさく、
-             * 中央値は真下に並ぶ行そのものから読める。
+             * **グループの要約値は出さない。** 平均順位・Top4率・1位率の中央値を横に並べて
+             * いたが、3つは**それぞれ別の行から**選ばれるので、どの構成にも存在しない数字の
+             * 組み合わせが見出しに立つ（実データの 8枠9件で 平均順位 2.33 は3行目・
+             * Top4率 91.5% は1行目・1位率 36.4% は9行目から来ていた）。行ごとの数字と
+             * 同じ名前で並ぶので、読み手には「集計が合っていない」としか見えない。
+             * 真下に並ぶ行がその数字そのものなので、見出しは「何枠のグループか」だけを言う。
              */}
-            {g.derivs.length > 1 && (
-              <span className="hidden flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-faint tabular-nums md:flex">
-                {span(t(lang, 'avgPlace'), g.place.median, (x) => x.toFixed(2))}
-                {span(t(lang, 'metricTop4'), g.top4.median, pct)}
-                {span(t(lang, 'metricWin'), g.win.median, pct)}
-              </span>
-            )}
-
             <span className="ml-auto shrink-0 text-[11px] text-faint tabular-nums">
               {t(lang, 'derivCount', { n: g.derivs.length })}
             </span>
@@ -96,6 +103,10 @@ export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: Family
               cohort={cohort}
               showEmblems={family.mixedEmblems}
               dim={dimLowSample && d.row.n <= DIM_SAMPLE_MAX}
+              showUtilization={showUtilization}
+              total={total}
+              bronzeMode={bronzeMode}
+              ladderMode={ladderMode}
               lang={lang}
             />
           ))}
@@ -104,15 +115,4 @@ export function FamilyCard({ stats, family, cohort, dimLowSample, lang }: Family
     </div>
   )
 
-  /** 「Top4率 96.4」。ラベルは淡く、値だけを立てる。 */
-  function span(label: string, value: number, fmt: (x: number) => string) {
-    return (
-      <span key={label} className="inline-flex items-baseline gap-1">
-        <span className="text-faint">{label}</span>
-        <b className="text-[12px] font-bold text-ink">{fmt(value)}</b>
-      </span>
-    )
-  }
 }
-
-const pct = (x: number) => `${x.toFixed(1)}%`
