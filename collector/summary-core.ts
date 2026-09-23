@@ -8,9 +8,9 @@ import type { StaticData } from './cdragon.ts'
 import type { EmblemInfo, ParticipantRecord, TraitInfo, WireRecordStat, WireSummaryView } from '../shared/types.ts'
 import { classifyEmblems, tierOfCount } from './aggregate-core.ts'
 
-const emptyStat = (): WireRecordStat => [0, 0, 0, 0, 0]
+export const emptyStat = (): WireRecordStat => [0, 0, 0, 0, 0]
 
-function addStat(s: WireRecordStat, rec: ParticipantRecord): void {
+export function addStat(s: WireRecordStat, rec: ParticipantRecord): void {
   s[0]++
   s[1] += rec.p
   if (rec.p <= 4) s[2]++
@@ -21,6 +21,50 @@ function addStat(s: WireRecordStat, rec: ParticipantRecord): void {
 /** 紋章が段の計算に使った特性（変種トレイトを持つ紋章は rec.t に載っている方）。 */
 function emblemTraitOf(rec: ParticipantRecord, traitApis: readonly string[]): string | undefined {
   return traitApis.find((a) => a in rec.t)
+}
+
+/** 1人の発動特性1つぶん。段の下限体数と、その特性の紋章との関係。 */
+export interface TraitTierEntry {
+  api: string
+  min: number
+  /** with = その特性の紋章が段を上げている / without = その特性の紋章を装備していない / null = 装備したが余り */
+  split: 'with' | 'without' | null
+}
+
+/**
+ * `rec.tc`（発動数）から、発動している特性ごとの段と紋章の有無を引く。統計の表と掘り下げの共通部品。
+ * `tc` を持たない旧レコードは段が分からないので空。
+ */
+export function traitTierEntries(
+  rec: ParticipantRecord,
+  staticData: StaticData,
+  activeEmblemApis: ReadonlySet<string>,
+): TraitTierEntry[] {
+  const tc = rec.tc
+  if (!tc) return []
+  // 特性 → その特性の紋章を装備しているか / 活用しているか
+  const equipped = new Set<string>()
+  const used = new Set<string>()
+  for (const raw of rec.e) {
+    const api = staticData.emblemAliases.get(raw) ?? raw
+    const emb = staticData.emblems.get(api)
+    if (!emb) continue
+    for (const t of emb.traitApis) equipped.add(t)
+    if (activeEmblemApis.has(api)) {
+      const t = emblemTraitOf(rec, emb.traitApis)
+      if (t !== undefined) used.add(t)
+    }
+  }
+  const out: TraitTierEntry[] = []
+  for (const t of Object.keys(rec.t)) {
+    const info = staticData.traits.get(t)
+    const count = tc[t]
+    if (!info || count === undefined) continue
+    const tier = tierOfCount(info.tiers, count)
+    if (tier === 0) continue
+    out.push({ api: t, min: info.tiers[tier - 1][0], split: used.has(t) ? 'with' : equipped.has(t) ? null : 'without' })
+  }
+  return out
 }
 
 export interface SummaryBuilder {
@@ -58,35 +102,13 @@ export function createSummaryBuilder(staticData: StaticData): SummaryBuilder {
         addStat(s, rec)
       }
 
-      const tc = rec.tc
-      if (!tc) return
-      // 特性 → その特性の紋章を装備しているか / 活用しているか
-      const equipped = new Set<string>()
-      const used = new Set<string>()
-      for (const raw of rec.e) {
-        const api = staticData.emblemAliases.get(raw) ?? raw
-        const emb = staticData.emblems.get(api)
-        if (!emb) continue
-        for (const t of emb.traitApis) equipped.add(t)
-        if (activeEmblemApis.has(api)) {
-          const t = emblemTraitOf(rec, emb.traitApis)
-          if (t !== undefined) used.add(t)
-        }
-      }
-      for (const t of Object.keys(rec.t)) {
-        const ti = traitIdx.get(t)
-        const count = tc[t]
-        if (ti === undefined || count === undefined) continue
-        const tiers = staticData.traits.get(t)!.tiers
-        const tier = tierOfCount(tiers, count)
-        if (tier === 0) continue
-        const min = tiers[tier - 1][0]
-        const key = `${ti}|${min}`
+      for (const e of traitTierEntries(rec, staticData, activeEmblemApis)) {
+        const key = `${traitIdx.get(e.api)}|${e.min}`
         let row = traits.get(key)
-        if (!row) traits.set(key, (row = [ti, min, emptyStat(), emptyStat(), emptyStat()]))
+        if (!row) traits.set(key, (row = [traitIdx.get(e.api)!, e.min, emptyStat(), emptyStat(), emptyStat()]))
         addStat(row[2], rec)
-        if (used.has(t)) addStat(row[3], rec)
-        else if (!equipped.has(t)) addStat(row[4], rec)
+        if (e.split === 'with') addStat(row[3], rec)
+        else if (e.split === 'without') addStat(row[4], rec)
       }
     },
     finish() {

@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url'
 import { config, KNOWN_ROUTES } from './config.ts'
 import { compareVersions, resolvePatch, planPatchViews, retentionFloor } from './patches.ts'
 import { getStaticData, type StaticData } from './cdragon.ts'
-import type { ParticipantRecord, WireStatsFile, WireSummaryFile, PatchIndexEntry } from '../shared/types.ts'
+import type { ParticipantRecord, WireDrillFile, WireStatsFile, WireSummaryFile, PatchIndexEntry } from '../shared/types.ts'
 import {
   classifyRecord,
   createStatsBuilder,
@@ -36,6 +36,7 @@ import {
 } from './aggregate-core.ts'
 import { listRouteShards, forEachRecord } from './shards.ts'
 import { createSummaryBuilder, summaryDictionaries, type SummaryBuilder } from './summary-core.ts'
+import { createDrillBuilder, type DrillBuilder } from './drill-core.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(here, '..')
@@ -45,6 +46,9 @@ const DEFAULT_FILE = 'stats.json'
 const SUMMARY_FILE = 'summary.json'
 /** パッチビューのファイル名。既定ビューは stats.json、それ以外は stats-{key}.json。 */
 const VIEW_FILE_RE = /^stats-[^/\\]+\.json$/
+/** 統計ページの掘り下げ（ビューごと、特性行を押したときに読む） */
+const DRILL_FILE_RE = /^drill-[^/\\]+\.json$/
+const drillFileName = (key: string): string => `drill-${key}.json`
 
 function viewFileName(key: string, defaultKey: string): string {
   return key === defaultKey ? DEFAULT_FILE : `stats-${key}.json`
@@ -62,10 +66,10 @@ function tftLabelOf(patch: string): string | undefined {
  * 集計は純関数で、出力は generatedAt を除き入力レコードのみに決定的に依存する。
  * 一致すれば書き換えをスキップし、generatedAt だけが変わる無意味な main コミット/デプロイを防ぐ。
  */
-function isUnchanged(path: string, out: WireStatsFile | WireSummaryFile): boolean {
+function isUnchanged(path: string, out: WireStatsFile | WireSummaryFile | WireDrillFile): boolean {
   if (!existsSync(path)) return false
   try {
-    const prev = JSON.parse(readFileSync(path, 'utf8')) as WireStatsFile | WireSummaryFile
+    const prev = JSON.parse(readFileSync(path, 'utf8')) as WireStatsFile | WireSummaryFile | WireDrillFile
     return JSON.stringify({ ...prev, generatedAt: '' }) === JSON.stringify({ ...out, generatedAt: '' })
   } catch {
     // 既存ファイルが壊れている等でパース不能なら比較を諦め、通常どおり書き直す。
@@ -238,13 +242,20 @@ async function main(): Promise<void> {
   const viewBuilders: { key: string; file: string; builder: StatsBuilder }[] = []
   const summariesByPatch = new Map<string, SummaryBuilder[]>()
   const summaryBuilders: { key: string; label: string; builder: SummaryBuilder }[] = []
+  const drillsByPatch = new Map<string, DrillBuilder[]>()
+  const drillBuilders: { key: string; builder: DrillBuilder }[] = []
   for (const view of views) {
     const summary = createSummaryBuilder(staticData)
     summaryBuilders.push({ key: view.key, label: viewLabel(view.patches), builder: summary })
+    const drill = createDrillBuilder(staticData)
+    drillBuilders.push({ key: view.key, builder: drill })
     for (const p of view.patches) {
       const list = summariesByPatch.get(p) ?? []
       list.push(summary)
       summariesByPatch.set(p, list)
+      const dl = drillsByPatch.get(p) ?? []
+      dl.push(drill)
+      drillsByPatch.set(p, dl)
     }
 
     const idxs = view.patches.map((p) => patchIdx.get(p)!).filter((i) => i !== undefined)
@@ -275,6 +286,7 @@ async function main(): Promise<void> {
     const patch = resolvePatch(rec.v, rec.ts, schedule)
     if (!inScope(rec, patch)) return
     for (const s of summariesByPatch.get(patch) ?? []) s.add(rec)
+    for (const d of drillsByPatch.get(patch) ?? []) d.add(rec)
     const bs = buildersByPatch.get(patch)
     if (!bs) return
     for (const b of bs) b.add(rec, route)
@@ -317,6 +329,15 @@ async function main(): Promise<void> {
     )
   }
 
+  const drillOuts = drillBuilders.map(({ key, builder }) => ({ file: drillFileName(key), out: builder.finish(key, generatedAt) }))
+  for (const { file, out } of drillOuts) {
+    const body = JSON.stringify(out)
+    console.log(
+      `[${out.key}] 掘り下げ: 特性×段 ${out.rows.length} 行 / 駒 ${out.units.length} → ${file} ` +
+        `(${(Buffer.byteLength(body) / 1024).toFixed(1)} KB, gzip ${(gzipSync(body).length / 1024).toFixed(1)} KB)`,
+    )
+  }
+
   // 9. 書き出し。実質差分のないファイルは触らず、今回のビューに無い旧 stats-*.json は消す。
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })
   const written: string[] = []
@@ -327,6 +348,14 @@ async function main(): Promise<void> {
     writeFileSync(summaryPath, JSON.stringify(summaryOut))
     written.push(SUMMARY_FILE)
   }
+  for (const { file, out } of drillOuts) {
+    const path = join(OUT_DIR, file)
+    if (isUnchanged(path, out)) skipped.push(file)
+    else {
+      writeFileSync(path, JSON.stringify(out))
+      written.push(file)
+    }
+  }
   for (const { file, out } of outputs) {
     const path = join(OUT_DIR, file)
     if (isUnchanged(path, out)) {
@@ -336,10 +365,10 @@ async function main(): Promise<void> {
     writeFileSync(path, serializeStatsFile(out))
     written.push(file)
   }
-  const current = new Set(outputs.map((o) => o.file))
+  const current = new Set([...outputs.map((o) => o.file), ...drillOuts.map((o) => o.file)])
   const removed: string[] = []
   for (const f of readdirSync(OUT_DIR)) {
-    if (VIEW_FILE_RE.test(f) && !current.has(f)) {
+    if ((VIEW_FILE_RE.test(f) || DRILL_FILE_RE.test(f)) && !current.has(f)) {
       unlinkSync(join(OUT_DIR, f))
       removed.push(f)
     }
