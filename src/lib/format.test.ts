@@ -18,6 +18,7 @@ import {
   grantsByUnit,
   granterOfTrait,
   cohortPlace,
+  buildPlannerCode,
 } from './format'
 
 // trait idx: 0=Brawler型(複数ティア), 1=固有(単一ティア), 2=Space Groove型(minUnits=1だが複数ティア)
@@ -334,4 +335,55 @@ test('grantsByUnit: delta を持たない旧ファイルはトレイトだけで
   const grants = [{ trait: 0, delta: 2, n: 8, share: 0.8 }]
   const byUnit = grantsByUnit(withGrants(grants), [[0, 0]])
   assert.deepEqual(byUnit.get(0)!.map((g) => g.trait), [0])
+})
+
+// チームプランナーの貼付コード。期待値は 2026-09-23 にセット18のクライアントへ貼って正しく出たもの。
+const plannerUnit = (api: string, cost: number, code: number): UnitInfo => ({
+  api, name: api, nameJa: api, cost, icon: '', code, traits: [],
+})
+const plannerUnits: UnitInfo[] = [
+  plannerUnit('Ahri', 4, 1001), // 0
+  plannerUnit('Varus', 1, 1077), // 1
+  plannerUnit('Diana', 3, 1018), // 2
+  plannerUnit('KogMaw', 3, 1038), // 3
+  plannerUnit('Vi', 3, 1079), // 4
+  plannerUnit('Amumu', 4, 1005), // 5
+  plannerUnit('Aphelios', 4, 1007), // 6
+  plannerUnit('Nidalee', 4, 1051), // 7
+  plannerUnit('Sentinel', 4, 1064), // 8
+  plannerUnit('Lux', 5, 1029), // 9
+  plannerUnit('Draven', 5, 1019), // 10
+  plannerUnit('ElderDragon', 5, 1020), // 11
+  plannerUnit('Ivern', 5, 1028), // 12
+  plannerUnit('Kennen', 5, 1035), // 13
+  plannerUnit('Maokai', 5, 1045), // 14
+  plannerUnit('Taric', 5, 1072), // 15
+  plannerUnit('LuxInferno', 5, 0), // 16 プランナー定義に無い変種
+]
+
+test('buildPlannerCode: クライアントで確認済みのコードと一致する', () => {
+  assert.equal(buildPlannerCode([0], plannerUnits, 18), '023e9000000000000000000000000000TFTSet18')
+  assert.equal(
+    buildPlannerCode([1, 2, 3, 4, 5, 6, 7, 8], plannerUnits, 18),
+    '024353fa40e4373ed3ef41b428000000TFTSet18',
+  )
+  assert.equal(
+    buildPlannerCode([1, 2, 3, 4, 5, 6, 7, 8, 9], plannerUnits, 18),
+    '024353fa40e4373ed3ef41b428405000TFTSet18',
+  )
+  assert.equal(
+    buildPlannerCode([5, 8, 10, 11, 12, 13, 14, 15], plannerUnits, 18),
+    '023ed4283fb3fc40440b415430000000TFTSet18',
+  )
+})
+
+test('buildPlannerCode: code の無い駒は飛ばして詰める', () => {
+  assert.equal(buildPlannerCode([16, 0], plannerUnits, 18), buildPlannerCode([0], plannerUnits, 18))
+})
+
+test('buildPlannerCode: 10体を超える盤面は安い駒から落とし、並びは保つ', () => {
+  // 1コスト(Varus)と3コスト(Diana)が落ちる
+  const code = buildPlannerCode([1, 2, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15], plannerUnits, 18)
+  assert.equal(code, buildPlannerCode([5, 6, 7, 8, 10, 11, 12, 13, 14, 15], plannerUnits, 18))
+  assert.equal(code.length, 2 + 30 + 'TFTSet18'.length)
 })
