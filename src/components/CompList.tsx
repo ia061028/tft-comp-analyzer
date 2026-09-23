@@ -222,7 +222,9 @@ export function CompList({
           <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
           <path d="m9 12 2 2 4-4" />
         </svg>
-        {t(lang, 'selectEmblemHintLeft')}
+        {/* 紋章を選ぶ場所は幅で変わる（デスクトップは左のレール、モバイルは下のドック）。 */}
+        <span className="md:hidden">{t(lang, 'selectEmblemHintBottom')}</span>
+        <span className="hidden md:inline">{t(lang, 'selectEmblemHintLeft')}</span>
       </div>
     )
   }
