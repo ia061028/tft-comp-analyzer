@@ -139,8 +139,13 @@ export interface CompStats {
   unitItems: [number, number, number][]
   /** 各紋章を最も多く装備したユニット [emblemIdx, unitIdx, count]（発動ゲート済み）。 */
   holders: [number, number, number][]
-  /** 紋章活用シグネチャ群。 */
+  /** 紋章活用シグネチャ群。紋章を使わない人気盤面では空。 */
   sigs: EmblemSig[]
+  /**
+   * 紋章の有無を問わない全レコードの成績（n は comp.n）。紋章を選ばずチャンピオンだけで
+   * 絞るときの行になる。schemaVersion 6 以前のファイルには無い。
+   */
+  total?: { top4: number; win: number; p: number }
   /** 静的トレイト・紋章の外で加算されていた特性（share 降順）。 */
   grants: TraitGrant[]
   /**
@@ -156,6 +161,11 @@ export interface WireComp {
   /** units */
   u: number[]
   n: number
+  /**
+   * 紋章の有無を問わない全レコードの成績 [top4, win, p]（n はこの構成の n）。
+   * 紋章を選ばずチャンピオンだけで絞るときの行になる。schemaVersion 6 以前のファイルには無い。
+   */
+  a?: [number, number, number]
   /** unitStars（全0なら省略） */
   k?: number[]
   /** unitItems（空なら省略） */
@@ -204,7 +214,7 @@ export interface PatchIndexEntry {
 
 /** stats.json 全体のオンディスク圧縮形式。 */
 export interface WireStatsFile {
-  schemaVersion: 6
+  schemaVersion: 7
   generatedAt: string
   patch: string
   tftPatch: string

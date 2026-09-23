@@ -61,6 +61,17 @@ export function compRows(comp: CompStats, sel: number[]): CompRow[] {
 }
 
 /**
+ * 紋章を選ばずチャンピオンだけで絞るときの行。構成の全レコード（紋章の有無を問わない）を1行にする。
+ *
+ * 全レコードの成績を持たない旧ファイル（schemaVersion 6 以前）では行を作らない。
+ * sigs を足し合わせて代わりにすると「紋章を活用した試合」だけの成績になり、別物を同じ顔で出してしまう。
+ */
+export function totalRows(comp: CompStats): CompRow[] {
+  if (!comp.total) return []
+  return [{ used: [], match: 0, n: comp.n, ...comp.total }]
+}
+
+/**
  * 紋章 idx → 1レコード内で同時に活用された最大枚数（データ上の上限）。
  * 未活用の紋章は 0。選択枚数がこれを超えると、その枚数を活かせる構成はデータに存在しない。
  */

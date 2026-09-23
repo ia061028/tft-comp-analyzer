@@ -306,6 +306,16 @@ test('cohortPlace: コホートは実効盤面サイズで切る', () => {
   assert.equal(cohort.get(3), 2)
 })
 
+test('cohortPlace: total を指定すると全試合の成績で基準を取る', () => {
+  const sig = (n: number, p: number) => ({ e: [], n, top4: 0, win: 0, p })
+  // 紋章を活用した3試合は平均2位だが、全10試合では平均5位。
+  const c1: CompStats = { ...comp, n: 10, sigs: [sig(3, 6)], total: { top4: 4, win: 1, p: 50 } }
+  // 全試合の成績を持たない構成（旧ファイル）は total の基準に入れない。
+  const c2: CompStats = { ...comp, n: 10, sigs: [sig(10, 10)] }
+  assert.equal(cohortPlace([c1, c2]).get(2), 16 / 13)
+  assert.equal(cohortPlace([c1, c2], 'total').get(2), 5)
+})
+
 test('grantsByUnit: 付与元は上乗せ数まで一致したものだけ引く', () => {
   const grants = [
     { trait: 0, delta: 2, n: 8, share: 0.8 },

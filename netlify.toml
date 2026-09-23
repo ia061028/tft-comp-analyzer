@@ -1,0 +1,7 @@
+# Netlify は PR ごとのプレビュー（deploy-preview-NN）の確認にだけ使う。
+# 本番の公開先は Cloudflare Pages（https://tft-comp-analyzer.pages.dev/）。
+# netlify.app の本番に古い版が残らないよう、本番コンテキストのビルドだけ
+# 全パスを pages.dev へ転送する _redirects を書き出す。プレビューには付かない。
+[context.production]
+  publish = "dist"
+  command = "npm run build && printf '/*  https://tft-comp-analyzer.pages.dev/:splat  301!\\n' > dist/_redirects"

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { CompStats, EmblemSig } from '../../shared/types'
-import { compRows, maxEmblemMultiplicity } from './multiset'
+import { compRows, maxEmblemMultiplicity, totalRows } from './multiset'
 
 /** sigs だけ持つ最小の CompStats を作る（compRows は sigs のみ参照）。 */
 function comp(sigs: EmblemSig[]): CompStats {
@@ -92,4 +92,14 @@ test('maxEmblemMultiplicity: 1レコード内で同時活用された最大枚�
   assert.equal(max[3], 2)
   assert.equal(max[7], 1)
   assert.equal(max[0], 0) // 一度も活用されていない紋章
+})
+
+test('totalRows: 構成の全試合を紋章なしの1行にする', () => {
+  const withTotal: CompStats = { ...c, n: 30, total: { top4: 12, win: 3, p: 120 } }
+  assert.deepEqual(totalRows(withTotal), [{ used: [], match: 0, n: 30, top4: 12, win: 3, p: 120 }])
+})
+
+test('totalRows: 全試合の成績を持たない旧ファイルの構成は行にしない', () => {
+  // sigs を足して代わりにすると「紋章を活用した試合だけ」の成績になり、別物になる。
+  assert.deepEqual(totalRows(c), [])
 })

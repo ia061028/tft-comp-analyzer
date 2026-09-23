@@ -302,8 +302,10 @@ export interface AggregateDiag {
   excludedUnresolvedTrait: number
   /** accumulate した盤面グループ（構成キー）数。boardFilter で除外した盤面は含まない。 */
   boardGroupCount: number
-  /** n は足りていたが紋章シグネチャが1つも無く、出力から外した盤面数。 */
+  /** n は足りていたが紋章シグネチャが1つも無い盤面数（総レコード数の上位に入れば出力する）。 */
   noSigBoards: number
+  /** 紋章活用レコード数の上位には入らず、総レコード数の上位として足した盤面数。 */
+  popularAdded: number
   /** 未解決トレイト apiName 集合（該当レコード除外）。 */
   unresolvedTraitNames: Set<string>
   /** 未解決ユニット apiName 集合（該当ユニットのみ無視）。 */
@@ -375,6 +377,10 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
   interface CompAcc {
     unitApis: string[] // 盤面ユニット apiName（ソート済み・構成キー）
     n: number
+    // 紋章の有無を問わない全レコードの成績（チャンピオンだけで絞るときの行になる）
+    top4: number
+    win: number
+    p: number // 順位合計
     // 表示用（スターは件数 Map。レコード数に比例して伸びる配列を持たない）
     unitStarCounts: Map<string, Map<number, number>>
     itemCounts: Map<string, Map<string, number>>
@@ -424,6 +430,9 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       acc = {
         unitApis: boardApis,
         n: 0,
+        top4: 0,
+        win: 0,
+        p: 0,
         unitStarCounts: new Map(),
         itemCounts: new Map(),
         holderCounts: new Map(),
@@ -435,6 +444,9 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       map.set(boardKey, acc)
     }
     acc.n++
+    if (rec.p <= 4) acc.top4++
+    if (rec.p === 1) acc.win++
+    acc.p += rec.p
 
     // 追加盤面枠（エルダードラゴンのような複数枠ユニットの検出）。
     const slotExtra = slotExtraOf(rec, boardSet.size)
@@ -533,36 +545,40 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       return total
     }
 
-    // 出力対象は「総レコード n>=MIN_OUTPUT_N」かつ「紋章シグネチャを1つ以上持つ」盤面。
+    // 出力対象は「総レコード n>=MIN_OUTPUT_N」の盤面のうち、次の2つのランキングの**和集合**。
     //
-    // sigs が空の盤面はフロントに出しても**絶対に画面に現れない**: 構成一覧の行は
-    // compRows が sigs から作るので0行になり、ティアの基準（cohortPlace）も sigs しか
-    // 見ないため寄与0。実データでは出力構成の 8〜17% がこれで、上限枠とファイルサイズを
-    // そのぶん無駄にしていた。
+    // 1. **紋章を活用したレコード数**の上位 maxComps（紋章で探すとき用）。総レコード数で切ると、
+    //    紋章を使わない人気構成が上限枠を埋め、紋章を2枚以上使う構成が集まる小さい盤面から
+    //    先に落ちる（実データでは n=3〜4 の構成は 18.4% が紋章2枚以上、n>=200 では 5.5%）。
+    //    stats.json を上限 12,000 で切る実測で、紋章2枚以上の行の残存率は 86.7% → 96.8%。
+    // 2. **総レコード数**の上位 maxComps（紋章を選ばずチャンピオンだけで探すとき用）。
+    //    1 だけだと、紋章が一度も使われない人気盤面が丸ごと抜ける（18.2b の実測で 20試合以上の
+    //    盤面が 495 個、最大 386 試合）。チャンピオンで探したときに人気盤面が無いと結果を信用できない。
     //
-    // 並べ替えのキーは盤面の総レコード数ではなく**紋章を活用したレコード数**。総レコード数で
-    // 切ると、紋章を使わない人気構成が上限枠を埋め、紋章を2枚以上使う構成が集まる小さい盤面から
-    // 先に落ちる（実データでは n=3〜4 の構成は 18.4% が紋章2枚以上、n>=200 では 5.5%）。
-    // このツールが見せたいものと逆順に切っていたことになる。stats.json を上限 12,000 で切る
-    // 実測で、紋章2枚以上の行の残存率は 86.7% → 96.8%、最小 n は 4 → 3 になる。
-    // 同数は総レコード数降順 → 盤面キー昇順で決定的に決める。
+    // 1 を先に並べ、2 で増えた分をその後ろに付ける。18.2b の実測で 2万 → 約2.5万構成。
+    // 同数は（それぞれのキーの次に）総レコード数降順 → 盤面キー昇順で決定的に決める。
     let noSigBoards = 0
-    const selected: { key: string; acc: CompAcc; sigRecords: number }[] = []
+    const candidates: { key: string; acc: CompAcc; sigRecords: number }[] = []
     for (const [key, acc] of map) {
       if (acc.n < MIN_OUTPUT_N) continue
-      if (acc.sigs.size === 0) {
-        noSigBoards++
-        continue
-      }
-      selected.push({ key, acc, sigRecords: sigRecordsOf(acc) })
+      const sigRecords = sigRecordsOf(acc)
+      if (sigRecords === 0) noSigBoards++
+      candidates.push({ key, acc, sigRecords })
     }
-    selected.sort(
-      (a, b) =>
-        b.sigRecords - a.sigRecords ||
-        b.acc.n - a.acc.n ||
-        (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
-    )
-    const capped = opts.maxComps && opts.maxComps > 0 ? selected.slice(0, opts.maxComps) : selected
+    const byKey = (a: { key: string }, b: { key: string }) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+    const limit = opts.maxComps && opts.maxComps > 0 ? opts.maxComps : Infinity
+    const byEmblem = candidates
+      .filter((c) => c.sigRecords > 0)
+      .sort((a, b) => b.sigRecords - a.sigRecords || b.acc.n - a.acc.n || byKey(a, b))
+      .slice(0, limit)
+    const inEmblem = new Set(byEmblem.map((c) => c.key))
+    const byTotal = candidates
+      .slice()
+      .sort((a, b) => b.acc.n - a.acc.n || byKey(a, b))
+      .slice(0, limit)
+      .filter((c) => !inEmblem.has(c.key))
+    const capped = [...byEmblem, ...byTotal]
+    const popularAdded = byTotal.length
 
     const usedTraitApis = new Set<string>()
     const usedUnitApis = new Set<string>()
@@ -572,6 +588,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
     interface PreComp {
       unitApis: string[]
       n: number
+      total: [number, number, number] // [top4, win, p]
       unitStarByApi: Map<string, number>
       unitItems: [string, string, number][] // [unitApi, itemApi, count]
       holders: [string, string, number][] // [emblemApi, unitApi, count]
@@ -663,6 +680,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       preComps.push({
         unitApis: acc.unitApis,
         n: acc.n,
+        total: [acc.top4, acc.win, acc.p],
         unitStarByApi,
         unitItems,
         holders,
@@ -778,7 +796,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
         ])
         .sort((a, b) => b[2] - a[2] || a[0] - b[0])
 
-      const wire: WireComp = { u: unitIdxs, n: pc.n, g }
+      const wire: WireComp = { u: unitIdxs, n: pc.n, a: pc.total, g }
       if (unitStars.some((s) => s > 0)) wire.k = unitStars
       if (unitItems.length) wire.i = unitItems
       if (holders.length) wire.h = holders
@@ -787,7 +805,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       return wire
     }
 
-    // preComps は既に紋章活用レコード数の降順（同数は総レコード数 → 盤面キー）。
+    // preComps は紋章活用レコード数の上位 → 総レコード数の上位で足した分、の順。
     // フロントは一覧を自前で並べ替えるので、この順序は決定性のためだけのもの。
     const comps: WireComp[] = preComps.map(toWire)
 
@@ -818,7 +836,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
     granters.sort((a, b) => a[0] - b[0] || a[1] - b[1] || (a[2] ?? 0) - (b[2] ?? 0))
 
     const out: WireStatsFile = {
-      schemaVersion: 6,
+      schemaVersion: 7,
       generatedAt: opts.generatedAt,
       patch: opts.targetPatch,
       tftPatch: opts.tftPatch,
@@ -842,6 +860,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       excludedUnresolvedTrait,
       boardGroupCount: map.size,
       noSigBoards,
+      popularAdded,
       unresolvedTraitNames,
       unresolvedUnitNames,
       unresolvedEmblemNames,

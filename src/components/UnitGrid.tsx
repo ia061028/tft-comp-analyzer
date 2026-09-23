@@ -53,6 +53,15 @@ export function UnitTile({
       className={`utile ${mark === 'use' ? 'utile--use' : mark === 'avoid' ? 'utile--avoid' : ''}`}
     >
       <img src={unit.icon} alt="" loading="lazy" />
+      {/* 印は角のバッジで示す。紋章タイルの個数バッジと同じ位置・同じ形。
+          枠の色だけに頼ると、5コスト（金枠）の「使う」が見分けられない。 */}
+      {mark && (
+        <span className="utile__mark" aria-hidden>
+          <svg viewBox="0 0 10 10">
+            {mark === 'use' ? <path d="M2 5.2 4.1 7.3 8 3" /> : <path d="M2.8 2.8 7.2 7.2M7.2 2.8 2.8 7.2" />}
+          </svg>
+        </span>
+      )}
     </button>
   )
 }

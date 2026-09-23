@@ -1097,7 +1097,8 @@
   /* ===== チャンピオンのタイル =====
    * 紋章と同じレール／ドックに並べる、構成を駒で絞るためのタイル。
    * 枠はコスト色。押すたびに 印なし → 使う → 使わない → 印なし と回る。
-   * 使う＝手の内（金）で光らせ、使わない＝光を消して斜線を引く。どちらも文字では示さない。
+   * 印は角のバッジ（使う＝金の ✓、使わない＝灰の ✕）で示す。枠や光だけだと、
+   * 金枠の5コストで「使う」が見分けられない。使わないは顔も灰色に落とす。
    */
   .utile {
     position: relative;
@@ -1108,7 +1109,7 @@
     border-color: var(--color-cost-1);
     background-color: var(--color-g-2);
     overflow: hidden;
-    transition: box-shadow 150ms, transform 150ms;
+    transition: box-shadow 150ms;
   }
   .utile[data-cost="2"] { border-color: var(--color-cost-2); }
   .utile[data-cost="3"] { border-color: var(--color-cost-3); }
@@ -1137,17 +1138,34 @@
     opacity: 0.3;
     filter: grayscale(1);
   }
-  .utile--avoid::after {
-    content: "";
+  .utile__mark {
     position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      to top right,
-      transparent calc(50% - 1.5px),
-      var(--color-ink-2) calc(50% - 1.5px),
-      var(--color-ink-2) calc(50% + 1.5px),
-      transparent calc(50% + 1.5px)
-    );
+    top: 2px;
+    right: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 2px var(--color-g-1);
+  }
+  .utile--use .utile__mark {
+    background-color: var(--color-hand);
+    color: var(--color-g-0);
+  }
+  .utile--avoid .utile__mark {
+    background-color: var(--color-g-4);
+    color: var(--color-ink);
+  }
+  .utile__mark svg {
+    width: 10px;
+    height: 10px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   /* コストごとに段を分ける。見出しは置かず、枠の色と段の切れ目だけで読ませる。 */
   .ugrid {
