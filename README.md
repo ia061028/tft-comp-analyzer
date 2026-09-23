@@ -1,4 +1,4 @@
-# TFT 紋章構成検索
+# TFTailor
 
 TFT（Teamfight Tactics）のプレイ支援用Webアプリ。Riot API から高ランク帯（Master以上。母集団が薄い時期だけ Diamond 以下で補充）のランク戦績を収集・集計し、**紋章(emblem)を選ぶと、その紋章を活用している構成**を平均順位・Top4率・採用数などで提示する自分専用ツール。データ収集は GitHub Actions、配信は Cloudflare Pages（静的 `stats.json` を読むSPA）。
 
