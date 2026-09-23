@@ -20,6 +20,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync, unlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { gzipSync } from 'node:zlib'
 import { fileURLToPath } from 'node:url'
 import { config, KNOWN_ROUTES } from './config.ts'
 import { compareVersions, resolvePatch, planPatchViews, retentionFloor } from './patches.ts'
@@ -28,6 +29,7 @@ import type { ParticipantRecord, WireStatsFile, WireSummaryFile, PatchIndexEntry
 import {
   classifyRecord,
   createStatsBuilder,
+  serializeStatsFile,
   pickTargetSetFromCounts,
   MIN_OUTPUT_N,
   type StatsBuilder,
@@ -284,8 +286,11 @@ async function main(): Promise<void> {
   const unresolvedUnitNames = new Set<string>()
   const unresolvedEmblemNames = new Set<string>()
   for (const { key, file, builder } of viewBuilders) {
-    const { out, diag } = builder.finish()
-    out.patches = index
+    const { out: built, diag } = builder.finish()
+    // comps を最後のキーに保つ。書き出し（serializeStatsFile）と同じキー順にしておかないと、
+    // 読み戻した前回分との比較（isUnchanged）が毎回食い違って無駄に書き直す。
+    const { comps, ...head } = built
+    const out: WireStatsFile = { ...head, patches: index, comps }
     outputs.push({ file, out })
     console.log(
       `[${key}] 盤面グループ(accumulate): ${diag.boardGroupCount}` +
@@ -328,7 +333,7 @@ async function main(): Promise<void> {
       skipped.push(file)
       continue
     }
-    writeFileSync(path, JSON.stringify(out))
+    writeFileSync(path, serializeStatsFile(out))
     written.push(file)
   }
   const current = new Set(outputs.map((o) => o.file))
@@ -344,12 +349,14 @@ async function main(): Promise<void> {
   console.log('--- 集計サマリ ---')
   console.log(`既定パッチ: ${labelOf(defaultKey)}（内部 ${defaultKey}） → ${DEFAULT_FILE}`)
   for (const { file, out } of outputs) {
-    const sizeKB = (Buffer.byteLength(JSON.stringify(out)) / 1024).toFixed(1)
+    const body = serializeStatsFile(out)
+    const sizeKB = (Buffer.byteLength(body) / 1024).toFixed(1)
+    const gzKB = (gzipSync(body).length / 1024).toFixed(1)
     const totalSigs = out.comps.reduce((s, c) => s + c.g.length, 0)
     const capped = config.maxCompsPerView > 0 && out.comps.length >= config.maxCompsPerView ? '（上限で切詰）' : ''
     console.log(
       `  ${file}: patch=${out.tftPatch} comps=${out.comps.length}${capped} sig=${totalSigs} ` +
-        `matches=${out.totals.matches} participants=${out.totals.participants} (${sizeKB} KB)`,
+        `matches=${out.totals.matches} participants=${out.totals.participants} (${sizeKB} KB, gzip ${gzKB} KB)`,
     )
   }
   const first = outputs[0].out

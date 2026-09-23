@@ -9,6 +9,7 @@ export function pickName(lang: Lang, o: { name: string; nameJa?: string }): stri
 /** UI 固定文言（基準）。{x} 等のプレースホルダは t() の vars で置換。 */
 const ja = {
   loading: '読み込み中…',
+  compsLoading: '構成を読み込み中…',
   loadFailed: '読み込みに失敗しました',
   retry: '再試行',
   title: 'TFTailor',
@@ -121,6 +122,7 @@ export type UIKey = keyof typeof ja
 
 const en: Record<UIKey, string> = {
   loading: 'Loading…',
+  compsLoading: 'Loading comps…',
   loadFailed: 'Failed to load',
   retry: 'Retry',
   title: 'TFTailor',

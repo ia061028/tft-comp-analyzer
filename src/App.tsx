@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { StatsFile } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
-import { loadStats, remapSelection, DEFAULT_STATS_FILE, ALL_PATCHES_KEY } from './lib/data'
+import { loadStats, remapSelection, DEFAULT_STATS_FILE, ALL_PATCHES_KEY, type LoadProgress } from './lib/data'
 import { maxEmblemMultiplicity } from './lib/multiset'
 import { effectiveUnits } from './lib/format'
 import { cycleMark, filterByUnits, type PickTab, type UnitMark } from './lib/unitFilter'
@@ -19,7 +19,8 @@ type GroupKey = 'none' | 'ladder' | 'bronze'
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; stats: StatsFile }
+  // pending: 初回だけ、辞書が届いた時点で画面を出し、構成（comps）は続けて読む。その間 comps は空。
+  | { status: 'ready'; stats: StatsFile; pending?: LoadProgress }
 
 const LANG_STORAGE_KEY = 'tft-lang'
 
@@ -94,7 +95,18 @@ function App() {
     const initial = shownRef.current === null
     if (initial) setLoad({ status: 'loading' })
     else setSwitching(true)
-    loadStats(patchFile)
+    // 初回だけ途中経過を出す。切替時は表示中のデータを出したまま、揃ってから入れ替える。
+    const callbacks = initial
+      ? {
+          onHead: (head: StatsFile, pending: LoadProgress) => {
+            if (!cancelled) setLoad({ status: 'ready', stats: head, pending })
+          },
+          onProgress: (pending: LoadProgress) => {
+            if (!cancelled) setLoad((l) => (l.status === 'ready' && l.pending ? { ...l, pending } : l))
+          },
+        }
+      : {}
+    loadStats(patchFile, callbacks)
       .then((stats) => {
         if (cancelled) return
         cacheRef.current.set(patchFile, stats)
@@ -125,6 +137,7 @@ function App() {
   }, [lang])
 
   const statsOrNull = load.status === 'ready' ? load.stats : null
+  const pending = load.status === 'ready' ? (load.pending ?? null) : null
 
   // 盤面サイズでフィルタ。ユニット数ではなく実効盤面サイズ（エルダードラゴンのような
   // 複数枠ユニットを枠数で数えた値）で切る。ラベルが「盤面サイズ」なので、
@@ -144,6 +157,8 @@ function App() {
   // チャンピオンの選択面に出す駒。構成に1度も出ない駒は選んでも何も起きないので出さない。
   const pickableUnits = useMemo(() => {
     if (!statsOrNull) return []
+    // 構成を読み込み中は数えられないので辞書の全員を出す（辞書は構成に出た駒だけでできている）。
+    if (statsOrNull.comps.length === 0) return statsOrNull.units
     const seen = new Set<number>()
     for (const c of statsOrNull.comps) for (const u of c.units) seen.add(u)
     return statsOrNull.units.filter((_, i) => seen.has(i))
@@ -554,20 +569,24 @@ function App() {
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          <CompList
-            stats={stats}
-            comps={selectedComps}
-            sel={selection}
-            sortKey={sortKey}
-            lang={lang}
-            bronzeMode={bronzeMode}
-            ladderMode={ladderMode}
-            minN={minN}
-            maxPlace={maxPlace}
-            minTop4={minTop4}
-            minWin={minWin}
-            unitFiltered={markedCount > 0}
-          />
+          {pending && (selectedCount > 0 || markedCount > 0) ? (
+            <CompsLoading pending={pending} lang={lang} />
+          ) : (
+            <CompList
+              stats={stats}
+              comps={selectedComps}
+              sel={selection}
+              sortKey={sortKey}
+              lang={lang}
+              bronzeMode={bronzeMode}
+              ladderMode={ladderMode}
+              minN={minN}
+              maxPlace={maxPlace}
+              minTop4={minTop4}
+              minWin={minWin}
+              unitFiltered={markedCount > 0}
+            />
+          )}
         </main>
       </div>
 
@@ -597,6 +616,28 @@ function App() {
       <footer className="shrink-0 border-t border-line bg-surface px-4 py-1.5 sm:px-5 sm:py-2">
         <p className="text-[10px] leading-tight text-faint sm:text-xs sm:leading-snug">{t(lang, 'legal')}</p>
       </footer>
+    </div>
+  )
+}
+
+/**
+ * 初回の構成読み込み中に、紋章やチャンピオンを先に選んだときの一覧の場所。
+ * 選ぶ操作は辞書だけでできるので止めず、一覧だけ揃うまで待ってもらう。
+ */
+function CompsLoading({ pending, lang }: { pending: LoadProgress; lang: Lang }) {
+  const { received, total } = pending
+  return (
+    <div
+      className="flex flex-col items-center gap-3 rounded-xl border border-line bg-surface/40 px-4 py-16 text-center text-sm text-muted"
+      role="status"
+    >
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-line-strong border-t-gold" aria-hidden />
+      <span>{t(lang, 'compsLoading')}</span>
+      {total !== null && total > 0 && (
+        <span className="text-xs tabular-nums text-faint">
+          {received.toLocaleString()} / {total.toLocaleString()}
+        </span>
+      )}
     </div>
   )
 }

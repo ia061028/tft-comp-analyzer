@@ -280,7 +280,7 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
   })
 
   assert.deepStrictEqual(out, {
-    schemaVersion: 7,
+    schemaVersion: 8,
     generatedAt: 'FIXED_TS',
     patch: '16.12',
     tftPatch: '17.5',
@@ -302,8 +302,9 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
     ],
     comps: [
       // a は紋章なしの M4 も含む全4件の成績（順位 1,4,8,4）。
-      { u: [0, 1], n: 4, a: [3, 1, 17], g: [[[0], 3, 2, 1, 13]], k: [2, 3], i: [[1, 0, 4]], h: [[0, 1, 3]] },
+      { u: [0, 1], n: 4, a: [3, 1, 17], g: [[[0], 3, 2, 1, 13]], k: [2, 3], i: [[1, 0]], h: [[0, 1]] },
     ],
+    compCount: 1,
     granters: [],
     baseItemIcons: { spatula: 'spat.png', fryingPan: 'pan.png' },
   })

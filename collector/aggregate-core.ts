@@ -762,21 +762,21 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
         })
       const unitStars = unitIdxs.map((idx) => pc.unitStarByApi.get(unitsOut[idx].api) ?? 0)
 
-      const unitItems: [number, number, number][] = pc.unitItems
-        .map(([unitApi, itemApi, count]): [number, number, number] => [
-          unitIndex.get(unitApi)!,
-          itemIndex.get(itemApi)!,
-          count,
-        ])
-        .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+      // 回数はフロントで使わない（表示は並び順だけで決まる）ので、配信には載せない。
+      // 推奨アイテムはユニットごとに [unitIdx, itemIdx...]（ユニット・アイテムとも idx 昇順）。
+      const unitItems = groupFirst(
+        pc.unitItems
+          .map(([unitApi, itemApi]): [number, number] => [unitIndex.get(unitApi)!, itemIndex.get(itemApi)!])
+          .sort((a, b) => a[0] - b[0] || a[1] - b[1]),
+      )
 
-      const holders: [number, number, number][] = pc.holders
-        .map(([emblemApi, unitApi, count]): [number, number, number] => [
-          emblemIndex.get(emblemApi)!,
-          unitIndex.get(unitApi)!,
-          count,
-        ])
-        .sort((a, b) => a[0] - b[0])
+      // 装備者は紋章ごとに [emblemIdx, unitIdx...]。ユニットは装備回数の多い順（holderMap が先頭から使う）。
+      // 紋章 idx だけで安定ソートするので、pc.holders の回数順がそのまま残る。
+      const holders = groupFirst(
+        pc.holders
+          .map(([emblemApi, unitApi]): [number, number] => [emblemIndex.get(emblemApi)!, unitIndex.get(unitApi)!])
+          .sort((a, b) => a[0] - b[0]),
+      )
 
       const g: [number[], number, number, number, number][] = pc.sigs
         .map((s): [number[], number, number, number, number] => [
@@ -836,7 +836,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
     granters.sort((a, b) => a[0] - b[0] || a[1] - b[1] || (a[2] ?? 0) - (b[2] ?? 0))
 
     const out: WireStatsFile = {
-      schemaVersion: 7,
+      schemaVersion: 8,
       generatedAt: opts.generatedAt,
       patch: opts.targetPatch,
       tftPatch: opts.tftPatch,
@@ -850,9 +850,10 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
       emblems: emblemsOut,
       units: unitsOut,
       items: itemsOut,
-      comps,
+      compCount: comps.length,
       granters,
       baseItemIcons: staticData.baseItemIcons,
+      comps,
     }
 
     const diag: AggregateDiag = {
@@ -883,4 +884,32 @@ export function buildStats(
   const builder = createStatsBuilder(staticData, opts)
   for (const lr of target) builder.add(lr.rec, lr.route)
   return builder.finish()
+}
+
+/** 先頭要素ごとにまとめる: [[a,x],[a,y],[b,z]] → [[a,x,y],[b,z]]（入力の並びを保つ）。 */
+function groupFirst(pairs: [number, number][]): number[][] {
+  const out: number[][] = []
+  for (const [k, v] of pairs) {
+    const last = out[out.length - 1]
+    if (last && last[0] === k) last.push(v)
+    else out.push([k, v])
+  }
+  return out
+}
+
+/**
+ * stats*.json の書き出し形式。中身は普通の JSON（JSON.parse でそのまま読める）だが、
+ * フロントが**届いた順に読めるよう**行の置き方を決めている（src/lib/statsStream.ts が読む）。
+ *
+ *   1行目        comps 以外の全キー。末尾は `"comps":[`
+ *   2行目〜      構成を1行に1つ（最後以外は末尾に `,`）
+ *   最終行       `]}`
+ *
+ * 辞書（紋章・ユニット等）が先頭の数KBに収まるので、フロントは構成を待たずに画面を出せる。
+ */
+export function serializeStatsFile(out: WireStatsFile): string {
+  const { comps, ...head } = out
+  const top = JSON.stringify(head)
+  const lines = comps.map((c) => JSON.stringify(c)).join(',\n')
+  return `${top.slice(0, -1)},"comps":[\n${lines ? `${lines}\n` : ''}]}`
 }
