@@ -1,0 +1,34 @@
+name: ci
+
+# PR と main への push で lint → test → build を回す。
+# main は push のたびに Cloudflare Pages が自動デプロイするので、ここが壊れたビルドを止める関所になる。
+# collect.yml が GITHUB_TOKEN で積む stats.json のコミットではこのワークフローは発火しない（GitHub の仕様）。
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
