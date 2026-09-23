@@ -8,6 +8,7 @@ import { EmblemDock } from './components/EmblemDock'
 import { EmblemGrid } from './components/EmblemGrid'
 import { CompList } from './components/CompList'
 import { SegmentedControl } from './components/SegmentedControl'
+import { SiteNav } from './components/SiteNav'
 import type { SortKey } from './lib/format'
 
 type SizeKey = 'all' | '7' | '8' | '9' | '10'
@@ -233,6 +234,7 @@ function App() {
             {t(lang, 'title')}
           </h1>
         </div>
+        <SiteNav current="comps" lang={lang} />
         {/* セットとパッチはモバイルでは畳んだフィルタ帯に出るので、ここでは出さない。 */}
         <div className="hidden items-center gap-2 md:flex">
           <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted ring-1 ring-inset ring-line">
