@@ -42,7 +42,7 @@ function readLang(): Lang {
  * 統計ページ。紋章ごと・特性の発動段ごとの成績を、全参加者で数えた表で出す。
  *
  * 構成一覧の成績は紋章を活用した試合だけの部分集合なので、ここの数字とは母集団が違う。
- * 並び順は縮約した平均順位（採用が少ないことでは下げない）。採用率は別の列で見せる。
+ * 並び順は縮約した平均順位（採用が少ないことでは下げない）。採用数は別の列で見せる。
  */
 export default function StatsPage() {
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
@@ -128,52 +128,76 @@ export default function StatsPage() {
       </header>
 
       {file && view && (
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-x-6 gap-y-2.5 border-b border-line bg-base/85 px-4 py-2 backdrop-blur-md md:px-5 md:py-2.5">
-          {file.views.length > 1 && (
-            <div className="flex items-center gap-2.5 text-sm">
-              <span className="text-xs font-semibold tracking-wide text-faint" title={t(lang, 'patchTitle')}>
-                {t(lang, 'patch')}
-              </span>
-              <SegmentedControl<string>
-                ariaLabel={t(lang, 'patch')}
-                value={view.key}
-                onChange={setViewKey}
-                options={file.views.map((v) => ({
-                  key: v.key,
-                  label: v.key === ALL_PATCHES_KEY ? t(lang, 'all') : v.label,
-                }))}
-              />
-            </div>
-          )}
-          <SegmentedControl<Tab>
-            value={tab}
-            onChange={setTab}
-            options={[
-              { key: 'emblems', label: t(lang, 'statsEmblems') },
-              { key: 'traits', label: t(lang, 'statsTraits') },
-            ]}
-          />
-          {tab === 'traits' && (
-            <>
-              <SegmentedControl<TraitSplit>
-                value={split}
-                onChange={setSplit}
-                options={[
-                  { key: 'all', label: t(lang, 'statsSplitAll') },
-                  { key: 'with', label: t(lang, 'statsSplitWith') },
-                  { key: 'without', label: t(lang, 'statsSplitWithout') },
-                ]}
-              />
-              <SegmentedControl<'in' | 'out'>
-                value={includeUnique ? 'in' : 'out'}
-                onChange={(k) => setIncludeUnique(k === 'in')}
-                options={[
-                  { key: 'in', label: t(lang, 'statsUniqueIn') },
-                  { key: 'out', label: t(lang, 'statsUniqueOut') },
-                ]}
-              />
-            </>
-          )}
+        <div className="sticky top-0 z-10 border-b border-line bg-base/85 backdrop-blur-md">
+          {/*
+           * 紋章／特性は「何の表を見るか」で、下の絞り込みとは手の種類が違う。同じ見た目の
+           * ボタンを並べると読み分けられないので、表の切り替えだけタブにして一段上に置く。
+           */}
+          <div role="tablist" className="flex gap-1 px-4 md:px-5">
+            {(
+              [
+                ['emblems', t(lang, 'statsEmblems')],
+                ['traits', t(lang, 'statsTraits')],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => setTab(key)}
+                className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                  tab === key ? 'border-gold text-ink' : 'border-transparent text-faint hover:text-ink'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line px-4 py-2 md:px-5">
+            {file.views.length > 1 && (
+              <div className="flex items-center gap-2.5 text-sm">
+                <span className="text-xs font-semibold tracking-wide text-faint" title={t(lang, 'patchTitle')}>
+                  {t(lang, 'patch')}
+                </span>
+                <SegmentedControl<string>
+                  ariaLabel={t(lang, 'patch')}
+                  value={view.key}
+                  onChange={setViewKey}
+                  options={file.views.map((v) => ({
+                    key: v.key,
+                    label: v.key === ALL_PATCHES_KEY ? t(lang, 'all') : v.label,
+                  }))}
+                />
+              </div>
+            )}
+            {tab === 'traits' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <SegmentedControl<TraitSplit>
+                  value={split}
+                  onChange={setSplit}
+                  options={[
+                    { key: 'all', label: t(lang, 'statsSplitAll') },
+                    { key: 'with', label: t(lang, 'statsSplitWith') },
+                    { key: 'without', label: t(lang, 'statsSplitWithout') },
+                  ]}
+                />
+                {/* 含む／除くの2択は片方が既定なので、1つの切り替えボタンにする。 */}
+                <button
+                  type="button"
+                  aria-pressed={!includeUnique}
+                  onClick={() => setIncludeUnique((v) => !v)}
+                  className={`rounded-md border px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                    includeUnique
+                      ? 'border-line bg-surface-2 text-muted hover:text-ink'
+                      : 'border-gold bg-gold text-base'
+                  }`}
+                >
+                  {t(lang, 'statsUniqueOut')}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -258,6 +282,8 @@ function StatsTable({ rows, refRow, nameLabel, sortKey, sortDir, onSort, lang }:
                   className="rounded hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
                 >
                   {c.label}
+                  {/* 押せる見出しだと分かるように、並べている列には向きを出す。 */}
+                  {c.key === sortKey && <span aria-hidden className="ml-0.5">{sortDir === 1 ? '▲' : '▼'}</span>}
                 </button>
               </th>
             ))}
@@ -303,8 +329,11 @@ function Row({ r, muted = false }: { r: StatRow; muted?: boolean }) {
       <td className="px-2.5 py-1.5 text-right">{pct(r.top4)}</td>
       <td className="px-2.5 py-1.5 text-right">{pct(r.win)}</td>
       <td className="px-2.5 py-1.5 text-right">{r.lv.toFixed(2)}</td>
-      <td className="px-2.5 py-1.5 text-right text-muted" title={r.n.toLocaleString()}>
-        {r.share < 1 ? `${r.share.toFixed(2)}%` : pct(r.share)}
+      <td
+        className="px-2.5 py-1.5 text-right text-muted"
+        title={r.share < 1 ? `${r.share.toFixed(2)}%` : pct(r.share)}
+      >
+        {r.n.toLocaleString()}
       </td>
     </tr>
   )
