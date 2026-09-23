@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { WireSummaryFile } from '../shared/types'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { WireDrillFile, WireSummaryFile } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
 import { ALL_PATCHES_KEY } from './lib/data'
 import {
@@ -14,7 +14,8 @@ import {
   type StatSortKey,
   type TraitSplit,
 } from './lib/summary'
-import { styleClasses } from './lib/format'
+import { drillTypes, loadDrill, type DrillType } from './lib/drill'
+import { costBorder, styleClasses } from './lib/format'
 import { SegmentedControl } from './components/SegmentedControl'
 import { SiteNav } from './components/SiteNav'
 
@@ -24,6 +25,10 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'missing' }
   | { status: 'ready'; file: WireSummaryFile }
+type DrillState = { status: 'loading' } | { status: 'error' } | { status: 'missing' } | { status: 'ready'; file: WireDrillFile }
+
+/** 「100人以上」で残す人数の下限。 */
+const MIN_N = 100
 
 const LANG_STORAGE_KEY = 'tft-lang'
 
@@ -52,6 +57,11 @@ export default function StatsPage() {
   const [tab, setTab] = useState<Tab>('emblems')
   const [split, setSplit] = useState<TraitSplit>('all')
   const [includeUnique, setIncludeUnique] = useState(true)
+  const [minN, setMinN] = useState(false)
+  /** 型を開いている特性行（行キー）。 */
+  const [openRow, setOpenRow] = useState<string | null>(null)
+  /** ビュー key → 掘り下げファイル。行を初めて開いたときに読む。 */
+  const [drills, setDrills] = useState<Record<string, DrillState>>({})
   const [sortKey, setSortKey] = useState<StatSortKey>('avg')
   const [sortDir, setSortDir] = useState<1 | -1>(1)
 
@@ -85,8 +95,35 @@ export default function StatsPage() {
   const rows = useMemo(() => {
     if (!file || !view) return []
     const base = tab === 'emblems' ? emblemRows(file, view, lang) : traitRows(file, view, lang, split, includeUnique)
-    return sortRows(base, sortKey, sortDir, lang)
-  }, [file, view, tab, split, includeUnique, sortKey, sortDir, lang])
+    return sortRows(minN ? base.filter((r) => r.n >= MIN_N) : base, sortKey, sortDir, lang)
+  }, [file, view, tab, split, includeUnique, minN, sortKey, sortDir, lang])
+
+  const drillKey = view?.key ?? null
+  const drill = drillKey ? drills[drillKey] : undefined
+  /** 型を開くときに、そのビューの掘り下げファイルをまだ読んでいなければ読む。 */
+  const ensureDrill = (key: string | null) => {
+    if (!key || drills[key]) return
+    setDrills((d) => ({ ...d, [key]: { status: 'loading' } }))
+    loadDrill(key)
+      .then((f) => setDrills((d) => ({ ...d, [key]: f ? { status: 'ready', file: f } : { status: 'missing' } })))
+      .catch(() => setDrills((d) => ({ ...d, [key]: { status: 'error' } })))
+  }
+  const toggleRow = (key: string) => {
+    setOpenRow((k) => (k === key ? null : key))
+    ensureDrill(drillKey)
+  }
+  const changeView = (key: string) => {
+    setViewKey(key)
+    if (openRow) ensureDrill(key)
+  }
+
+  const renderDrill = (r: StatRow): ReactNode => {
+    if (!drill || drill.status === 'loading') return <p className="text-xs text-faint">{t(lang, 'loading')}</p>
+    if (drill.status === 'error') return <p className="text-xs text-red-400/80">{t(lang, 'loadFailed')}</p>
+    if (drill.status === 'missing') return <p className="text-xs text-faint">{t(lang, 'drillNotReady')}</p>
+    const [api] = r.key.split('|')
+    return <DrillPanel types={drillTypes(drill.file, file!, api, r.min!, split, lang)} lang={lang} />
+  }
   const refRow = tab === 'emblems' && view ? noEmblemRow(view, t(lang, 'statsNoEmblem')) : null
 
   const onSort = (key: StatSortKey) => {
@@ -163,7 +200,7 @@ export default function StatsPage() {
                 <SegmentedControl<string>
                   ariaLabel={t(lang, 'patch')}
                   value={view.key}
-                  onChange={setViewKey}
+                  onChange={changeView}
                   options={file.views.map((v) => ({
                     key: v.key,
                     label: v.key === ALL_PATCHES_KEY ? t(lang, 'all') : v.label,
@@ -171,6 +208,10 @@ export default function StatsPage() {
                 />
               </div>
             )}
+            {/* 狭い画面ではパッチの右に収まり、絞り込みが2段で済む位置。 */}
+            <ToggleButton pressed={minN} onClick={() => setMinN((v) => !v)}>
+              {t(lang, 'statsMinN')}
+            </ToggleButton>
             {tab === 'traits' && (
               <div className="flex flex-wrap items-center gap-2">
                 <SegmentedControl<TraitSplit>
@@ -183,18 +224,9 @@ export default function StatsPage() {
                   ]}
                 />
                 {/* 含む／除くの2択は片方が既定なので、1つの切り替えボタンにする。 */}
-                <button
-                  type="button"
-                  aria-pressed={!includeUnique}
-                  onClick={() => setIncludeUnique((v) => !v)}
-                  className={`rounded-md border px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
-                    includeUnique
-                      ? 'border-line bg-surface-2 text-muted hover:text-ink'
-                      : 'border-gold bg-gold text-base'
-                  }`}
-                >
+                <ToggleButton pressed={!includeUnique} onClick={() => setIncludeUnique((v) => !v)}>
                   {t(lang, 'statsUniqueOut')}
-                </button>
+                </ToggleButton>
               </div>
             )}
           </div>
@@ -230,6 +262,9 @@ export default function StatsPage() {
             sortDir={sortDir}
             onSort={onSort}
             lang={lang}
+            openRow={tab === 'traits' ? openRow : null}
+            onToggleRow={tab === 'traits' ? toggleRow : undefined}
+            renderDetail={renderDrill}
           />
         )}
       </main>
@@ -250,9 +285,13 @@ interface StatsTableProps {
   sortDir: 1 | -1
   onSort: (key: StatSortKey) => void
   lang: Lang
+  /** 行を押して下に開く（特性の表だけ）。 */
+  openRow: string | null
+  onToggleRow?: (key: string) => void
+  renderDetail: (r: StatRow) => ReactNode
 }
 
-function StatsTable({ rows, refRow, nameLabel, sortKey, sortDir, onSort, lang }: StatsTableProps) {
+function StatsTable({ rows, refRow, nameLabel, sortKey, sortDir, onSort, lang, openRow, onToggleRow, renderDetail }: StatsTableProps) {
   const cols: { key: StatSortKey; label: string }[] = [
     { key: 'name', label: nameLabel },
     { key: 'avg', label: t(lang, 'statsAvgPlace') },
@@ -291,7 +330,17 @@ function StatsTable({ rows, refRow, nameLabel, sortKey, sortDir, onSort, lang }:
         </thead>
         <tbody>
           {rows.map((r) => (
-            <Row key={r.key} r={r} />
+            <Fragment key={r.key}>
+              <Row r={r} open={openRow === r.key} onToggle={onToggleRow ? () => onToggleRow(r.key) : undefined} />
+              {openRow === r.key && (
+                <tr className="border-t border-line bg-base">
+                  <td colSpan={cols.length} className="p-0">
+                    {/* 表は狭い画面で横に流れるので、中身は画面幅に収めて左に貼り付ける。 */}
+                    <div className="sticky left-0 max-w-[calc(100vw-2rem)] p-2.5">{renderDetail(r)}</div>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
           {refRow && <Row r={refRow} muted />}
         </tbody>
@@ -300,10 +349,16 @@ function StatsTable({ rows, refRow, nameLabel, sortKey, sortDir, onSort, lang }:
   )
 }
 
-function Row({ r, muted = false }: { r: StatRow; muted?: boolean }) {
+function Row({ r, muted = false, open = false, onToggle }: { r: StatRow; muted?: boolean; open?: boolean; onToggle?: () => void }) {
   const pct = (v: number) => `${v.toFixed(1)}%`
   return (
-    <tr className={`border-t border-line first:border-t-0 ${muted ? 'bg-base text-faint' : ''}`}>
+    <tr
+      className={`border-t border-line first:border-t-0 ${muted ? 'bg-base text-faint' : ''} ${
+        onToggle ? `cursor-pointer hover:bg-surface-2 ${open ? 'bg-surface-2' : ''}` : ''
+      }`}
+      onClick={onToggle}
+      aria-expanded={onToggle ? open : undefined}
+    >
       <td className="px-2.5 py-1.5">
         <span className="flex items-center gap-2">
           {r.min !== undefined ? (
@@ -321,6 +376,11 @@ function Row({ r, muted = false }: { r: StatRow; muted?: boolean }) {
             <span className="h-5 w-5 shrink-0" aria-hidden />
           )}
           <span className={`whitespace-nowrap ${muted ? '' : 'font-medium text-ink'}`}>{r.name}</span>
+          {onToggle && (
+            <span aria-hidden className={`text-[10px] text-faint transition-transform ${open ? 'rotate-180' : ''}`}>
+              ▾
+            </span>
+          )}
         </span>
       </td>
       <td className={`px-2.5 py-1.5 text-right font-bold ${muted ? '' : TONE_CLASS[placeTone(r.avg)]}`}>
@@ -349,5 +409,133 @@ function Icon({ src, className }: { src: string; className: string }) {
       className={className}
       onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
     />
+  )
+}
+
+function ToggleButton({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={`rounded-md border px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+        pressed ? 'border-gold bg-gold text-base' : 'border-line bg-surface-2 text-muted hover:text-ink'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * 特性の段の「構成の型」。相方特性ごとに、人数・平均順位・平均Lv・最多の盤面を並べ、
+ * 押すと駒ごとの採用率と星3率を開く。並びは人数順（型は採用の多さで探すので）。
+ */
+function DrillPanel({ types, lang }: { types: DrillType[]; lang: Lang }) {
+  const [open, setOpen] = useState<string | null>(null)
+  if (types.length === 0) return <p className="text-xs text-faint">{t(lang, 'statsEmpty')}</p>
+  return (
+    <ul className="flex flex-col gap-1.5">
+      {types.map((ty) => (
+        <li key={ty.key} className="rounded-md border border-line bg-surface">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (ty.units.length > 0) setOpen((k) => (k === ty.key ? null : ty.key))
+            }}
+            aria-expanded={ty.units.length > 0 ? open === ty.key : undefined}
+            className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-2.5 py-1.5 text-left text-xs tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+          >
+            <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-ink">
+              {ty.partner === null ? (
+                t(lang, 'drillOther')
+              ) : ty.partner === undefined ? (
+                t(lang, 'drillSolo')
+              ) : (
+                <>
+                  <span aria-hidden className="text-faint">＋</span>
+                  <Icon src={ty.partner.icon} className="h-4 w-4 shrink-0 object-contain" />
+                  <span className="truncate">{ty.partner.name}</span>
+                </>
+              )}
+            </span>
+            <span className="ml-auto flex items-center gap-3">
+              <span className={`font-bold ${TONE_CLASS[placeTone(ty.avg)]}`}>{ty.avg.toFixed(2)}</span>
+              <span className="text-muted">Lv {ty.lv.toFixed(2)}</span>
+              <span className="w-14 text-right text-muted" title={`${ty.share.toFixed(1)}%`}>
+                {t(lang, 'statsParticipants', { n: ty.n.toLocaleString() })}
+              </span>
+              <span aria-hidden className={`w-2 text-[10px] text-faint ${ty.units.length === 0 ? 'invisible' : ''}`}>
+                {open === ty.key ? '▴' : '▾'}
+              </span>
+            </span>
+          </button>
+          {ty.board.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 border-t border-line px-2.5 py-1.5">
+              {ty.board.map((u, i) => (
+                <img
+                  key={i}
+                  src={u.icon}
+                  alt={u.name}
+                  title={u.name}
+                  loading="lazy"
+                  className={`h-7 w-7 rounded border-2 object-cover ${costBorder(u.cost)}`}
+                  onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+                />
+              ))}
+              <span className="ml-1 text-[11px] text-faint tabular-nums">
+                {t(lang, 'drillBoard')} · {t(lang, 'statsParticipants', { n: ty.boardN.toLocaleString() })} ·{' '}
+                {ty.boardAvg.toFixed(2)}
+              </span>
+            </div>
+          )}
+          {open === ty.key && <DrillUnits type={ty} lang={lang} />}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function DrillUnits({ type, lang }: { type: DrillType; lang: Lang }) {
+  const avg = (v: number | null) => (v === null ? '–' : v.toFixed(2))
+  return (
+    <div className="overflow-x-auto border-t border-line">
+      <table className="w-full border-collapse text-xs tabular-nums">
+        <thead>
+          <tr className="text-faint">
+            <th scope="col" className="whitespace-nowrap px-2.5 py-1.5 text-left font-semibold">{t(lang, 'drillUnit')}</th>
+            <th scope="col" className="whitespace-nowrap px-2 py-1.5 text-right font-semibold">{t(lang, 'drillUnitShare')}</th>
+            <th scope="col" className="whitespace-nowrap px-2 py-1.5 text-right font-semibold">{t(lang, 'drillStar3')}</th>
+            <th scope="col" className="whitespace-nowrap px-2 py-1.5 text-right font-semibold">{t(lang, 'drillStar3Avg')}</th>
+            <th scope="col" className="whitespace-nowrap px-2.5 py-1.5 text-right font-semibold">{t(lang, 'drillOtherAvg')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {type.units.map((u) => (
+            <tr key={u.api} className="border-t border-line">
+              <td className="px-2.5 py-1">
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  <img
+                    src={u.icon}
+                    alt=""
+                    loading="lazy"
+                    className={`h-5 w-5 rounded border ${costBorder(u.cost)} object-cover`}
+                    onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+                  />
+                  <span className="text-ink">{u.name}</span>
+                </span>
+              </td>
+              <td className="px-2 py-1 text-right text-muted">{u.share.toFixed(0)}%</td>
+              <td className={`px-2 py-1 text-right font-semibold ${u.star3 >= 50 ? 'text-gold' : 'text-ink'}`}>
+                {u.star3.toFixed(0)}%
+              </td>
+              <td className="px-2 py-1 text-right">{avg(u.star3Avg)}</td>
+              <td className="px-2.5 py-1 text-right text-muted">{avg(u.otherAvg)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }

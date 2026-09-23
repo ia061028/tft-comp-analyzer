@@ -312,3 +312,48 @@ export interface WireSummaryFile {
   emblems: EmblemInfo[]
   views: WireSummaryView[]
 }
+
+/**
+ * 統計ページの掘り下げ（public/data/drill-<ビュー>.json）。特性の段ごとに、相方特性で分けた「構成の型」。
+ * 型ごとの駒: [unitIdx, 採用人数, 星3人数, 星3の順位合計, 星3以外の順位合計]。
+ * 星3以外は「採用人数 − 星3人数」人ぶん（星の記録が無い旧レコードもこちらに入る）。
+ */
+export type WireDrillUnit = [number, number, number, number, number]
+
+export interface WireDrillType {
+  /** 相方特性（traits の idx）。他に段のある特性が無い盤面は -1、上限より後ろの型をまとめた行は -2。 */
+  p: number
+  s: WireRecordStat
+  /** 最頻の盤面（units の idx）。まとめ行は空。 */
+  b: number[]
+  /** その盤面の [人数, 順位合計]（数え始めてからの下限値）。 */
+  bs: [number, number]
+  /** 採用率の高い順。まとめ行は空。 */
+  u: WireDrillUnit[]
+}
+
+export interface WireDrillRow {
+  /** traits の idx と段の下限体数（summary.json の特性行と同じキー） */
+  t: number
+  m: number
+  /** [全体, 紋章あり, 紋章なし]。人数の多い順。 */
+  sp: [WireDrillType[], WireDrillType[], WireDrillType[]]
+}
+
+export interface WireDrillUnitInfo {
+  api: string
+  name: string
+  nameJa: string
+  cost: number
+  icon: string
+}
+
+export interface WireDrillFile {
+  schemaVersion: 1
+  generatedAt: string
+  key: string
+  /** traits の api（idx は summary.json の traits と同じ並び）。読み手はこれで食い違いを検出する。 */
+  traits: string[]
+  units: WireDrillUnitInfo[]
+  rows: WireDrillRow[]
+}

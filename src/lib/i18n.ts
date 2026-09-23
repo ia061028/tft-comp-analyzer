@@ -114,6 +114,16 @@ const ja = {
   statsUniqueOut: '固有を除く',
   statsEmpty: '該当するデータがありません。',
   statsNotReady: '統計データはまだありません。次回の集計で作られます。',
+  statsMinN: '100人以上',
+  drillOther: 'その他',
+  drillSolo: 'ほかの特性なし',
+  drillBoard: '最多の盤面',
+  drillUnit: '駒',
+  drillUnitShare: '採用',
+  drillStar3: '星3率',
+  drillStar3Avg: '星3時',
+  drillOtherAvg: 'それ以外',
+  drillNotReady: '構成の型はまだありません。次回の集計で作られます。',
   legal: "TFTailor isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 }
 
@@ -227,6 +237,16 @@ const en: Record<UIKey, string> = {
   statsUniqueOut: 'Excl. unique',
   statsEmpty: 'No matching data.',
   statsNotReady: 'Stats are not available yet. They will be built in the next aggregation run.',
+  statsMinN: '100+ players',
+  drillOther: 'Others',
+  drillSolo: 'No other trait',
+  drillBoard: 'Most common board',
+  drillUnit: 'Unit',
+  drillUnitShare: 'Play',
+  drillStar3: '3★ rate',
+  drillStar3Avg: '3★ avg',
+  drillOtherAvg: 'Other avg',
+  drillNotReady: 'Comp types are not available yet. They will be built in the next aggregation run.',
   legal: "TFTailor isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 }
 
