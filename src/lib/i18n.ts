@@ -11,7 +11,7 @@ const ja = {
   loading: '読み込み中…',
   loadFailed: '読み込みに失敗しました',
   retry: '再試行',
-  title: 'TFT 紋章構成検索',
+  title: 'TFTailor',
   matchesCount: '{n} マッチ',
   generated: '生成 {time}',
   langSwitchTitle: '表示言語を切替',
@@ -89,7 +89,7 @@ const ja = {
   emblemCatSpatula: 'へら',
   emblemCatPan: 'フライパン',
   emblemCatNone: '合成不可',
-  legal: "TFT Emblem Comp Search isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
+  legal: "TFTailor isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 }
 
 /** 翻訳キー（ja を基準に型化。en はこの全キーを持つことを型で強制）。 */
@@ -99,7 +99,7 @@ const en: Record<UIKey, string> = {
   loading: 'Loading…',
   loadFailed: 'Failed to load',
   retry: 'Retry',
-  title: 'TFT Emblem Comp Search',
+  title: 'TFTailor',
   matchesCount: '{n} matches',
   generated: 'Generated {time}',
   langSwitchTitle: 'Switch language',
@@ -177,7 +177,7 @@ const en: Record<UIKey, string> = {
   emblemCatSpatula: 'Spatula',
   emblemCatPan: 'Frying Pan',
   emblemCatNone: 'Non-craftable',
-  legal: "TFT Emblem Comp Search isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
+  legal: "TFTailor isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 }
 
 const STRINGS: Record<Lang, Record<UIKey, string>> = { ja, en }
