@@ -6,7 +6,7 @@ name: collect
 #   aggregate / data ブランチ push / stats.json コミットを全てスキップし、コミット0・デプロイ0。
 #   収集が成功した時（status=ok）だけ:
 #     1) 集計し、data ブランチへ squash force-push（履歴は常に1コミット＝スナップショット）
-#     2) public/data/（stats.json ＋ パッチ別 stats-*.json）に実質差分がある時だけ main へコミット
+#     2) public/data/（stats.json ＋ パッチ別 stats-*.json ＋ 統計ページの summary.json）に実質差分がある時だけ main へコミット
 #        （generatedAt だけの変更ではデプロイしない）
 #   実エラー（ルート例外）は collect が exit 1 → ジョブ赤失敗で従来どおり失敗通知を維持する。
 
@@ -109,7 +109,7 @@ jobs:
           git commit -m "chore(data): snapshot $(date -u +%FT%TZ) (+${{ steps.collect.outputs.new_records }} matches)"
           git push --force origin snapshot:data
 
-      # public/data/（stats.json ＋ パッチ別 stats-*.json）は実質差分がある時だけ main にコミット
+      # public/data/（stats.json ＋ パッチ別 stats-*.json ＋ 統計ページの summary.json）は実質差分がある時だけ main にコミット
       # （＝サイト再デプロイ）。aggregate 側で generatedAt のみの変更はスキップ済みなので、
       # ここで差分があれば実変更。パッチが窓から消えた時のファイル削除も同じコミットに乗る。
       - name: commit public/data to main (only on substantive change)

@@ -262,3 +262,44 @@ export interface StatsFile {
   /** パッチ別ビューの一覧（このファイル自身も含む）。1件以下ならパッチ選択 UI は出さない。 */
   patches: PatchIndexEntry[]
 }
+
+/**
+ * 成績の集計値 [人数, 順位合計, Top4 数, 1位数, レベル合計]。
+ * 平均順位 = [1] / [0]、平均レベル = [4] / [0]。
+ */
+export type WireRecordStat = [number, number, number, number, number]
+
+/**
+ * 統計ページの1ビュー（パッチ、または全パッチ合算）。
+ *
+ * 構成一覧（WireComp の sig）は紋章を活用した試合しか持たないので、ここは**全参加者**を数える。
+ */
+export interface WireSummaryView {
+  /** PatchIndexEntry.key と同じ（"all" は全パッチ合算）。 */
+  key: string
+  label: string
+  matches: number
+  participants: number
+  /** 紋章ごとの成績（活用した参加者）。[emblems の idx, 成績] */
+  emblems: [number, WireRecordStat][]
+  /** 紋章を1枚も活用していない参加者。 */
+  noEmblem: WireRecordStat
+  /**
+   * 特性 × 発動段の成績。[traits の idx, 段の下限体数, 全体, 紋章あり, 紋章なし]
+   * 紋章あり ＝ その特性の紋章が段を上げている。紋章なし ＝ その特性の紋章を装備していない。
+   * 装備しているが段を上げていない参加者は「全体」にだけ入る。
+   */
+  traits: [number, number, WireRecordStat, WireRecordStat, WireRecordStat][]
+}
+
+/** public/data/summary.json（統計ページ用）。 */
+export interface WireSummaryFile {
+  schemaVersion: 1
+  generatedAt: string
+  setNumber: number
+  /** 既定ビューの key（構成一覧の既定パッチと同じ）。 */
+  defaultKey: string
+  traits: TraitInfo[]
+  emblems: EmblemInfo[]
+  views: WireSummaryView[]
+}

@@ -14,6 +14,9 @@
 //   - 既定ビュー（ヒステリシス選定パッチ）  → stats.json（フロントが最初に読む）
 //   - その他のパッチ / 全パッチ合算("all") → stats-{key}.json
 // 全ファイルに同じ `patches` 一覧を埋め込み、フロントはそれを見て切り替え先を fetch する。
+//
+// 統計ページ用に、全ビューぶんの紋章・特性の成績を summary.json（1ファイル）へ書く。
+// こちらは構成一覧と違って全参加者を数える（集計は summary-core.ts）。
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync, unlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -21,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { config, KNOWN_ROUTES } from './config.ts'
 import { compareVersions, resolvePatch, planPatchViews, retentionFloor } from './patches.ts'
 import { getStaticData, type StaticData } from './cdragon.ts'
-import type { ParticipantRecord, WireStatsFile, PatchIndexEntry } from '../shared/types.ts'
+import type { ParticipantRecord, WireStatsFile, WireSummaryFile, PatchIndexEntry } from '../shared/types.ts'
 import {
   classifyRecord,
   createStatsBuilder,
@@ -30,12 +33,14 @@ import {
   type StatsBuilder,
 } from './aggregate-core.ts'
 import { listRouteShards, forEachRecord } from './shards.ts'
+import { createSummaryBuilder, summaryDictionaries, type SummaryBuilder } from './summary-core.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(here, '..')
 const RECORDS_DIR = join(ROOT, 'data', 'state', 'records')
 const OUT_DIR = join(ROOT, 'public', 'data')
 const DEFAULT_FILE = 'stats.json'
+const SUMMARY_FILE = 'summary.json'
 /** パッチビューのファイル名。既定ビューは stats.json、それ以外は stats-{key}.json。 */
 const VIEW_FILE_RE = /^stats-[^/\\]+\.json$/
 
@@ -55,10 +60,10 @@ function tftLabelOf(patch: string): string | undefined {
  * 集計は純関数で、出力は generatedAt を除き入力レコードのみに決定的に依存する。
  * 一致すれば書き換えをスキップし、generatedAt だけが変わる無意味な main コミット/デプロイを防ぐ。
  */
-function isUnchanged(path: string, out: WireStatsFile): boolean {
+function isUnchanged(path: string, out: WireStatsFile | WireSummaryFile): boolean {
   if (!existsSync(path)) return false
   try {
-    const prev = JSON.parse(readFileSync(path, 'utf8')) as WireStatsFile
+    const prev = JSON.parse(readFileSync(path, 'utf8')) as WireStatsFile | WireSummaryFile
     return JSON.stringify({ ...prev, generatedAt: '' }) === JSON.stringify({ ...out, generatedAt: '' })
   } catch {
     // 既存ファイルが壊れている等でパース不能なら比較を諦め、通常どおり書き直す。
@@ -229,7 +234,17 @@ async function main(): Promise<void> {
 
   const buildersByPatch = new Map<string, StatsBuilder[]>()
   const viewBuilders: { key: string; file: string; builder: StatsBuilder }[] = []
+  const summariesByPatch = new Map<string, SummaryBuilder[]>()
+  const summaryBuilders: { key: string; label: string; builder: SummaryBuilder }[] = []
   for (const view of views) {
+    const summary = createSummaryBuilder(staticData)
+    summaryBuilders.push({ key: view.key, label: viewLabel(view.patches), builder: summary })
+    for (const p of view.patches) {
+      const list = summariesByPatch.get(p) ?? []
+      list.push(summary)
+      summariesByPatch.set(p, list)
+    }
+
     const idxs = view.patches.map((p) => patchIdx.get(p)!).filter((i) => i !== undefined)
     const builder = createStatsBuilder(staticData, {
       targetPatch: view.key,
@@ -257,6 +272,7 @@ async function main(): Promise<void> {
   await forEachRecord(routes.values(), (rec, route) => {
     const patch = resolvePatch(rec.v, rec.ts, schedule)
     if (!inScope(rec, patch)) return
+    for (const s of summariesByPatch.get(patch) ?? []) s.add(rec)
     const bs = buildersByPatch.get(patch)
     if (!bs) return
     for (const b of bs) b.add(rec, route)
@@ -282,10 +298,30 @@ async function main(): Promise<void> {
     for (const n of diag.unresolvedEmblemNames) unresolvedEmblemNames.add(n)
   }
 
+  const summaryOut: WireSummaryFile = {
+    schemaVersion: 1,
+    generatedAt,
+    setNumber: staticData.setNumber,
+    defaultKey,
+    ...summaryDictionaries(staticData),
+    views: summaryBuilders.map(({ key, label, builder }) => ({ key, label, ...builder.finish() })),
+  }
+  for (const v of summaryOut.views) {
+    console.log(
+      `[${v.key}] 統計: 参加者 ${v.participants} / 紋章 ${v.emblems.length} 種 / 特性×段 ${v.traits.length} 行 → ${SUMMARY_FILE}`,
+    )
+  }
+
   // 9. 書き出し。実質差分のないファイルは触らず、今回のビューに無い旧 stats-*.json は消す。
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })
   const written: string[] = []
   const skipped: string[] = []
+  const summaryPath = join(OUT_DIR, SUMMARY_FILE)
+  if (isUnchanged(summaryPath, summaryOut)) skipped.push(SUMMARY_FILE)
+  else {
+    writeFileSync(summaryPath, JSON.stringify(summaryOut))
+    written.push(SUMMARY_FILE)
+  }
   for (const { file, out } of outputs) {
     const path = join(OUT_DIR, file)
     if (isUnchanged(path, out)) {
