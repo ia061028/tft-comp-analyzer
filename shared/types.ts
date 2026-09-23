@@ -135,10 +135,10 @@ export interface CompStats {
   n: number
   /** units と同順の代表スターレベル(1-3、不明は0)。 */
   unitStars: number[]
-  /** キャリー中心の推奨完成アイテム [unitIdx, itemIdx, count]。 */
-  unitItems: [number, number, number][]
-  /** 各紋章を最も多く装備したユニット [emblemIdx, unitIdx, count]（発動ゲート済み）。 */
-  holders: [number, number, number][]
+  /** キャリー中心の推奨完成アイテム [unitIdx, itemIdx]（ユニットごとに並ぶ）。 */
+  unitItems: [number, number][]
+  /** 各紋章を最も多く装備したユニット [emblemIdx, unitIdx]（紋章ごとに装備回数の多い順。発動ゲート済み）。 */
+  holders: [number, number][]
   /** 紋章活用シグネチャ群。紋章を使わない人気盤面では空。 */
   sigs: EmblemSig[]
   /**
@@ -168,10 +168,16 @@ export interface WireComp {
   a?: [number, number, number]
   /** unitStars（全0なら省略） */
   k?: number[]
-  /** unitItems（空なら省略） */
-  i?: [number, number, number][]
-  /** holders（空なら省略） */
-  h?: [number, number, number][]
+  /**
+   * unitItems（空なら省略）。schemaVersion 8 からユニットごとに [unitIdx, itemIdx...]。
+   * 7 以前は [unitIdx, itemIdx, 回数] の組（回数はフロントで使っていなかったので 8 で外した）。
+   */
+  i?: number[][]
+  /**
+   * holders（空なら省略）。schemaVersion 8 から紋章ごとに [emblemIdx, unitIdx...]（装備回数の多い順）。
+   * 7 以前は [emblemIdx, unitIdx, 回数] の組。
+   */
+  h?: number[][]
   /** sigs: [活用紋章idx[], n, top4, win, p] */
   g: [number[], number, number, number, number][]
   /** grants: [traitIdx, delta, n]（空なら省略）。share は n / comp.n で復元する。 */
@@ -214,7 +220,7 @@ export interface PatchIndexEntry {
 
 /** stats.json 全体のオンディスク圧縮形式。 */
 export interface WireStatsFile {
-  schemaVersion: 7
+  schemaVersion: 8
   generatedAt: string
   patch: string
   tftPatch: string
@@ -228,6 +234,9 @@ export interface WireStatsFile {
   emblems: EmblemInfo[]
   units: UnitInfo[]
   items: ItemInfo[]
+  /** comps の件数。フロントが構成を読み込み中に進み具合を出すのに使う（旧ファイルは欠落）。 */
+  compCount?: number
+  /** 書き出しでは最後のキーになる（collector の serializeStatsFile）。 */
   comps: WireComp[]
   /** 特性を上乗せするユニットの推定（旧ファイルは欠落）。 */
   granters?: TraitGranter[]
