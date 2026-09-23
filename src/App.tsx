@@ -4,8 +4,10 @@ import { t, type Lang } from './lib/i18n'
 import { loadStats, remapSelection, DEFAULT_STATS_FILE, ALL_PATCHES_KEY } from './lib/data'
 import { maxEmblemMultiplicity } from './lib/multiset'
 import { effectiveUnits } from './lib/format'
+import { cycleMark, filterByUnits, type PickTab, type UnitMark } from './lib/unitFilter'
 import { EmblemDock } from './components/EmblemDock'
 import { EmblemGrid } from './components/EmblemGrid'
+import { UnitGrid } from './components/UnitGrid'
 import { CompList } from './components/CompList'
 import { SegmentedControl } from './components/SegmentedControl'
 import type { SortKey } from './lib/format'
@@ -34,6 +36,9 @@ function App() {
   const shownRef = useRef<StatsFile | null>(null)
 
   const [selection, setSelection] = useState<number[]>([])
+  // チャンピオンの印（apiName → 使う／使わない）。紋章の選択に重ねて構成を絞る。
+  const [unitMarks, setUnitMarks] = useState<Map<string, UnitMark>>(() => new Map())
+  const [pickTab, setPickTab] = useState<PickTab>('emblem')
   // 既定は平均順位。同点は 1位率 → Top4率 の順で決まる（CompList の PRIORITY）。
   const [sortKey, setSortKey] = useState<SortKey>('place')
   // 採用数の下限フィルタは廃止した（紋章を2枚以上使う構成がほぼ全部そこで消えていた）。
@@ -64,7 +69,16 @@ function App() {
     const apply = (stats: StatsFile) => {
       const prev = shownRef.current
       // 紋章 intern はファイルごとに異なるので、選択を apiName 経由で写す。
-      if (prev && prev !== stats) setSelection((s) => remapSelection(s, prev.emblems, stats.emblems))
+      if (prev && prev !== stats) {
+        setSelection((s) => remapSelection(s, prev.emblems, stats.emblems))
+        // チャンピオンの印は apiName で持つので写し替えは要らない。移行先に居ない駒の印だけ落とす
+        // （タイルが出ないので外す手段が無くなる）。
+        const apis = new Set(stats.units.map((u) => u.api))
+        setUnitMarks((m) => {
+          const kept = [...m].filter(([api]) => apis.has(api))
+          return kept.length === m.size ? m : new Map(kept)
+        })
+      }
       shownRef.current = stats
       setLoad({ status: 'ready', stats })
       setSwitching(false)
@@ -114,12 +128,25 @@ function App() {
   // 盤面サイズでフィルタ。ユニット数ではなく実効盤面サイズ（エルダードラゴンのような
   // 複数枠ユニットを枠数で数えた値）で切る。ラベルが「盤面サイズ」なので、
   // 9 を選んだら実際に9枠埋まる構成が出るのが期待どおり。
+  //
+  // チャンピオンの印もここで効かせる。盤面ユニットだけで決まる絞り込みなので、紋章の行
+  // （compRows）を作る前に構成ごと落とせる。
   const selectedComps = useMemo(() => {
     if (!statsOrNull) return []
-    return size === 'all'
-      ? statsOrNull.comps
-      : statsOrNull.comps.filter((c) => effectiveUnits(c) === Number(size))
-  }, [statsOrNull, size])
+    const sized =
+      size === 'all'
+        ? statsOrNull.comps
+        : statsOrNull.comps.filter((c) => effectiveUnits(c) === Number(size))
+    return filterByUnits(sized, statsOrNull.units, unitMarks)
+  }, [statsOrNull, size, unitMarks])
+
+  // チャンピオンの選択面に出す駒。構成に1度も出ない駒は選んでも何も起きないので出さない。
+  const pickableUnits = useMemo(() => {
+    if (!statsOrNull) return []
+    const seen = new Set<number>()
+    for (const c of statsOrNull.comps) for (const u of c.units) seen.add(u)
+    return statsOrNull.units.filter((_, i) => seen.has(i))
+  }, [statsOrNull])
 
   // 紋章ごとの「データ上1レコードで同時活用された最大枚数」。選択枚数がこれを超えた紋章は
   // タイルの個数バッジを銅にして知らせる（構成全体が対象。ユニット数フィルタの影響を受けない）。
@@ -195,10 +222,25 @@ function App() {
       return next
     })
   const clear = () => setSelection([])
+  const cycleUnit = (api: string) => setUnitMarks((m) => cycleMark(m, api))
+  const unmarkUnit = (api: string) =>
+    setUnitMarks((m) => {
+      if (!m.has(api)) return m
+      const next = new Map(m)
+      next.delete(api)
+      return next
+    })
+  const clearUnits = () => setUnitMarks(new Map())
 
   const generatedAt = new Date(stats.generatedAt).toLocaleString()
 
   const selectedCount = selection.length
+  const markedCount = unitMarks.size
+  // 紋章とチャンピオンの切り替え（レールとドックで共用）。数は選んでいるときだけ付ける。
+  const tabOptions: { key: PickTab; label: string }[] = [
+    { key: 'emblem', label: selectedCount > 0 ? `${t(lang, 'emblems')} ${selectedCount}` : t(lang, 'emblems') },
+    { key: 'unit', label: markedCount > 0 ? `${t(lang, 'champions')} ${markedCount}` : t(lang, 'champions') },
+  ]
 
   // パッチ選択肢。集計側が全ファイルに同じ一覧を埋め込んでいる。1件以下なら選択 UI は出さない。
   const patchOptions = stats.patches.map((p) => ({
@@ -471,30 +513,42 @@ function App() {
       <div className="flex min-h-0 flex-1">
         {/* デスクトップのレール。モバイルは下の EmblemDock（ドック＋シート）に置き換わる。 */}
         <aside className="hidden w-[300px] shrink-0 overflow-y-auto border-r border-line bg-surface/40 p-4 md:block">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wide text-faint">
-              {t(lang, 'emblems')}
-              {selectedCount > 0 && <span className="ml-1.5 text-gold">{selectedCount}</span>}
-            </h2>
-            {selectedCount > 0 && (
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <SegmentedControl<PickTab>
+              ariaLabel={t(lang, 'emblems')}
+              value={pickTab}
+              onChange={setPickTab}
+              options={tabOptions}
+            />
+            {(pickTab === 'emblem' ? selectedCount : markedCount) > 0 && (
               <button
                 type="button"
-                onClick={clear}
+                onClick={pickTab === 'emblem' ? clear : clearUnits}
                 className="text-xs font-medium text-faint transition-colors hover:text-ink"
               >
                 {t(lang, 'clear')}
               </button>
             )}
           </div>
-          <EmblemGrid
-            emblems={stats.emblems}
-            counts={counts}
-            lang={lang}
-            onAdd={addEmblem}
-            onRemove={removeEmblem}
-            baseItemIcons={stats.baseItemIcons}
-            maxMult={maxMult}
-          />
+          {pickTab === 'emblem' ? (
+            <EmblemGrid
+              emblems={stats.emblems}
+              counts={counts}
+              lang={lang}
+              onAdd={addEmblem}
+              onRemove={removeEmblem}
+              baseItemIcons={stats.baseItemIcons}
+              maxMult={maxMult}
+            />
+          ) : (
+            <UnitGrid
+              units={pickableUnits}
+              marks={unitMarks}
+              lang={lang}
+              onCycle={cycleUnit}
+              onUnmark={unmarkUnit}
+            />
+          )}
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
@@ -510,6 +564,7 @@ function App() {
             maxPlace={maxPlace}
             minTop4={minTop4}
             minWin={minWin}
+            unitFiltered={markedCount > 0}
           />
         </main>
       </div>
@@ -526,6 +581,14 @@ function App() {
         maxMult={maxMult}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
+        tab={pickTab}
+        onTabChange={setPickTab}
+        tabOptions={tabOptions}
+        units={pickableUnits}
+        unitMarks={unitMarks}
+        onCycleUnit={cycleUnit}
+        onUnmarkUnit={unmarkUnit}
+        onClearUnits={clearUnits}
       />
 
       {/* Riot の Legal Jibber Jabber。ポリシー上「プレイヤーが見つけやすい場所」への掲示が必須。 */}

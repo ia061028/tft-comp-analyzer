@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { CompStats, StatsFile } from '../../shared/types'
-import { compRows, type CompRow } from '../lib/multiset'
+import { compRows, totalRows, type CompRow } from '../lib/multiset'
 import {
   PRIOR_PLACE,
   PRIOR_TOP4,
@@ -44,6 +44,11 @@ interface CompListProps {
   minTop4: number | null
   /** 1位率の下限 %（これに満たない行を外す）。null なら絞らない。 */
   minWin: number | null
+  /**
+   * チャンピオンの印で構成を絞っているか。紋章を選んでいなくても、これが立っていれば
+   * 構成の全試合を1行にして一覧を出す（totalRows）。
+   */
+  unitFiltered?: boolean
 }
 
 /**
@@ -67,6 +72,7 @@ export function CompList({
   maxPlace,
   minTop4,
   minWin,
+  unitFiltered = false,
 }: CompListProps) {
   const { units, emblems, traits, granters } = stats
 
@@ -79,10 +85,13 @@ export function CompList({
   //
   // compRows / activeTraitCounts / bronzeTraitCount は構成数×選択紋章に比例して重いため、
   // comps・sel・stats の該当サブフィールドが変わらない限り再計算しない。
+  //
+  // 紋章を選ばずチャンピオンだけで絞っているときは、構成の全試合を1行にする。
+  const unitsOnly = sel.length === 0 && unitFiltered
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = []
     for (const comp of comps) {
-      for (const row of compRows(comp, sel)) {
+      for (const row of unitsOnly ? totalRows(comp) : compRows(comp, sel)) {
         // 絞り込みは特性やブロンズを数える前に効かせる（外す行の計算をしない）。
         //
         // 出す数字そのものを閾値にする（並べ替えで使う縮約値ではない）。画面の数字で
@@ -97,11 +106,12 @@ export function CompList({
       }
     }
     return out
-  }, [comps, sel, units, emblems, traits, granters, minN, maxPlace, minTop4, minWin])
+  }, [comps, sel, unitsOnly, units, emblems, traits, granters, minN, maxPlace, minTop4, minWin])
 
   // 同体数コホートの平均順位。Tier バッジの色と、Tier順ソートの両方の基準にする。
   // 絶対値で切ると 10体グループが全部 S になり、色も順位も情報を運ばなくなる。
-  const cohort = useMemo(() => cohortPlace(stats.comps), [stats.comps])
+  // 基準は行と同じレコード集合で取る（チャンピオンだけのときは全試合）。
+  const cohort = useMemo(() => cohortPlace(stats.comps, unitsOnly ? 'total' : 'sigs'), [stats.comps, unitsOnly])
 
   // 並び順は「選んだ指標」が第1キー。同点は Tier → 1位率 → Top4率 → 採用数 の順で決める。
   //
@@ -196,14 +206,14 @@ export function CompList({
   // セクションごとのフルカード表示件数。選択・並び順・対象構成が変わったら先頭に戻す。
   // リセット用の useEffect を置くと1フレームだけ古い件数で描いてしまうので、
   // 基準キーを state に同梱して読み出し時に比較する。
-  const pageKey = `${sel.join(',')}|${sortKey}|${bronzeMode}|${ladderMode}|${minN}|${maxPlace}|${minTop4}|${minWin}|${comps.length}`
+  const pageKey = `${sel.join(',')}|${unitsOnly}|${sortKey}|${bronzeMode}|${ladderMode}|${minN}|${maxPlace}|${minTop4}|${minWin}|${comps.length}`
   const [page, setPage] = useState<{ key: string; shown: Record<string, number> }>({
     key: pageKey,
     shown: {},
   })
   const shown = page.key === pageKey ? page.shown : {}
 
-  if (sel.length === 0) {
+  if (sel.length === 0 && !unitFiltered) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-line bg-surface/40 px-4 py-16 text-center text-sm text-muted">
         <svg
@@ -226,9 +236,10 @@ export function CompList({
 
   if (sorted.length === 0) {
     // 既定（絞り込みなし）で来るのは、選択紋章を活用した試合が1件も無いときだけ。
+    // チャンピオンで絞っているときは、そちらが原因のことが多いのでそう書く。
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-line bg-surface/40 px-4 py-10 text-center text-sm text-muted">
-        {t(lang, 'noComps')}
+        {t(lang, unitFiltered ? 'noCompsUnits' : 'noComps')}
       </div>
     )
   }

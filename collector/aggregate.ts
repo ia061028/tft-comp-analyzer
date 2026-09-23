@@ -274,7 +274,7 @@ async function main(): Promise<void> {
     console.log(
       `[${key}] 盤面グループ(accumulate): ${diag.boardGroupCount}` +
         `（盤面なし除外 ${diag.noBoard}, 未解決トレイト除外 ${diag.excludedUnresolvedTrait}, ` +
-        `紋章シグネチャなしで出力除外 ${diag.noSigBoards}）` +
+        `紋章シグネチャなし ${diag.noSigBoards}, 総レコード数の上位として追加 ${diag.popularAdded}）` +
         ` comps=${out.comps.length} matches=${out.totals.matches} → ${file}`,
     )
     for (const n of diag.unresolvedTraitNames) unresolvedTraitNames.add(n)

@@ -1,7 +1,10 @@
-import { useEffect, useRef } from 'react'
-import type { EmblemInfo } from '../../shared/types'
+import { Fragment, useEffect, useRef } from 'react'
+import type { EmblemInfo, UnitInfo } from '../../shared/types'
 import { EmblemGrid } from './EmblemGrid'
+import { SegmentedControl } from './SegmentedControl'
+import { UnitGrid, UnitTile } from './UnitGrid'
 import { pickName, t, type Lang } from '../lib/i18n'
+import { unitsByCost, type PickTab, type UnitMark, type UnitMarks } from '../lib/unitFilter'
 
 interface EmblemDockProps {
   emblems: EmblemInfo[]
@@ -17,6 +20,15 @@ interface EmblemDockProps {
   /** シートが開いているか（状態は App が持つ）。 */
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** 紋章とチャンピオンのどちらを出しているか（状態は App が持ち、レールと共用）。 */
+  tab: PickTab
+  onTabChange: (tab: PickTab) => void
+  tabOptions: { key: PickTab; label: string }[]
+  units: UnitInfo[]
+  unitMarks: UnitMarks
+  onCycleUnit: (api: string) => void
+  onUnmarkUnit: (api: string) => void
+  onClearUnits: () => void
 }
 
 /**
@@ -39,10 +51,28 @@ export function EmblemDock({
   maxMult,
   open,
   onOpenChange,
+  tab,
+  onTabChange,
+  tabOptions,
+  units,
+  unitMarks,
+  onCycleUnit,
+  onUnmarkUnit,
+  onClearUnits,
 }: EmblemDockProps) {
   const sheetRef = useRef<HTMLDivElement>(null)
   const selectedCount = counts.reduce((a, b) => a + b, 0)
   const picked = counts.map((count, index) => ({ count, index })).filter((x) => x.count > 0)
+  // 見出しに出す、印を付けた駒（使う → 使わない の順）。
+  const unitByApi = new Map(units.map((u) => [u.api, u]))
+  const marked: { unit: UnitInfo; mark: UnitMark }[] = []
+  for (const want of ['use', 'avoid'] as const) {
+    for (const [api, mark] of unitMarks) {
+      const unit = unitByApi.get(api)
+      if (unit && mark === want) marked.push({ unit, mark })
+    }
+  }
+  const tabCount = tab === 'emblem' ? selectedCount : marked.length
 
   // Esc で閉じる。開いた直後にシートへフォーカスを移し、背後の一覧をタブで拾わせない。
   useEffect(() => {
@@ -59,31 +89,50 @@ export function EmblemDock({
     <>
       <div className="dock">
         <div className="dock__head">
+          <SegmentedControl<PickTab>
+            ariaLabel={t(lang, 'emblems')}
+            value={tab}
+            onChange={onTabChange}
+            options={tabOptions}
+          />
+          {/* 選んだものの顔ぶれ。押すと区切り付きの一覧（シート）を開く。 */}
           <button
             type="button"
             onClick={() => onOpenChange(true)}
             aria-expanded={open}
-            className="flex min-w-0 flex-1 items-center gap-2 text-left text-muted"
+            aria-label={tab === 'emblem' ? t(lang, 'openEmblems') : t(lang, 'champions')}
+            className="flex h-full min-w-0 flex-1 items-center gap-1.5 text-left text-muted"
           >
-            {picked.length > 0 ? (
-              <>
-                {picked.slice(0, 4).map(({ index }) => {
+            {tab === 'emblem'
+              ? picked.slice(0, 4).map(({ index }) => {
                   const e = emblems[index]
                   if (!e) return null
                   return <img key={index} src={e.icon} alt={pickName(lang, e)} loading="lazy" />
-                })}
-                <span className="truncate font-semibold text-ink">
-                  {t(lang, 'emblems')} <span className="text-gold">{selectedCount}</span>
-                </span>
-              </>
-            ) : (
-              <span>{t(lang, 'openEmblems')}</span>
-            )}
+                })
+              : marked.slice(0, 4).map(({ unit, mark }) => (
+                  <img
+                    key={unit.api}
+                    src={unit.icon}
+                    alt={pickName(lang, unit)}
+                    loading="lazy"
+                    className={mark === 'avoid' ? 'dock__avoid' : undefined}
+                  />
+                ))}
+            <svg viewBox="0 0 12 12" aria-hidden className="ml-auto h-3.5 w-3.5 shrink-0 text-faint">
+              <path
+                d="M2 7.5 6 3.5 10 7.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
-          {selectedCount > 0 && (
+          {tabCount > 0 && (
             <button
               type="button"
-              onClick={onClear}
+              onClick={tab === 'emblem' ? onClear : onClearUnits}
               className="shrink-0 text-xs font-medium text-faint"
             >
               {t(lang, 'clear')}
@@ -91,34 +140,54 @@ export function EmblemDock({
           )}
         </div>
 
-        {/* 19種を横帯で。シートを開かずに1タップで切り替えられるのがこの帯の役目。 */}
-        <div className="dock__strip">
-          {emblems.map((emblem, i) => {
-            const count = counts[i] ?? 0
-            const label = pickName(lang, emblem)
-            return (
-              <button
-                key={emblem.api}
-                type="button"
-                aria-pressed={count > 0}
-                aria-label={count > 0 ? `${label} ${count}` : label}
-                onClick={() => onAdd(i)}
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  onRemove(i)
-                }}
-                className={`dock__tile relative ${count > 0 ? 'dock__tile--on' : ''}`}
-              >
-                <img src={emblem.icon} alt="" loading="lazy" />
-                {count > 0 && (
-                  <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-black text-base">
-                    {count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
+        {/* 横帯。シートを開かずに1タップで切り替えられるのがこの帯の役目。駒はコストの切れ目で間を空ける。 */}
+        {tab === 'unit' ? (
+          <div className="dock__strip">
+            {unitsByCost(units, lang).map((row, r) => (
+              <Fragment key={row[0].cost}>
+                {r > 0 && <span className="dock__gap" aria-hidden />}
+                {row.map((unit) => (
+                  <UnitTile
+                    key={unit.api}
+                    unit={unit}
+                    mark={unitMarks.get(unit.api)}
+                    lang={lang}
+                    onCycle={onCycleUnit}
+                    onUnmark={onUnmarkUnit}
+                  />
+                ))}
+              </Fragment>
+            ))}
+          </div>
+        ) : (
+          <div className="dock__strip">
+            {emblems.map((emblem, i) => {
+              const count = counts[i] ?? 0
+              const label = pickName(lang, emblem)
+              return (
+                <button
+                  key={emblem.api}
+                  type="button"
+                  aria-pressed={count > 0}
+                  aria-label={count > 0 ? `${label} ${count}` : label}
+                  onClick={() => onAdd(i)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    onRemove(i)
+                  }}
+                  className={`dock__tile relative ${count > 0 ? 'dock__tile--on' : ''}`}
+                >
+                  <img src={emblem.icon} alt="" loading="lazy" />
+                  {count > 0 && (
+                    <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-black text-base">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {open && (
@@ -133,21 +202,31 @@ export function EmblemDock({
             ref={sheetRef}
             role="dialog"
             aria-modal="true"
-            aria-label={t(lang, 'emblems')}
+            aria-label={tab === 'emblem' ? t(lang, 'emblems') : t(lang, 'champions')}
             tabIndex={-1}
             className="sheet focus-visible:outline-none"
           >
             <div className="sheet__grip" aria-hidden />
             <div className="sheet__body">
-              <EmblemGrid
-                emblems={emblems}
-                counts={counts}
-                lang={lang}
-                onAdd={onAdd}
-                onRemove={onRemove}
-                baseItemIcons={baseItemIcons}
-                maxMult={maxMult}
-              />
+              {tab === 'emblem' ? (
+                <EmblemGrid
+                  emblems={emblems}
+                  counts={counts}
+                  lang={lang}
+                  onAdd={onAdd}
+                  onRemove={onRemove}
+                  baseItemIcons={baseItemIcons}
+                  maxMult={maxMult}
+                />
+              ) : (
+                <UnitGrid
+                  units={units}
+                  marks={unitMarks}
+                  lang={lang}
+                  onCycle={onCycleUnit}
+                  onUnmark={onUnmarkUnit}
+                />
+              )}
             </div>
           </div>
         </>

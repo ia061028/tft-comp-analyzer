@@ -280,7 +280,7 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
   })
 
   assert.deepStrictEqual(out, {
-    schemaVersion: 6,
+    schemaVersion: 7,
     generatedAt: 'FIXED_TS',
     patch: '16.12',
     tftPatch: '17.5',
@@ -301,7 +301,8 @@ test('buildStats: 2構成（1つは n<MIN_OUTPUT_N で除外）→ WireStatsFile
       { api: 'TFT_Item_ItemX', name: 'ItemX', nameJa: 'アイテムX', icon: 'itemX.png', recipe: ['c1.png', 'c2.png'] },
     ],
     comps: [
-      { u: [0, 1], n: 4, g: [[[0], 3, 2, 1, 13]], k: [2, 3], i: [[1, 0, 4]], h: [[0, 1, 3]] },
+      // a は紋章なしの M4 も含む全4件の成績（順位 1,4,8,4）。
+      { u: [0, 1], n: 4, a: [3, 1, 17], g: [[[0], 3, 2, 1, 13]], k: [2, 3], i: [[1, 0, 4]], h: [[0, 1, 3]] },
     ],
     granters: [],
     baseItemIcons: { spatula: 'spat.png', fryingPan: 'pan.png' },
@@ -436,26 +437,26 @@ function popularVsEmblem(): LoadedRecord[] {
   return out
 }
 
-test('buildStats: 紋章シグネチャが無い盤面は、n が足りていても出力しない', () => {
+test('buildStats: 紋章シグネチャが無い盤面も、総レコード数の上位なら出力する', () => {
   const sd = makeStaticData()
   const { out, diag } = buildStats(popularVsEmblem(), sd, {
     targetPatch: 'x',
     tftPatch: 'x',
     generatedAt: 'T',
   })
-  // 残るのは紋章を使う n=3 の盤面だけ。n=8 の盤面は画面に出せないので落とす。
-  assert.equal(out.comps.length, 1)
-  assert.equal(out.comps[0].n, 3)
+  // 紋章で探す用の盤面（n=3）が先、チャンピオンだけで探す用の人気盤面（n=8）が後ろ。
+  assert.deepEqual(out.comps.map((c) => c.n), [3, 8])
+  // 人気盤面は sig を持たず、全レコードの成績だけを持つ（8件とも4位）。
+  assert.deepEqual(out.comps[1].g, [])
+  assert.deepEqual(out.comps[1].a, [8, 0, 32])
   assert.equal(diag.noSigBoards, 1)
-  // 除外しても totals は全レコードを数えたまま。
+  assert.equal(diag.popularAdded, 1)
   assert.equal(out.totals.participants, 11)
-  // 辞書も残った構成の分だけ（UnitA/UnitC は消える）。
-  assert.deepEqual(out.units.map((u) => u.api), ['TFT_UnitB', 'TFT_UnitD'])
 })
 
-test('buildStats: 上限は紋章活用レコード数で切る（総レコード数の多い盤面が優先されない）', () => {
+test('buildStats: 上限は「紋章活用レコード数」と「総レコード数」のそれぞれに効き、和集合を出す', () => {
   const sd = makeStaticData()
-  // 人気盤面にも紋章を1件だけ足し、両方が出力候補になるようにする。
+  // 人気盤面にも紋章を1件だけ足し、両方が紋章の候補になるようにする。
   const target = popularVsEmblem()
   target.push({
     route: 'asia',
@@ -469,16 +470,22 @@ test('buildStats: 上限は紋章活用レコード数で切る（総レコー�
       eh: ['TFT_UnitA'],
     }),
   })
+  // 3つ目: 紋章なしで n=4。どちらのランキングでも1位にならない。
+  for (let i = 0; i < 4; i++) {
+    target.push({
+      route: 'asia',
+      rec: rec({ m: `Q${i}`, p: 5, t: { TraitA: 3 }, u: ['TFT_UnitB', 'TFT_UnitC'], us: [2, 2] }),
+    })
+  }
   const opts = { targetPatch: 'x', tftPatch: 'x', generatedAt: 'T' }
 
-  // 上限なし: 両方出る。総レコード数は 9 対 3 だが、紋章活用は 1 対 3。
-  const all = buildStats(target, sd, opts)
-  assert.deepEqual(all.out.comps.map((c) => c.n), [3, 9])
+  // 上限なし: 全部出る。紋章活用の順（3 → 1）の後ろに、紋章なしの盤面が付く。
+  assert.deepEqual(buildStats(target, sd, opts).out.comps.map((c) => c.n), [3, 9, 4])
 
-  // 上限1: 紋章活用レコードが多い方（n=3 の盤面）が残る。
-  const { out } = buildStats(target, sd, { ...opts, maxComps: 1 })
-  assert.equal(out.comps.length, 1)
-  assert.equal(out.comps[0].n, 3)
+  // 上限1: 紋章活用の1位（n=3）と総レコード数の1位（n=9）だけが残る。
+  const { out, diag } = buildStats(target, sd, { ...opts, maxComps: 1 })
+  assert.deepEqual(out.comps.map((c) => c.n), [3, 9])
+  assert.equal(diag.popularAdded, 1)
 })
 
 test('buildStats: 紋章活用レコード数が同数なら総レコード数の多い方が先', () => {
