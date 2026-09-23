@@ -282,8 +282,9 @@ function Row({ r, muted = false }: { r: StatRow; muted?: boolean }) {
         <span className="flex items-center gap-2">
           {r.min !== undefined ? (
             // 構成一覧の発動特性チップと同じ見た目（段の色の枠＋アイコン＋体数）。
+            // 幅は2桁の体数に合わせて固定し、右の特性名の書き出しを縦にそろえる。
             <span
-              className={`inline-flex h-[20px] shrink-0 items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold tabular-nums ${styleClasses(r.style ?? 1)}`}
+              className={`inline-flex h-[20px] w-11 shrink-0 items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold tabular-nums ${styleClasses(r.style ?? 1)}`}
             >
               {r.icon && <Icon src={r.icon} className="h-3.5 w-3.5 object-contain" />}
               {r.min}
