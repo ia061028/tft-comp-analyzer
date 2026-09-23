@@ -32,6 +32,7 @@ function decodeComp(c: WireComp): CompStats {
     unitItems: c.i ?? [],
     holders: c.h ?? [],
     sigs,
+    ...(c.a ? { total: { top4: c.a[0], win: c.a[1], p: c.a[2] } } : {}),
     grants,
     slotExtra: c.s ?? 0,
   }

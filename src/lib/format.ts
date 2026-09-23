@@ -346,7 +346,7 @@ export function costBorder(cost: number): string {
  * 根拠のみ）。CompList で1回だけ算出し、FamilyCard・DerivRow に配る。
  * CI でデータが更新されるたびに実際の値が動くので、定数で埋め込まず stats から算出する。
  */
-export function cohortPlace(comps: CompStats[]): Map<number, number> {
+export function cohortPlace(comps: CompStats[], basis: 'sigs' | 'total' = 'sigs'): Map<number, number> {
   const sum = new Map<number, { n: number; p: number }>()
   for (const c of comps) {
     // キーは実効盤面サイズ。エルダードラゴン構成は1体で2枠使うので、ユニット数で切ると
@@ -354,9 +354,18 @@ export function cohortPlace(comps: CompStats[]): Map<number, number> {
     // （実測: 8体+エルダードラゴン=平均3.69 / 8体のみ=4.96）。
     const k = effectiveUnits(c)
     const a = sum.get(k) ?? { n: 0, p: 0 }
-    for (const sig of c.sigs) {
-      a.n += sig.n
-      a.p += sig.p
+    // 基準は行と同じレコード集合で取る。紋章を選んでいれば紋章を活用した試合（sigs）、
+    // チャンピオンだけで絞っていれば全試合（total）。
+    if (basis === 'total') {
+      if (c.total) {
+        a.n += c.n
+        a.p += c.total.p
+      }
+    } else {
+      for (const sig of c.sigs) {
+        a.n += sig.n
+        a.p += sig.p
+      }
     }
     sum.set(k, a)
   }
