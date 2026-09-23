@@ -17,7 +17,7 @@ export interface StatRow {
   key: string
   name: string
   icon: string
-  /** 特性の行だけ: 段の下限体数と、その段の style（1=ブロンズ … 4=プリズム）。 */
+  /** 特性の行だけ: 段の下限体数と、その段の style（TFT の値。色は format.ts の styleClasses）。 */
   min?: number
   style?: number
   n: number

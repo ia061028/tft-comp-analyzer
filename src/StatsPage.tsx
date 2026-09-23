@@ -14,6 +14,7 @@ import {
   type StatSortKey,
   type TraitSplit,
 } from './lib/summary'
+import { styleClasses } from './lib/format'
 import { SegmentedControl } from './components/SegmentedControl'
 import { SiteNav } from './components/SiteNav'
 
@@ -27,13 +28,6 @@ type LoadState =
 const LANG_STORAGE_KEY = 'tft-lang'
 
 const TONE_CLASS = { hot: 'text-ember-hot', warm: 'text-ember-warm', cold: 'text-ember-cold' } as const
-/** 特性の段の数字の色（TFT の style 値: 1=ブロンズ 2=シルバー 3=ゴールド 4=プリズム）。 */
-const STYLE_CLASS: Record<number, string> = {
-  1: 'text-tier-bronze',
-  2: 'text-tier-silver',
-  3: 'text-tier-gold',
-  4: 'text-tier-prism',
-}
 
 function readLang(): Lang {
   try {
@@ -286,23 +280,20 @@ function Row({ r, muted = false }: { r: StatRow; muted?: boolean }) {
     <tr className={`border-t border-line first:border-t-0 ${muted ? 'bg-base text-faint' : ''}`}>
       <td className="px-2.5 py-1.5">
         <span className="flex items-center gap-2">
-          {r.icon ? (
-            <img
-              src={r.icon}
-              alt=""
-              width={20}
-              height={20}
-              loading="lazy"
-              className="h-5 w-5 shrink-0"
-              onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
-            />
+          {r.min !== undefined ? (
+            // 構成一覧の発動特性チップと同じ見た目（段の色の枠＋アイコン＋体数）。
+            <span
+              className={`inline-flex h-[20px] shrink-0 items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold tabular-nums ${styleClasses(r.style ?? 1)}`}
+            >
+              {r.icon && <Icon src={r.icon} className="h-3.5 w-3.5 object-contain" />}
+              {r.min}
+            </span>
+          ) : r.icon ? (
+            <Icon src={r.icon} className="h-5 w-5 shrink-0" />
           ) : (
             <span className="h-5 w-5 shrink-0" aria-hidden />
           )}
           <span className={`whitespace-nowrap ${muted ? '' : 'font-medium text-ink'}`}>{r.name}</span>
-          {r.min !== undefined && (
-            <span className={`font-bold ${r.style ? STYLE_CLASS[r.style] : 'text-muted'}`}>{r.min}</span>
-          )}
         </span>
       </td>
       <td className={`px-2.5 py-1.5 text-right font-bold ${muted ? '' : TONE_CLASS[placeTone(r.avg)]}`}>
@@ -315,5 +306,18 @@ function Row({ r, muted = false }: { r: StatRow; muted?: boolean }) {
         {r.share < 1 ? `${r.share.toFixed(2)}%` : pct(r.share)}
       </td>
     </tr>
+  )
+}
+
+/** 読み込めないアイコン（CDragon 側の欠け）は枠ごと消さず、場所だけ残して見えなくする。 */
+function Icon({ src, className }: { src: string; className: string }) {
+  return (
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      className={className}
+      onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+    />
   )
 }
