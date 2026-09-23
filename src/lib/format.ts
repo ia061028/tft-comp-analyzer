@@ -414,13 +414,20 @@ export function tierOf(avgPlace: number): { label: string; color: string; classe
  * チームプランナーの貼付コード（現行 02 形式）:
  * `02` + 10スロット×「team_planner_code を12bit=3桁hex(big-endian)」 + `TFTSet{N}`。空き枠は `000`。
  * （旧 01 形式は8bit/2桁だが、グローバルIDが255を超えるため12bit形式に変更されている）
+ * 2026-09-23 にセット18のクライアントへ貼って、単体・8体・ラックス入り・エルダードラゴン入りが正しく出ることを確認済み。
+ * code を持たない駒（ラックスの変種など）は飛ばす。10体を超える盤面は、プランナーに入らない分を安い駒から落とす。
  */
 export function buildPlannerCode(unitIdxs: number[], units: UnitInfo[], setNumber: number): string {
-  const slots: string[] = []
-  for (const idx of unitIdxs) {
-    const code = units[idx]?.code ?? 0
-    if (code > 0) slots.push(code.toString(16).padStart(3, '0'))
+  let coded = unitIdxs.filter((idx) => (units[idx]?.code ?? 0) > 0)
+  if (coded.length > 10) {
+    const keep = new Set(
+      [...coded.keys()]
+        .sort((a, b) => units[coded[b]].cost - units[coded[a]].cost || a - b)
+        .slice(0, 10),
+    )
+    coded = coded.filter((_, i) => keep.has(i))
   }
+  const slots = coded.map((idx) => units[idx].code.toString(16).padStart(3, '0'))
   while (slots.length < 10) slots.push('000')
-  return '02' + slots.slice(0, 10).join('') + 'TFTSet' + setNumber
+  return '02' + slots.join('') + 'TFTSet' + setNumber
 }

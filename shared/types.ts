@@ -70,7 +70,7 @@ export interface UnitInfo {
   nameJa: string
   cost: number
   icon: string
-  /** チームプランナーのチャンピオンバイト値（ロスター内 apiName 昇順の1始まり位置。非ロスターは0） */
+  /** チームプランナーの team_planner_code（CDragon の tftchampions-teamplanner.json）。定義に無い駒は0 */
   code: number
   /** このユニットが所持するトレイト（traits 配列インデックス）。発動数の算出に使う。 */
   traits: number[]

@@ -77,8 +77,8 @@ cp .env.example .env   # RIOT_API_KEY を設定（https://developer.riotgames.co
 
 ## 既知の課題 / TODO
 
-- **チームコードの形式**: 現行は `02` + 各チャンピオン12bit(3桁hex, team_planner_code) + `TFTSet{n}`。実機での有効性は要再検証（クライアント生成コードとの突き合わせ）。
-  セット18 では Lux の9変種（`DA_18_Lux_*` 等、Avatar 特性でトレイト別に姿が変わる5コスト）が Riot のチームプランナー定義に無く `team_planner_code` を持たないため、その枠は `000` になる。
+- **チームコードの形式**: `02` + 各チャンピオン12bit(3桁hex, team_planner_code) + `TFTSet{n}`。2026-09-23 にセット18のクライアントへ貼って正しく読み込めることを確認済み（単体・8体・ラックス入り・エルダードラゴン入り。検証したコードは `src/lib/format.test.ts` に固定）。
+  セット18 では Lux の9変種（`DA_18_Lux_*` 等、Avatar 特性でトレイト別に姿が変わる5コスト）が Riot のチームプランナー定義に無く `team_planner_code` を持たないため、コードからは抜ける（基本形の `DA_Lux18_Base` は入る）。10体を超える盤面は安い駒から落として10体に収める。
 - **パッチ境界は日時で近似**: セット18 以降 `game_version` がプレースホルダのため、パッチは `config.patchSchedule` の配信日時（UTC 00:00 目安）で割り当てている。実際の配信はリージョンごとに数時間ずれるので境界付近の試合は数時間分ずれうる。Riot が `game_version` を直せば実パッチキーが優先される（その場合は `config.tftPatchLabels` に表記を追加）。
 - **Production キー**: 現在のパーソナルキーのレート上限は開発キーと同じ 100req/120s（リージョナルホストごと）で、1ランあたり約5,000マッチ/ルートの天井を決めている。ただし母集団を Master 以上に絞った後は取得能力より母集団の新規試合数（1日5,000〜10,000試合）が上限なので、上限の高い Production キーに切り替える実益は現状ない。
 - **保持量の天井**: レコードは gzip 分割シャードで保持し、1ルート 64MB gz（約10万マッチ）＋直近2パッチが上限（`config.maxSealedBytesPerRoute` / `patchesToKeep`）。増やすなら前者を上げる（集計時間とメモリ、`stats-*.json` のサイズが比例して増える。構成数は `maxCompsPerView` で抑えている）。

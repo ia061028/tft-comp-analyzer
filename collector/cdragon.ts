@@ -246,7 +246,7 @@ async function fetchPlannerCodes(setNumber: number): Promise<Map<string, number>
       }
     }
   } catch {
-    // 取得失敗時はコード未設定（プランナーコードはその分 00 になる）。
+    // 取得失敗時はコード未設定（その駒はプランナーコードから抜ける）。
   }
   return map
 }
