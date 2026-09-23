@@ -44,6 +44,8 @@ interface CompListProps {
   minTop4: number | null
   /** 1位率の下限 %（これに満たない行を外す）。null なら絞らない。 */
   minWin: number | null
+  /** チャンピオンの印で構成を絞っているか。0件のときの文言を出し分けるだけに使う。 */
+  unitFiltered?: boolean
 }
 
 /**
@@ -67,6 +69,7 @@ export function CompList({
   maxPlace,
   minTop4,
   minWin,
+  unitFiltered = false,
 }: CompListProps) {
   const { units, emblems, traits, granters } = stats
 
@@ -226,9 +229,10 @@ export function CompList({
 
   if (sorted.length === 0) {
     // 既定（絞り込みなし）で来るのは、選択紋章を活用した試合が1件も無いときだけ。
+    // チャンピオンで絞っているときは、そちらが原因のことが多いのでそう書く。
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-line bg-surface/40 px-4 py-10 text-center text-sm text-muted">
-        {t(lang, 'noComps')}
+        {t(lang, unitFiltered ? 'noCompsUnits' : 'noComps')}
       </div>
     )
   }

@@ -1093,4 +1093,88 @@
       (100% - var(--lane-item) * var(--lane-item-n)) / (var(--lane-item-n) - 1)
     );
   }
+
+  /* ===== チャンピオンのタイル =====
+   * 紋章と同じレール／ドックに並べる、構成を駒で絞るためのタイル。
+   * 枠はコスト色。押すたびに 印なし → 使う → 使わない → 印なし と回る。
+   * 使う＝手の内（金）で光らせ、使わない＝光を消して斜線を引く。どちらも文字では示さない。
+   */
+  .utile {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    border-width: 2px;
+    border-color: var(--color-cost-1);
+    background-color: var(--color-g-2);
+    overflow: hidden;
+    transition: box-shadow 150ms, transform 150ms;
+  }
+  .utile[data-cost="2"] { border-color: var(--color-cost-2); }
+  .utile[data-cost="3"] { border-color: var(--color-cost-3); }
+  .utile[data-cost="4"] { border-color: var(--color-cost-4); }
+  .utile[data-cost="5"] { border-color: var(--color-cost-5); }
+  .utile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.85;
+  }
+  .utile:hover img {
+    opacity: 1;
+  }
+  .utile:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-hand) 50%, transparent);
+  }
+  .utile--use {
+    box-shadow: 0 0 0 2px var(--color-hand), 0 0 16px -4px var(--color-hand);
+  }
+  .utile--use img {
+    opacity: 1;
+  }
+  .utile--avoid img {
+    opacity: 0.3;
+    filter: grayscale(1);
+  }
+  .utile--avoid::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to top right,
+      transparent calc(50% - 1.5px),
+      var(--color-ink-2) calc(50% - 1.5px),
+      var(--color-ink-2) calc(50% + 1.5px),
+      transparent calc(50% + 1.5px)
+    );
+  }
+  /* コストごとに段を分ける。見出しは置かず、枠の色と段の切れ目だけで読ませる。 */
+  .ugrid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .ugrid__row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--tile-size), 1fr));
+    gap: 0.375rem;
+  }
+  /* ドックの見出しで「使わない」に選んだ駒。光を消して、使う駒と見分ける。 */
+  .dock__head img.dock__avoid {
+    filter: grayscale(1);
+    opacity: 0.4;
+    box-shadow: 0 0 0 2px var(--color-g-4);
+  }
+  /* モバイルのドックの帯では、コストの切れ目に少し間を空ける。 */
+  .dock__gap {
+    width: 0.25rem;
+    flex-shrink: 0;
+  }
+  .dock__strip .utile {
+    width: var(--dock-tile);
+    height: var(--dock-tile);
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
 }
