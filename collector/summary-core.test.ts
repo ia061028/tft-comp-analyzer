@@ -2,7 +2,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { StaticData } from './cdragon.ts'
 import type { ParticipantRecord } from '../shared/types.ts'
-import { choosersFromGranters, createSummaryBuilder, summaryChoosers, summaryDictionaries } from './summary-core.ts'
+import {
+  choosersFromGranters,
+  createSummaryBuilder,
+  summaryChoosers,
+  summaryDictionaries,
+  uniqueTraitApis,
+} from './summary-core.ts'
 
 // TraitA [2,3] / TraitB [2,4]。紋章A は TraitA、紋章B は TraitB（変種で TraitA も持つ）。
 function makeStaticData(): StaticData {
@@ -89,24 +95,17 @@ test('summaryDictionaries: builder の idx と同じ並びで、紋章の trait 
   assert.deepEqual(emblems.map((e) => [e.api, e.trait]), [['EmblemA', 0], ['EmblemB', 1]])
 })
 
-test('区分: レベルは7以下と10以上をまとめ、区分ごとに同じ集計を持つ', () => {
+test('区分: プレイヤーのレベルでは分けない（選択駒が無ければ区分は1つ）', () => {
   const b = createSummaryBuilder(makeStaticData())
   b.add(rec({ p: 1, lv: 10, t: { TraitA: 3 }, tc: { TraitA: 3 }, e: ['EmblemA'] }))
-  b.add(rec({ p: 3, lv: 11, t: { TraitA: 3 }, tc: { TraitA: 3 } }))
   b.add(rec({ p: 8, lv: 6 }))
-  b.add(rec({ p: 5, lv: 8, t: { TraitA: 1 }, tc: { TraitA: 2 } }))
   const out = b.finish()
-  // 選択駒が無いので c は常に 0。人の居ない区分は出さない
   assert.deepEqual(
-    out.cells!.map((l) => [l.lv, l.c, l.participants]),
-    [['7', 0, 1], ['8', 0, 1], ['10', 0, 2]],
+    out.cells!.map((c) => [c.lv, c.c, c.participants]),
+    [[undefined, 0, 2]],
   )
-  const lv10 = out.cells!.find((l) => l.lv === '10')!
-  assert.deepEqual(lv10.emblems, [[0, [1, 1, 1, 1, 10]]])
-  assert.deepEqual(lv10.traits, [[0, 3, [2, 4, 2, 1, 21], [1, 1, 1, 1, 10], [1, 3, 1, 0, 11]]])
-  assert.deepEqual(out.cells!.find((l) => l.lv === '7')!.noEmblem, [1, 8, 0, 0, 6])
-  // 全体は区分の合計
-  assert.equal(out.participants, 4)
+  assert.deepEqual(out.cells![0].emblems, out.emblems)
+  assert.deepEqual(out.cells![0].traits, out.traits)
 })
 
 // 選択駒の検証用。Lux は選んだ特性を +2、Kz は進化を +1。Ann は TraitA の素の駒。
@@ -189,4 +188,24 @@ test('summaryChoosers: 駒の名前と、選べる特性の idx', () => {
   const sd = makeChooserData()
   const [lux] = summaryChoosers(sd, [{ api: 'Lux', delta: 2, traits: new Set(['TraitC', 'TraitA']) }])
   assert.deepEqual(lux, { api: 'Lux', name: 'Lux', nameJa: 'Lux', cost: 3, icon: 'Lux.png', traits: [0, 2] })
+})
+
+test('uniqueTraitApis: 持つチャンピオンが1体だけの特性。段の数では決めない', () => {
+  const sd = makeStaticData()
+  // TraitA は段が1つでも3体が持つ（ソーラー相当）。Solo は1体だけ。召喚物は数えない
+  sd.traits.set('Solo', { name: 'Solo', nameJa: 'ソロ', icon: 's.png', tiers: [[1, 4]] })
+  const unit = (traits: string[], cost = 2) => ({ name: 'x', nameJa: 'x', cost, icon: '', code: 0, traits })
+  sd.units = new Map([
+    ['U1', unit(['TraitA', 'Solo'])],
+    ['U2', unit(['TraitA', 'TraitB'])],
+    ['U3', unit(['TraitA', 'TraitB'])],
+    ['X_Summon', unit(['TraitB'])],
+    ['Dummy', unit(['TraitB'], 0)],
+  ])
+  assert.deepEqual([...uniqueTraitApis(sd)], ['Solo'])
+  const { traits } = summaryDictionaries(sd)
+  assert.deepEqual(
+    traits.map((t) => [t.api, t.unique]),
+    [['TraitA', false], ['TraitB', false], ['Solo', true]],
+  )
 })

@@ -4,7 +4,7 @@ import type { StaticData } from './cdragon.ts'
 import type { ParticipantRecord } from '../shared/types.ts'
 import { createDrillBuilder, DRILL_TYPE_LIMIT } from './drill-core.ts'
 
-// TraitA [2,4] / TraitB [2,4] / TraitC [2,3] / Solo [1]（固有）。紋章A は TraitA。
+// TraitA [2,4] / TraitB [2,4] / TraitC [2,3] / Solo [1]（Dee だけが持つ固有特性）。紋章A は TraitA。
 function makeStaticData(extraTraits = 0): StaticData {
   const traits = new Map<string, { name: string; nameJa: string; icon: string; tiers: [number, number][] }>([
     ['TraitA', { name: 'Alpha', nameJa: 'アルファ', icon: 'a.png', tiers: [[2, 1], [4, 3]] }],
@@ -13,7 +13,7 @@ function makeStaticData(extraTraits = 0): StaticData {
     ['Solo', { name: 'Solo', nameJa: 'ソロ', icon: 's.png', tiers: [[1, 4]] }],
   ])
   for (let i = 0; i < extraTraits; i++) traits.set(`X${i}`, { name: `X${i}`, nameJa: `X${i}`, icon: '', tiers: [[2, 1], [4, 3]] })
-  const unit = (name: string, cost: number) => ({ name, nameJa: name, cost, icon: `${name}.png`, code: 0, traits: [] })
+  const unit = (name: string, cost: number, traits: string[] = []) => ({ name, nameJa: name, cost, icon: `${name}.png`, code: 0, traits })
   return {
     setNumber: 18,
     traits,
@@ -21,7 +21,8 @@ function makeStaticData(extraTraits = 0): StaticData {
       ['U1', unit('Ann', 1)],
       ['U2', unit('Bob', 2)],
       ['U3', unit('Cid', 3)],
-      ['U4', unit('Dee', 1)],
+      // Solo を持つのは Dee だけ（固有特性）
+      ['U4', unit('Dee', 1, ['Solo'])],
     ]),
     emblems: new Map([
       ['EmblemA', { name: 'EmblemA', nameJa: '紋章A', traitApi: 'TraitA', traitApis: ['TraitA'], icon: 'ea.png', base: 'spatula' as const }],
