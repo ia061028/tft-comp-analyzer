@@ -28,14 +28,24 @@ import { getStaticData, type StaticData } from './cdragon.ts'
 import type { ParticipantRecord, WireDrillFile, WireStatsFile, WireSummaryFile, PatchIndexEntry } from '../shared/types.ts'
 import {
   classifyRecord,
+  createGranterCounter,
   createStatsBuilder,
+  inferTraitGrants,
   serializeStatsFile,
   pickTargetSetFromCounts,
   MIN_OUTPUT_N,
   type StatsBuilder,
 } from './aggregate-core.ts'
 import { listRouteShards, forEachRecord } from './shards.ts'
-import { createSummaryBuilder, LEVEL_KEYS, levelKeyOf, summaryDictionaries, type SummaryBuilder } from './summary-core.ts'
+import {
+  choosersFromGranters,
+  createSummaryBuilder,
+  LEVEL_KEYS,
+  levelKeyOf,
+  summaryChoosers,
+  summaryDictionaries,
+  type SummaryBuilder,
+} from './summary-core.ts'
 import { createDrillBuilder, type DrillBuilder } from './drill-core.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -202,6 +212,8 @@ async function main(): Promise<void> {
   const patchIdx = new Map<string, number>()
   for (const [p] of patchEntries) patchIdx.set(p, patchIdx.size)
   const boardCounts = new Map<string, number[]>()
+  // 統計ページの選択駒（ラックス等）を決めるための付与元推定。構成一覧の推定とは別に、対象レコード全部で数える。
+  const granterCounter = createGranterCounter()
   let inScopeRecords = 0
   await forEachRecord(routes.values(), (rec) => {
     const patch = resolvePatch(rec.v, rec.ts, schedule)
@@ -209,6 +221,7 @@ async function main(): Promise<void> {
     inScopeRecords++
     const cls = classifyRecord(rec, staticData)
     if (cls.kind !== 'ok') return
+    if (rec.tc) granterCounter.add(inferTraitGrants(rec, staticData, cls.boardSet), cls.boardSet)
     const pi = patchIdx.get(patch)
     if (pi === undefined) return
     let c = boardCounts.get(cls.boardKey)
@@ -220,6 +233,10 @@ async function main(): Promise<void> {
   })
   console.log(
     `パス B（盤面カウント）: 対象 ${inScopeRecords} レコード / 盤面 ${boardCounts.size} ${secSince(t0)} heap=${heapMB()}`,
+  )
+  const choosers = choosersFromGranters(granterCounter.finish())
+  console.log(
+    `選択駒: ${choosers.map((c) => `${c.api}（+${c.delta}、${[...c.traits].join(' / ')}）`).join('、') || 'なし'}`,
   )
 
   // 7. ビューごとの builder。boardFilter でそのビュー内の n >= MIN_OUTPUT_N の盤面だけ accumulate する。
@@ -252,7 +269,7 @@ async function main(): Promise<void> {
   const drillsByPatch = new Map<string, ViewDrills[]>()
   const drillBuilders: { key: string; builder: DrillBuilder }[] = []
   for (const view of views) {
-    const summary = createSummaryBuilder(staticData)
+    const summary = createSummaryBuilder(staticData, choosers)
     summaryBuilders.push({ key: view.key, label: viewLabel(view.patches), builder: summary })
     const drill: ViewDrills = { all: createDrillBuilder(staticData), byLevel: new Map() }
     drillBuilders.push({ key: view.key, builder: drill.all })
@@ -336,6 +353,7 @@ async function main(): Promise<void> {
     setNumber: staticData.setNumber,
     defaultKey,
     ...summaryDictionaries(staticData),
+    choosers: summaryChoosers(staticData, choosers),
     views: summaryBuilders.map(({ key, label, builder }) => ({ key, label, ...builder.finish() })),
   }
   for (const v of summaryOut.views) {

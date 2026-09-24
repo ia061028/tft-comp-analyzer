@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { WireSummaryFile, WireSummaryView } from '../../shared/types'
-import { emblemRows, noEmblemRow, traitRows, sortRows, placeTone } from './summary'
+import { emblemRows, filterView, noEmblemRow, pickRows, traitRows, sortRows, placeTone } from './summary'
 
 const file: WireSummaryFile = {
   schemaVersion: 1,
@@ -61,4 +61,39 @@ test('placeTone: 4.5 からの差で段を決める', () => {
   assert.equal(placeTone(3.6), 'hot')
   assert.equal(placeTone(4.1), 'warm')
   assert.equal(placeTone(4.4), 'cold')
+})
+
+test('filterView: 条件に合う区分を足す。全部「全体」ならそのまま', () => {
+  const st = (n: number, p: number): [number, number, number, number, number] => [n, p, 0, 0, n * 8]
+  const cell = (lv: '8' | '9', c: number, n: number) => ({
+    lv,
+    c,
+    participants: n,
+    emblems: [[0, st(n, n * 4)]] as [number, [number, number, number, number, number]][],
+    noEmblem: st(0, 0),
+    traits: [[0, 2, st(n, n * 4), st(0, 0), st(n, n * 4)]] as WireSummaryView['traits'],
+    picks: c & 1 ? ([[0, 0, st(n, n * 3)]] as [number, number, [number, number, number, number, number]][]) : [],
+  })
+  const v: WireSummaryView = { ...view, cells: [cell('8', 0, 10), cell('8', 1, 2), cell('8', 3, 1), cell('9', 1, 4)] }
+  assert.equal(filterView(v, 'all', ['all', 'all']), v)
+  // 1つ目の選択駒あり（ビット0）
+  const withLux = filterView(v, 'all', ['with', 'all'])
+  assert.equal(withLux.participants, 7)
+  assert.deepEqual(withLux.emblems, [[0, [7, 28, 0, 0, 56]]])
+  assert.deepEqual(withLux.picks, [[0, 0, [7, 21, 0, 0, 56]]])
+  // Lv8 かつ 2つ目の選択駒なし
+  const v8 = filterView(v, '8', ['all', 'without'])
+  assert.equal(v8.participants, 12)
+  assert.deepEqual(v8.traits, [[0, 2, [12, 48, 0, 0, 96], [0, 0, 0, 0, 0], [12, 48, 0, 0, 96]]])
+  // 元のビューは書き換えない
+  assert.deepEqual(v.cells![0].emblems, [[0, [10, 40, 0, 0, 80]]])
+  const rows = pickRows(file, withLux, 0, 'ja')
+  assert.deepEqual(rows.map((r) => [r.name, r.n, r.avg]), [['アルファ', 7, 3]])
+})
+
+test('filterView: 区分の無い古いファイルはレベルだけで絞る', () => {
+  const lv = { lv: '8' as const, participants: 3, emblems: [], noEmblem: [3, 9, 0, 0, 24] as [number, number, number, number, number], traits: [] }
+  const v: WireSummaryView = { ...view, levels: [lv] }
+  assert.equal(filterView(v, '8', []).participants, 3)
+  assert.equal(filterView(v, '9', []), v)
 })

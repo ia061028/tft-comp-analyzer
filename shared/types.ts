@@ -301,8 +301,40 @@ export interface WireSummaryView {
    * 装備しているが段を上げていない参加者は「全体」にだけ入る。
    */
   traits: [number, number, WireRecordStat, WireRecordStat, WireRecordStat][]
-  /** レベル区分ごとの内訳（2026-09-24 から。古いファイルには無い）。 */
+  /** 選択駒が選んだ特性の成績。[choosers の idx, traits の idx, 成績]（2026-09-24 から） */
+  picks?: [number, number, WireRecordStat][]
+  /**
+   * 絞り込みの区分ごとの内訳（2026-09-24 から）。1人はどれか1つに入り、画面は条件に合う区分を足す。
+   * 古いファイルは cells の代わりに levels を持つ。
+   */
+  cells?: WireSummaryCell[]
+  /** レベル区分ごとの内訳（2026-09-24 の一時期だけ。cells に置き換え）。 */
   levels?: WireSummaryLevel[]
+}
+
+/** 統計ページの絞り込みの最小区分。レベル区分 × 選択駒の有無（ビット i ＝ choosers[i] が盤面に居る）。 */
+export interface WireSummaryCell {
+  lv: LevelKey
+  c: number
+  participants: number
+  emblems: WireSummaryView['emblems']
+  noEmblem: WireRecordStat
+  traits: WireSummaryView['traits']
+  picks: NonNullable<WireSummaryView['picks']>
+}
+
+/**
+ * 選択駒: 盤面に置くと、プレイヤーが選んだ特性を上乗せする駒（セット18 ではラックスとカ＝ジックス）。
+ * 集計が上乗せの実測から決める。
+ */
+export interface WireSummaryChooser {
+  api: string
+  name: string
+  nameJa: string
+  cost: number
+  icon: string
+  /** 選べる特性（traits の idx）。 */
+  traits: number[]
 }
 
 /** プレイヤーレベルの区分。"7" は 7 以下、"10" は 10 以上。 */
@@ -326,6 +358,8 @@ export interface WireSummaryFile {
   defaultKey: string
   traits: TraitInfo[]
   emblems: EmblemInfo[]
+  /** 選択駒（2026-09-24 から）。無い・空ならラックス等の切り替えは出さない。 */
+  choosers?: WireSummaryChooser[]
   views: WireSummaryView[]
 }
 

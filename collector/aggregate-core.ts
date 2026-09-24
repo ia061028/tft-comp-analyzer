@@ -295,6 +295,67 @@ export function parseGranterKey(key: string): { traitApi: string; delta: number 
   return { traitApi: key.slice(0, i), delta }
 }
 
+/** 付与元の推定結果。「トレイト＋上乗せ数」ごとに、同席していた割合が最も高いユニット。 */
+export interface GranterGuess {
+  traitApi: string
+  delta: number
+  unitApi: string
+  /** その上乗せが観測されたレコード数。 */
+  total: number
+  /** GRANTER_MIN_RECORDS と GRANTER_MIN_COVERAGE を満たし、付与元と言い切れる。 */
+  confident: boolean
+}
+
+export interface GranterCounter {
+  /** 1レコード分。grants は inferTraitGrants の結果。 */
+  add(grants: ReadonlyMap<string, number>, boardSet: ReadonlySet<string>): void
+  /** 件数が GRANTER_MIN_RECORDS 未満の組は出さない。 */
+  finish(): GranterGuess[]
+}
+
+/**
+ * 付与元ユニットの推定器。上乗せと同時に盤面に居たユニットを数える。
+ * キーは「トレイト＋上乗せ数」。同じトレイトでも由来ごとに上乗せ数が違うので、
+ * 混ぜると本来の付与元の同席率が薄まる（granterKey のコメント参照）。
+ */
+export function createGranterCounter(): GranterCounter {
+  // granterKey → ユニット apiName → 同時出現数
+  const co = new Map<string, Map<string, number>>()
+  // granterKey → その上乗せが観測されたレコード数（co の分母）
+  const totals = new Map<string, number>()
+  return {
+    add(grants, boardSet) {
+      for (const [tApi, delta] of grants) {
+        const gKey = granterKey(tApi, delta)
+        totals.set(gKey, (totals.get(gKey) ?? 0) + 1)
+        let c = co.get(gKey)
+        if (!c) co.set(gKey, (c = new Map()))
+        for (const uApi of boardSet) c.set(uApi, (c.get(uApi) ?? 0) + 1)
+      }
+    },
+    finish() {
+      const out: GranterGuess[] = []
+      for (const [gKey, c] of co) {
+        const parsed = parseGranterKey(gKey)
+        if (!parsed) continue
+        const total = totals.get(gKey) ?? 0
+        if (total < GRANTER_MIN_RECORDS) continue
+        let bestApi: string | undefined
+        let bestCo = -1
+        for (const [uApi, n] of c) {
+          if (n > bestCo || (n === bestCo && bestApi !== undefined && uApi < bestApi)) {
+            bestCo = n
+            bestApi = uApi
+          }
+        }
+        if (bestApi === undefined) continue
+        out.push({ ...parsed, unitApi: bestApi, total, confident: bestCo / total >= GRANTER_MIN_COVERAGE })
+      }
+      return out
+    },
+  }
+}
+
 export interface AggregateDiag {
   /** 盤面ユニットが1体も無く除外したレコード数。 */
   noBoard: number
@@ -396,10 +457,7 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
   }
 
   const map = new Map<string, CompAcc>()
-  // 付与元ユニットの推定用。granterKey(トレイト, 上乗せ数) → ユニット apiName → 同時出現数。
-  const granterCo = new Map<string, Map<string, number>>()
-  // granterKey → その上乗せが観測されたレコード数（granterCo の分母）。
-  const granterTotal = new Map<string, number>()
+  const granterCounter = createGranterCounter()
   let noBoard = 0
   let excludedUnresolvedTrait = 0
   const byRoute: Record<string, number> = {}
@@ -455,25 +513,15 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
     // 静的データ外の特性上乗せ（tc を持つレコードのみ）。
     if (rec.tc) {
       acc.grantRecords++
-      for (const [tApi, delta] of inferTraitGrants(rec, staticData, boardSet)) {
+      const grants = inferTraitGrants(rec, staticData, boardSet)
+      granterCounter.add(grants, boardSet)
+      for (const [tApi, delta] of grants) {
         let dc = acc.grantCounts.get(tApi)
         if (!dc) {
           dc = new Map()
           acc.grantCounts.set(tApi, dc)
         }
         dc.set(delta, (dc.get(delta) ?? 0) + 1)
-
-        // 付与元の推定材料: この上乗せと同時に盤面に居たユニット。
-        // キーは「トレイト＋上乗せ数」。同じトレイトでも由来ごとに上乗せ数が違うので、
-        // 混ぜると本来の付与元の同席率が薄まる（granterKey のコメント参照）。
-        const gKey = granterKey(tApi, delta)
-        granterTotal.set(gKey, (granterTotal.get(gKey) ?? 0) + 1)
-        let co = granterCo.get(gKey)
-        if (!co) {
-          co = new Map()
-          granterCo.set(gKey, co)
-        }
-        for (const uApi of boardSet) co.set(uApi, (co.get(uApi) ?? 0) + 1)
       }
     }
 
@@ -813,25 +861,12 @@ export function createStatsBuilder(staticData: StaticData, opts: StatsBuilderOpt
     // 実データ（セット18）ではカ＝ジックス・ラックス・エルダードラゴンがそれぞれ
     // 別のトレイトを付与するので1対1に決まる。決まらないセットでは閾値に届かず空になる。
     const granters: TraitGranter[] = []
-    for (const [gKey, co] of granterCo) {
-      const parsed = parseGranterKey(gKey)
-      if (!parsed) continue
-      const ti = traitIndex.get(parsed.traitApi)
-      if (ti === undefined) continue
-      const total = granterTotal.get(gKey) ?? 0
-      if (total < GRANTER_MIN_RECORDS) continue
-      let bestApi: string | undefined
-      let bestCo = -1
-      for (const [uApi, c] of co) {
-        if (c > bestCo || (c === bestCo && bestApi !== undefined && uApi < bestApi)) {
-          bestCo = c
-          bestApi = uApi
-        }
-      }
-      if (bestApi === undefined || bestCo / total < GRANTER_MIN_COVERAGE) continue
-      const ui = unitIndex.get(bestApi)
-      if (ui === undefined) continue
-      granters.push([ui, ti, parsed.delta])
+    for (const g of granterCounter.finish()) {
+      if (!g.confident) continue
+      const ti = traitIndex.get(g.traitApi)
+      const ui = unitIndex.get(g.unitApi)
+      if (ti === undefined || ui === undefined) continue
+      granters.push([ui, ti, g.delta])
     }
     granters.sort((a, b) => a[0] - b[0] || a[1] - b[1] || (a[2] ?? 0) - (b[2] ?? 0))
 

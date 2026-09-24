@@ -1,6 +1,6 @@
 import type { UnitInfo } from '../../shared/types'
-import { pickName, t, type Lang } from '../lib/i18n'
-import { unitsByCost, type UnitMark, type UnitMarks } from '../lib/unitFilter'
+import { pickName, type Lang } from '../lib/i18n'
+import { markLabel, unitsByCost, type UnitMark, type UnitMarks } from '../lib/unitFilter'
 import { Tip } from './Tip'
 
 interface UnitGridProps {
@@ -11,12 +11,6 @@ interface UnitGridProps {
   onCycle: (api: string) => void
   /** 右クリック／キー操作(Backspace,Delete,-): 印を外す。 */
   onUnmark: (api: string) => void
-}
-
-function markLabel(lang: Lang, name: string, mark: UnitMark | undefined): string {
-  if (mark === 'use') return `${name} ${t(lang, 'unitUse')}`
-  if (mark === 'avoid') return `${name} ${t(lang, 'unitAvoid')}`
-  return name
 }
 
 /** チャンピオン1体のタイル。レールの格子とモバイルのドックの帯で共用する。 */
