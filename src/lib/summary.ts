@@ -1,5 +1,5 @@
 // 統計ページ（summary.json）の読み込みと、表の行の組み立て。
-import type { WireRecordStat, WireSummaryFile, WireSummaryView } from '../../shared/types'
+import type { LevelKey, WireRecordStat, WireSummaryCell, WireSummaryFile, WireSummaryView } from '../../shared/types'
 import { pickName, type Lang } from './i18n'
 import { PRIOR_PLACE, shrunk } from './format'
 
@@ -11,6 +11,76 @@ export async function loadSummary(): Promise<WireSummaryFile | null> {
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`${SUMMARY_FILE} fetch failed (${res.status} ${res.statusText})`)
   return (await res.json()) as WireSummaryFile
+}
+
+/** 選択駒（ラックス等）ごとの絞り込み。 */
+export type ChooserFilter = 'all' | 'with' | 'without'
+
+function addInto(to: WireRecordStat, from: WireRecordStat): void {
+  for (let k = 0; k < 5; k++) to[k] += from[k]
+}
+
+/** 区分を足し合わせて1つのビューの形にする。 */
+function sumCells(view: WireSummaryView, cells: readonly Omit<WireSummaryCell, 'lv' | 'c'>[]): WireSummaryView {
+  const emblems = new Map<number, WireRecordStat>()
+  const traits = new Map<string, WireSummaryView['traits'][number]>()
+  const picks = new Map<string, [number, number, WireRecordStat]>()
+  const noEmblem: WireRecordStat = [0, 0, 0, 0, 0]
+  let participants = 0
+  for (const cell of cells) {
+    participants += cell.participants
+    addInto(noEmblem, cell.noEmblem)
+    for (const [i, st] of cell.emblems) {
+      const cur = emblems.get(i)
+      if (cur) addInto(cur, st)
+      else emblems.set(i, [...st])
+    }
+    for (const [ti, min, a, w, wo] of cell.traits) {
+      const key = `${ti}|${min}`
+      const cur = traits.get(key)
+      if (cur) {
+        addInto(cur[2], a)
+        addInto(cur[3], w)
+        addInto(cur[4], wo)
+      } else traits.set(key, [ti, min, [...a], [...w], [...wo]])
+    }
+    for (const [ci, ti, st] of cell.picks ?? []) {
+      const key = `${ci}|${ti}`
+      const cur = picks.get(key)
+      if (cur) addInto(cur[2], st)
+      else picks.set(key, [ci, ti, [...st]])
+    }
+  }
+  return {
+    ...view,
+    participants,
+    emblems: [...emblems.entries()].sort((a, b) => a[0] - b[0]),
+    noEmblem,
+    traits: [...traits.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]),
+    picks: [...picks.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]),
+  }
+}
+
+/**
+ * レベルと選択駒の条件に合う参加者だけのビュー。条件が全部「全体」ならそのまま返す。
+ * 区分（cells）を持たない古いファイルはレベルだけで絞る（選択駒の条件は効かない）。
+ */
+export function filterView(
+  view: WireSummaryView,
+  level: 'all' | LevelKey,
+  choosers: readonly ChooserFilter[],
+): WireSummaryView {
+  if (level === 'all' && choosers.every((c) => c === 'all')) return view
+  if (view.cells) {
+    const match = (c: number) =>
+      choosers.every((f, i) => f === 'all' || ((c >> i) & 1) === (f === 'with' ? 1 : 0))
+    return sumCells(
+      view,
+      view.cells.filter((cell) => (level === 'all' || cell.lv === level) && match(cell.c)),
+    )
+  }
+  const lv = level === 'all' ? undefined : view.levels?.find((l) => l.lv === level)
+  return lv ? { ...view, ...lv } : view
 }
 
 export interface StatRow {
@@ -89,6 +159,17 @@ export function traitRows(
     if (!includeUnique && t.tiers.length < 2) continue
     const style = t.tiers.find(([m]) => m === min)?.[1]
     rows.push(toRow({ key: `${t.api}|${min}`, name: pickName(lang, t), icon: t.icon, min, style }, s, view.participants))
+  }
+  return rows
+}
+
+/** 選択駒が選んだ特性の行（ラックスの出自、カ＝ジックスの進化）。 */
+export function pickRows(file: WireSummaryFile, view: WireSummaryView, chooser: number, lang: Lang): StatRow[] {
+  const rows: StatRow[] = []
+  for (const [ci, ti, s] of view.picks ?? []) {
+    if (ci !== chooser || s[0] === 0) continue
+    const t = file.traits[ti]
+    rows.push(toRow({ key: `${chooser}|${t.api}`, name: pickName(lang, t), icon: t.icon }, s, view.participants))
   }
   return rows
 }

@@ -1,16 +1,19 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { LevelKey, WireDrillFile, WireSummaryFile, WireSummaryView } from '../shared/types'
-import { t, type Lang } from './lib/i18n'
+import { pickName, t, type Lang } from './lib/i18n'
 import { ALL_PATCHES_KEY } from './lib/data'
 import {
   defaultDir,
   emblemRows,
+  filterView,
   loadSummary,
   noEmblemRow,
+  pickRows,
   placeTone,
   sortRows,
   traitRows,
   type StatRow,
+  type ChooserFilter,
   type StatSortKey,
   type TraitSplit,
 } from './lib/summary'
@@ -19,7 +22,8 @@ import { costBorder, styleClasses } from './lib/format'
 import { SegmentedControl } from './components/SegmentedControl'
 import { SiteNav } from './components/SiteNav'
 
-type Tab = 'emblems' | 'traits'
+/** 数字のタブは選択駒（summary.json の choosers の idx）。 */
+type Tab = 'emblems' | 'traits' | number
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
@@ -54,11 +58,13 @@ export default function StatsPage() {
   const [reloadKey, setReloadKey] = useState(0)
   const [lang, setLang] = useState<Lang>(readLang)
   const [viewKey, setViewKey] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('emblems')
+  const [tabState, setTab] = useState<Tab>('emblems')
   const [split, setSplit] = useState<TraitSplit>('all')
   const [includeUnique, setIncludeUnique] = useState(true)
   const [minN, setMinN] = useState(false)
   const [level, setLevel] = useState<'all' | LevelKey>('all')
+  /** 選択駒ごとの絞り込み（choosers の idx 順。足りない分は全体）。 */
+  const [chooserFilters, setChooserFilters] = useState<ChooserFilter[]>([])
   /** 型を開いている特性行（行キー）。 */
   const [openRow, setOpenRow] = useState<string | null>(null)
   /** ビュー key → 掘り下げファイル。行を初めて開いたときに読む。 */
@@ -92,21 +98,33 @@ export default function StatsPage() {
 
   const file = load.status === 'ready' ? load.file : null
   const baseView = file ? (file.views.find((v) => v.key === (viewKey ?? file.defaultKey)) ?? file.views[0]) : null
-  // レベルで絞るときは、その区分の内訳を同じ形のビューとして扱う（古いファイルには内訳が無い）。
-  const levelData = level === 'all' ? undefined : baseView?.levels?.find((l) => l.lv === level)
+  // 選択駒の切り替えは、区分（cells）を持つファイルでだけ出す。
+  const choosers = useMemo(() => (baseView?.cells ? (file?.choosers ?? []) : []), [baseView, file])
+  // 選択駒の無いビューへ移ったら、選択駒のタブは紋章に戻す。
+  const tab: Tab = typeof tabState === 'number' && tabState >= choosers.length ? 'emblems' : tabState
+  const cf = useMemo(() => choosers.map((_, i) => chooserFilters[i] ?? 'all'), [choosers, chooserFilters])
+  const filtered = cf.some((f) => f !== 'all')
+  const hasLevels = !!(baseView?.cells || baseView?.levels)
   const view: WireSummaryView | null = useMemo(
-    () => (baseView && levelData ? { ...baseView, ...levelData } : baseView),
-    [baseView, levelData],
+    () => (baseView ? filterView(baseView, hasLevels ? level : 'all', cf) : null),
+    [baseView, hasLevels, level, cf],
   )
 
   const rows = useMemo(() => {
     if (!file || !view) return []
-    const base = tab === 'emblems' ? emblemRows(file, view, lang) : traitRows(file, view, lang, split, includeUnique)
+    const base =
+      tab === 'emblems'
+        ? emblemRows(file, view, lang)
+        : tab === 'traits'
+          ? traitRows(file, view, lang, split, includeUnique)
+          : pickRows(file, view, tab, lang)
     const min = view.participants * MIN_SHARE
     return sortRows(minN ? base.filter((r) => r.n >= min) : base, sortKey, sortDir, lang)
   }, [file, view, tab, split, includeUnique, minN, sortKey, sortDir, lang])
 
-  const drillKey = view ? (levelData ? `${view.key}-lv${levelData.lv}` : view.key) : null
+  const drillKey = view ? (hasLevels && level !== 'all' ? `${view.key}-lv${level}` : view.key) : null
+  // 構成の型は全参加者（とレベル）でしか作っていないので、選択駒で絞っている間は開けない。
+  const drillable = tab === 'traits' && !filtered
   const drill = drillKey ? drills[drillKey] : undefined
   /** 型を開くときに、そのビューの掘り下げファイルをまだ読んでいなければ読む。 */
   const ensureDrill = (key: string | null) => {
@@ -124,6 +142,8 @@ export default function StatsPage() {
     setViewKey(key)
     if (openRow) ensureDrill(level === 'all' ? key : `${key}-lv${level}`)
   }
+  const changeChooser = (i: number, f: ChooserFilter) =>
+    setChooserFilters(choosers.map((_, k) => (k === i ? f : (cf[k] ?? 'all'))))
   const changeLevel = (lv: 'all' | LevelKey) => {
     setLevel(lv)
     if (openRow && view) ensureDrill(lv === 'all' ? view.key : `${view.key}-lv${lv}`)
@@ -187,6 +207,7 @@ export default function StatsPage() {
               [
                 ['emblems', t(lang, 'statsEmblems')],
                 ['traits', t(lang, 'statsTraits')],
+                ...choosers.map((c, i) => [i, pickName(lang, c)] as const),
               ] as const
             ).map(([key, label]) => (
               <button
@@ -220,7 +241,7 @@ export default function StatsPage() {
                 />
               </div>
             )}
-            {baseView?.levels && (
+            {hasLevels && (
               <SegmentedControl<'all' | LevelKey>
                 ariaLabel={t(lang, 'statsLevel')}
                 value={level}
@@ -234,6 +255,28 @@ export default function StatsPage() {
                 ]}
               />
             )}
+            {choosers.map((c, i) => (
+              <div key={c.api} className="flex items-center gap-1.5">
+                <img
+                  src={c.icon}
+                  alt={pickName(lang, c)}
+                  title={pickName(lang, c)}
+                  loading="lazy"
+                  className="h-7 w-7 rounded-full border border-line object-cover"
+                  onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+                />
+                <SegmentedControl<ChooserFilter>
+                  ariaLabel={pickName(lang, c)}
+                  value={cf[i]}
+                  onChange={(f) => changeChooser(i, f)}
+                  options={[
+                    { key: 'all', label: t(lang, 'statsSplitAll') },
+                    { key: 'with', label: t(lang, 'statsChooserWith') },
+                    { key: 'without', label: t(lang, 'statsChooserWithout') },
+                  ]}
+                />
+              </div>
+            ))}
             {/* 狭い画面ではパッチの右に収まり、絞り込みが2段で済む位置。 */}
             <ToggleButton pressed={minN} onClick={() => setMinN((v) => !v)}>
               {t(lang, 'statsMinN')}
@@ -288,8 +331,8 @@ export default function StatsPage() {
             sortDir={sortDir}
             onSort={onSort}
             lang={lang}
-            openRow={tab === 'traits' ? openRow : null}
-            onToggleRow={tab === 'traits' ? toggleRow : undefined}
+            openRow={drillable ? openRow : null}
+            onToggleRow={drillable ? toggleRow : undefined}
             renderDetail={renderDrill}
           />
         )}
