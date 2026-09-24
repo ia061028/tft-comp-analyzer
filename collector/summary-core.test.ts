@@ -88,3 +88,22 @@ test('summaryDictionaries: builder の idx と同じ並びで、紋章の trait 
   assert.deepEqual(traits.map((t) => t.api), ['TraitA', 'TraitB'])
   assert.deepEqual(emblems.map((e) => [e.api, e.trait]), [['EmblemA', 0], ['EmblemB', 1]])
 })
+
+test('レベル区分: 7以下と10以上をまとめ、区分ごとに同じ集計を持つ', () => {
+  const b = createSummaryBuilder(makeStaticData())
+  b.add(rec({ p: 1, lv: 10, t: { TraitA: 3 }, tc: { TraitA: 3 }, e: ['EmblemA'] }))
+  b.add(rec({ p: 3, lv: 11, t: { TraitA: 3 }, tc: { TraitA: 3 } }))
+  b.add(rec({ p: 8, lv: 6 }))
+  b.add(rec({ p: 5, lv: 8, t: { TraitA: 1 }, tc: { TraitA: 2 } }))
+  const out = b.finish()
+  assert.deepEqual(
+    out.levels!.map((l) => [l.lv, l.participants]),
+    [['7', 1], ['8', 1], ['9', 0], ['10', 2]],
+  )
+  const lv10 = out.levels!.find((l) => l.lv === '10')!
+  assert.deepEqual(lv10.emblems, [[0, [1, 1, 1, 1, 10]]])
+  assert.deepEqual(lv10.traits, [[0, 3, [2, 4, 2, 1, 21], [1, 1, 1, 1, 10], [1, 3, 1, 0, 11]]])
+  assert.deepEqual(out.levels!.find((l) => l.lv === '7')!.noEmblem, [1, 8, 0, 0, 6])
+  // 全体は区分の合計
+  assert.equal(out.participants, 4)
+})

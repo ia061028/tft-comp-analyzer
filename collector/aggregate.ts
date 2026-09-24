@@ -35,7 +35,7 @@ import {
   type StatsBuilder,
 } from './aggregate-core.ts'
 import { listRouteShards, forEachRecord } from './shards.ts'
-import { createSummaryBuilder, summaryDictionaries, type SummaryBuilder } from './summary-core.ts'
+import { createSummaryBuilder, LEVEL_KEYS, levelKeyOf, summaryDictionaries, type SummaryBuilder } from './summary-core.ts'
 import { createDrillBuilder, type DrillBuilder } from './drill-core.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -49,6 +49,8 @@ const VIEW_FILE_RE = /^stats-[^/\\]+\.json$/
 /** 統計ページの掘り下げ（ビューごと、特性行を押したときに読む） */
 const DRILL_FILE_RE = /^drill-[^/\\]+\.json$/
 const drillFileName = (key: string): string => `drill-${key}.json`
+/** レベル区分つきの掘り下げの key（ファイル名は drill-<ビュー>-lv<区分>.json）。 */
+const drillLevelKey = (view: string, lv: string): string => `${view}-lv${lv}`
 
 function viewFileName(key: string, defaultKey: string): string {
   return key === defaultKey ? DEFAULT_FILE : `stats-${key}.json`
@@ -242,13 +244,23 @@ async function main(): Promise<void> {
   const viewBuilders: { key: string; file: string; builder: StatsBuilder }[] = []
   const summariesByPatch = new Map<string, SummaryBuilder[]>()
   const summaryBuilders: { key: string; label: string; builder: SummaryBuilder }[] = []
-  const drillsByPatch = new Map<string, DrillBuilder[]>()
+  // 掘り下げはビュー全体と、レベル区分（〜7 / 8 / 9 / 10）ごと。区分は1人がどれか1つに入る。
+  interface ViewDrills {
+    all: DrillBuilder
+    byLevel: Map<string, DrillBuilder>
+  }
+  const drillsByPatch = new Map<string, ViewDrills[]>()
   const drillBuilders: { key: string; builder: DrillBuilder }[] = []
   for (const view of views) {
     const summary = createSummaryBuilder(staticData)
     summaryBuilders.push({ key: view.key, label: viewLabel(view.patches), builder: summary })
-    const drill = createDrillBuilder(staticData)
-    drillBuilders.push({ key: view.key, builder: drill })
+    const drill: ViewDrills = { all: createDrillBuilder(staticData), byLevel: new Map() }
+    drillBuilders.push({ key: view.key, builder: drill.all })
+    for (const lv of LEVEL_KEYS) {
+      const b = createDrillBuilder(staticData)
+      drill.byLevel.set(lv, b)
+      drillBuilders.push({ key: drillLevelKey(view.key, lv), builder: b })
+    }
     for (const p of view.patches) {
       const list = summariesByPatch.get(p) ?? []
       list.push(summary)
@@ -286,7 +298,10 @@ async function main(): Promise<void> {
     const patch = resolvePatch(rec.v, rec.ts, schedule)
     if (!inScope(rec, patch)) return
     for (const s of summariesByPatch.get(patch) ?? []) s.add(rec)
-    for (const d of drillsByPatch.get(patch) ?? []) d.add(rec)
+    for (const d of drillsByPatch.get(patch) ?? []) {
+      d.all.add(rec)
+      d.byLevel.get(levelKeyOf(rec.lv))!.add(rec)
+    }
     const bs = buildersByPatch.get(patch)
     if (!bs) return
     for (const b of bs) b.add(rec, route)

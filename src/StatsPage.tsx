@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { WireDrillFile, WireSummaryFile } from '../shared/types'
+import type { LevelKey, WireDrillFile, WireSummaryFile, WireSummaryView } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
 import { ALL_PATCHES_KEY } from './lib/data'
 import {
@@ -58,6 +58,7 @@ export default function StatsPage() {
   const [split, setSplit] = useState<TraitSplit>('all')
   const [includeUnique, setIncludeUnique] = useState(true)
   const [minN, setMinN] = useState(false)
+  const [level, setLevel] = useState<'all' | LevelKey>('all')
   /** 型を開いている特性行（行キー）。 */
   const [openRow, setOpenRow] = useState<string | null>(null)
   /** ビュー key → 掘り下げファイル。行を初めて開いたときに読む。 */
@@ -90,7 +91,13 @@ export default function StatsPage() {
   }, [lang])
 
   const file = load.status === 'ready' ? load.file : null
-  const view = file ? (file.views.find((v) => v.key === (viewKey ?? file.defaultKey)) ?? file.views[0]) : null
+  const baseView = file ? (file.views.find((v) => v.key === (viewKey ?? file.defaultKey)) ?? file.views[0]) : null
+  // レベルで絞るときは、その区分の内訳を同じ形のビューとして扱う（古いファイルには内訳が無い）。
+  const levelData = level === 'all' ? undefined : baseView?.levels?.find((l) => l.lv === level)
+  const view: WireSummaryView | null = useMemo(
+    () => (baseView && levelData ? { ...baseView, ...levelData } : baseView),
+    [baseView, levelData],
+  )
 
   const rows = useMemo(() => {
     if (!file || !view) return []
@@ -98,7 +105,7 @@ export default function StatsPage() {
     return sortRows(minN ? base.filter((r) => r.n >= MIN_N) : base, sortKey, sortDir, lang)
   }, [file, view, tab, split, includeUnique, minN, sortKey, sortDir, lang])
 
-  const drillKey = view?.key ?? null
+  const drillKey = view ? (levelData ? `${view.key}-lv${levelData.lv}` : view.key) : null
   const drill = drillKey ? drills[drillKey] : undefined
   /** 型を開くときに、そのビューの掘り下げファイルをまだ読んでいなければ読む。 */
   const ensureDrill = (key: string | null) => {
@@ -114,7 +121,11 @@ export default function StatsPage() {
   }
   const changeView = (key: string) => {
     setViewKey(key)
-    if (openRow) ensureDrill(key)
+    if (openRow) ensureDrill(level === 'all' ? key : `${key}-lv${level}`)
+  }
+  const changeLevel = (lv: 'all' | LevelKey) => {
+    setLevel(lv)
+    if (openRow && view) ensureDrill(lv === 'all' ? view.key : `${view.key}-lv${lv}`)
   }
 
   const renderDrill = (r: StatRow): ReactNode => {
@@ -207,6 +218,20 @@ export default function StatsPage() {
                   }))}
                 />
               </div>
+            )}
+            {baseView?.levels && (
+              <SegmentedControl<'all' | LevelKey>
+                ariaLabel={t(lang, 'statsLevel')}
+                value={level}
+                onChange={changeLevel}
+                options={[
+                  { key: 'all', label: t(lang, 'statsLevelAll') },
+                  { key: '7', label: t(lang, 'statsLevelLow') },
+                  { key: '8', label: '8' },
+                  { key: '9', label: '9' },
+                  { key: '10', label: '10' },
+                ]}
+              />
             )}
             {/* 狭い画面ではパッチの右に収まり、絞り込みが2段で済む位置。 */}
             <ToggleButton pressed={minN} onClick={() => setMinN((v) => !v)}>

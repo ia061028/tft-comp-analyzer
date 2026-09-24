@@ -301,6 +301,20 @@ export interface WireSummaryView {
    * 装備しているが段を上げていない参加者は「全体」にだけ入る。
    */
   traits: [number, number, WireRecordStat, WireRecordStat, WireRecordStat][]
+  /** レベル区分ごとの内訳（2026-09-24 から。古いファイルには無い）。 */
+  levels?: WireSummaryLevel[]
+}
+
+/** プレイヤーレベルの区分。"7" は 7 以下、"10" は 10 以上。 */
+export type LevelKey = '7' | '8' | '9' | '10'
+
+/** 統計ページのレベル絞り込み。中身は WireSummaryView の同名項目と同じで、その区分の参加者だけを数える。 */
+export interface WireSummaryLevel {
+  lv: LevelKey
+  participants: number
+  emblems: WireSummaryView['emblems']
+  noEmblem: WireRecordStat
+  traits: WireSummaryView['traits']
 }
 
 /** public/data/summary.json（統計ページ用）。 */

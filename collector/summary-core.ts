@@ -5,7 +5,14 @@
 // 対象レコードを全部数える。
 
 import type { StaticData } from './cdragon.ts'
-import type { EmblemInfo, ParticipantRecord, TraitInfo, WireRecordStat, WireSummaryView } from '../shared/types.ts'
+import type {
+  EmblemInfo,
+  LevelKey,
+  ParticipantRecord,
+  TraitInfo,
+  WireRecordStat,
+  WireSummaryView,
+} from '../shared/types.ts'
 import { classifyEmblems, tierOfCount } from './aggregate-core.ts'
 
 export const emptyStat = (): WireRecordStat => [0, 0, 0, 0, 0]
@@ -67,9 +74,54 @@ export function traitTierEntries(
   return out
 }
 
+export const LEVEL_KEYS: readonly LevelKey[] = ['7', '8', '9', '10']
+
+/** プレイヤーレベル → 絞り込みの区分（7 以下と 10 以上はまとめる）。 */
+export function levelKeyOf(lv: number): LevelKey {
+  return lv <= 7 ? '7' : lv >= 10 ? '10' : lv === 8 ? '8' : '9'
+}
+
 export interface SummaryBuilder {
   add(rec: ParticipantRecord): void
   finish(): Omit<WireSummaryView, 'key' | 'label'>
+}
+
+type TraitRow = [number, number, WireRecordStat, WireRecordStat, WireRecordStat]
+
+/** 紋章・特性の成績の入れ物。ビュー全体とレベル区分ごとに1つずつ持つ。 */
+function createAcc() {
+  const emblems = new Map<number, WireRecordStat>()
+  const noEmblem = emptyStat()
+  // `${traitIdx}|${min}` → [全体, 紋章あり, 紋章なし]
+  const traits = new Map<string, TraitRow>()
+  let participants = 0
+  return {
+    add(rec: ParticipantRecord, emblemIdxs: number[], entries: { ti: number; e: TraitTierEntry }[]) {
+      participants++
+      if (emblemIdxs.length === 0) addStat(noEmblem, rec)
+      for (const i of emblemIdxs) {
+        let s = emblems.get(i)
+        if (!s) emblems.set(i, (s = emptyStat()))
+        addStat(s, rec)
+      }
+      for (const { ti, e } of entries) {
+        const key = `${ti}|${e.min}`
+        let row = traits.get(key)
+        if (!row) traits.set(key, (row = [ti, e.min, emptyStat(), emptyStat(), emptyStat()]))
+        addStat(row[2], rec)
+        if (e.split === 'with') addStat(row[3], rec)
+        else if (e.split === 'without') addStat(row[4], rec)
+      }
+    },
+    finish() {
+      return {
+        participants,
+        emblems: [...emblems.entries()].sort((a, b) => a[0] - b[0]),
+        noEmblem,
+        traits: [...traits.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]),
+      }
+    },
+  }
 }
 
 /**
@@ -78,46 +130,29 @@ export interface SummaryBuilder {
  * - 紋章: classifyEmblems の「活用」で数える（構成一覧と同じ定義）。1人が同じ紋章を2枚活用しても1人。
  * - 特性: `rec.tc`（発動数）から発動段を引き、段の下限体数ごとに数える。`tc` を持たない旧レコードは
  *   段が分からないので特性の集計に入れない（紋章の集計には入る）。
+ * - 同じものをプレイヤーレベルの区分（〜7 / 8 / 9 / 10）ごとにも数える。
  */
 export function createSummaryBuilder(staticData: StaticData): SummaryBuilder {
   const emblemIdx = new Map([...staticData.emblems.keys()].map((api, i) => [api, i]))
   const traitIdx = new Map([...staticData.traits.keys()].map((api, i) => [api, i]))
-  const emblems = new Map<number, WireRecordStat>()
-  const noEmblem = emptyStat()
-  // `${traitIdx}|${min}` → [全体, 紋章あり, 紋章なし]
-  const traits = new Map<string, [number, number, WireRecordStat, WireRecordStat, WireRecordStat]>()
+  const all = createAcc()
+  const byLevel = new Map(LEVEL_KEYS.map((k) => [k, createAcc()]))
   const matches = new Set<string>()
-  let participants = 0
 
   return {
     add(rec) {
-      participants++
       matches.add(rec.m)
       const { activeEmblemApis } = classifyEmblems(rec, staticData)
-      if (activeEmblemApis.size === 0) addStat(noEmblem, rec)
-      for (const api of activeEmblemApis) {
-        const i = emblemIdx.get(api)!
-        let s = emblems.get(i)
-        if (!s) emblems.set(i, (s = emptyStat()))
-        addStat(s, rec)
-      }
-
-      for (const e of traitTierEntries(rec, staticData, activeEmblemApis)) {
-        const key = `${traitIdx.get(e.api)}|${e.min}`
-        let row = traits.get(key)
-        if (!row) traits.set(key, (row = [traitIdx.get(e.api)!, e.min, emptyStat(), emptyStat(), emptyStat()]))
-        addStat(row[2], rec)
-        if (e.split === 'with') addStat(row[3], rec)
-        else if (e.split === 'without') addStat(row[4], rec)
-      }
+      const emblemIdxs = [...activeEmblemApis].map((api) => emblemIdx.get(api)!)
+      const entries = traitTierEntries(rec, staticData, activeEmblemApis).map((e) => ({ ti: traitIdx.get(e.api)!, e }))
+      all.add(rec, emblemIdxs, entries)
+      byLevel.get(levelKeyOf(rec.lv))!.add(rec, emblemIdxs, entries)
     },
     finish() {
       return {
         matches: matches.size,
-        participants,
-        emblems: [...emblems.entries()].sort((a, b) => a[0] - b[0]),
-        noEmblem,
-        traits: [...traits.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]),
+        ...all.finish(),
+        levels: LEVEL_KEYS.map((lv) => ({ lv, ...byLevel.get(lv)!.finish() })),
       }
     },
   }
