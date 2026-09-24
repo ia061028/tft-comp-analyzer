@@ -305,18 +305,16 @@ export interface WireSummaryView {
   traits: [number, number, WireRecordStat, WireRecordStat, WireRecordStat][]
   /** 選択駒が選んだ特性の成績。[choosers の idx, traits の idx, 成績]（2026-09-24 から） */
   picks?: [number, number, WireRecordStat][]
-  /**
-   * 絞り込みの区分ごとの内訳（2026-09-24 から）。1人はどれか1つに入り、画面は条件に合う区分を足す。
-   * 古いファイルは cells の代わりに levels を持つ。
-   */
+  /** 選択駒の有無の区分ごとの内訳（2026-09-24 から）。1人はどれか1つに入り、画面は条件に合う区分を足す。 */
   cells?: WireSummaryCell[]
-  /** レベル区分ごとの内訳（2026-09-24 の一時期だけ。cells に置き換え）。 */
-  levels?: WireSummaryLevel[]
 }
 
-/** 統計ページの絞り込みの最小区分。レベル区分 × 選択駒の有無（ビット i ＝ choosers[i] が盤面に居る）。 */
+/**
+ * 統計ページの絞り込みの最小区分。選択駒の有無（ビット i ＝ choosers[i] が盤面に居る）。
+ * 2026-09-24 の一時期のファイルはレベル区分でも分けていた（lv）。足せば同じなので画面は lv を見ない。
+ */
 export interface WireSummaryCell {
-  lv: LevelKey
+  lv?: LevelKey
   c: number
   participants: number
   emblems: WireSummaryView['emblems']
@@ -339,17 +337,8 @@ export interface WireSummaryChooser {
   traits: number[]
 }
 
-/** プレイヤーレベルの区分。"7" は 7 以下、"10" は 10 以上。 */
+/** 統計ページの平均レベルのふるい分け。"7" は 7.5 未満、"10" は 9.5 以上、他はその値 ±0.5。 */
 export type LevelKey = '7' | '8' | '9' | '10'
-
-/** 統計ページのレベル絞り込み。中身は WireSummaryView の同名項目と同じで、その区分の参加者だけを数える。 */
-export interface WireSummaryLevel {
-  lv: LevelKey
-  participants: number
-  emblems: WireSummaryView['emblems']
-  noEmblem: WireRecordStat
-  traits: WireSummaryView['traits']
-}
 
 /** public/data/summary.json（統計ページ用）。 */
 export interface WireSummaryFile {

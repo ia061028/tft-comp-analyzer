@@ -6,6 +6,7 @@ import {
   defaultDir,
   emblemRows,
   filterView,
+  levelBucketOf,
   loadSummary,
   noEmblemRow,
   pickRows,
@@ -107,11 +108,7 @@ export default function StatsPage() {
   const tab: Tab = typeof tabState === 'number' && tabState >= choosers.length ? 'emblems' : tabState
   const cf = useMemo(() => choosers.map((_, i) => chooserFilters[i] ?? 'all'), [choosers, chooserFilters])
   const filtered = cf.some((f) => f !== 'all')
-  const hasLevels = !!(baseView?.cells || baseView?.levels)
-  const view: WireSummaryView | null = useMemo(
-    () => (baseView ? filterView(baseView, hasLevels ? level : 'all', cf) : null),
-    [baseView, hasLevels, level, cf],
-  )
+  const view: WireSummaryView | null = useMemo(() => (baseView ? filterView(baseView, cf) : null), [baseView, cf])
 
   const rows = useMemo(() => {
     if (!file || !view) return []
@@ -122,11 +119,12 @@ export default function StatsPage() {
           ? traitRows(file, view, lang, split, includeUnique)
           : pickRows(file, view, tab, lang)
     const min = view.participants * MIN_SHARE
-    return sortRows(minN ? base.filter((r) => r.n >= min) : base, sortKey, sortDir, lang)
-  }, [file, view, tab, split, includeUnique, minN, sortKey, sortDir, lang])
+    const kept = base.filter((r) => (!minN || r.n >= min) && (level === 'all' || levelBucketOf(r.lv) === level))
+    return sortRows(kept, sortKey, sortDir, lang)
+  }, [file, view, tab, split, includeUnique, minN, level, sortKey, sortDir, lang])
 
-  const drillKey = view ? (hasLevels && level !== 'all' ? `${view.key}-lv${level}` : view.key) : null
-  // 構成の型は全参加者（とレベル）でしか作っていないので、選択駒で絞っている間は開けない。
+  const drillKey = view?.key ?? null
+  // 構成の型は全参加者でしか作っていないので、選択駒で絞っている間は開けない。
   const drillable = tab === 'traits' && !filtered
   const drill = drillKey ? drills[drillKey] : undefined
   /** 型を開くときに、そのビューの掘り下げファイルをまだ読んでいなければ読む。 */
@@ -143,17 +141,13 @@ export default function StatsPage() {
   }
   const changeView = (key: string) => {
     setViewKey(key)
-    if (openRow) ensureDrill(level === 'all' ? key : `${key}-lv${level}`)
+    if (openRow) ensureDrill(key)
   }
   const setChooser = (i: number, f: ChooserFilter) =>
     setChooserFilters(choosers.map((_, k) => (k === i ? f : (cf[k] ?? 'all'))))
   /** 構成ページのチャンピオン絞り込みと同じ: 押すたびに 全体 → あり → なし → 全体。 */
   const cycleChooser = (i: number) =>
     setChooser(i, cf[i] === 'all' ? 'with' : cf[i] === 'with' ? 'without' : 'all')
-  const changeLevel = (lv: 'all' | LevelKey) => {
-    setLevel(lv)
-    if (openRow && view) ensureDrill(lv === 'all' ? view.key : `${view.key}-lv${lv}`)
-  }
 
   const renderDrill = (r: StatRow): ReactNode => {
     if (!drill || drill.status === 'loading') return <p className="text-xs text-faint">{t(lang, 'loading')}</p>
@@ -270,20 +264,19 @@ export default function StatsPage() {
                 })}
               </div>
             )}
-            {hasLevels && (
-              <SegmentedControl<'all' | LevelKey>
-                ariaLabel={t(lang, 'statsLevel')}
-                value={level}
-                onChange={changeLevel}
-                options={[
-                  { key: 'all', label: t(lang, 'statsLevelAll') },
-                  { key: '7', label: t(lang, 'statsLevelLow') },
-                  { key: '8', label: '8' },
-                  { key: '9', label: '9' },
-                  { key: '10', label: '10' },
-                ]}
-              />
-            )}
+            {/* 行の平均Lvでふるい分ける（数字は全員分のまま。levelBucketOf）。 */}
+            <SegmentedControl<'all' | LevelKey>
+              ariaLabel={t(lang, 'statsLevel')}
+              value={level}
+              onChange={setLevel}
+              options={[
+                { key: 'all', label: t(lang, 'statsLevelAll') },
+                { key: '7', label: t(lang, 'statsLevelLow') },
+                { key: '8', label: '8' },
+                { key: '9', label: '9' },
+                { key: '10', label: '10' },
+              ]}
+            />
             {/* 狭い画面ではパッチの右に収まり、絞り込みが2段で済む位置。 */}
             <ToggleButton pressed={minN} onClick={() => setMinN((v) => !v)}>
               {t(lang, 'statsMinN')}

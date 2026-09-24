@@ -69,25 +69,22 @@ function sumCells(view: WireSummaryView, cells: readonly Omit<WireSummaryCell, '
 }
 
 /**
- * レベルと選択駒の条件に合う参加者だけのビュー。条件が全部「全体」ならそのまま返す。
- * 区分（cells）を持たない古いファイルはレベルだけで絞る（選択駒の条件は効かない）。
+ * 選択駒の条件に合う参加者だけのビュー。条件が全部「全体」ならそのまま返す。
+ * 区分（cells）を持たない古いファイルは絞れない（選択駒の切り替えも出ない）。
  */
-export function filterView(
-  view: WireSummaryView,
-  level: 'all' | LevelKey,
-  choosers: readonly ChooserFilter[],
-): WireSummaryView {
-  if (level === 'all' && choosers.every((c) => c === 'all')) return view
-  if (view.cells) {
-    const match = (c: number) =>
-      choosers.every((f, i) => f === 'all' || ((c >> i) & 1) === (f === 'with' ? 1 : 0))
-    return sumCells(
-      view,
-      view.cells.filter((cell) => (level === 'all' || cell.lv === level) && match(cell.c)),
-    )
-  }
-  const lv = level === 'all' ? undefined : view.levels?.find((l) => l.lv === level)
-  return lv ? { ...view, ...lv } : view
+export function filterView(view: WireSummaryView, choosers: readonly ChooserFilter[]): WireSummaryView {
+  if (!view.cells || choosers.every((c) => c === 'all')) return view
+  const match = (c: number) => choosers.every((f, i) => f === 'all' || ((c >> i) & 1) === (f === 'with' ? 1 : 0))
+  return sumCells(view, view.cells.filter((cell) => match(cell.c)))
+}
+
+/**
+ * 行の平均レベルのふるい分け。人をレベルで絞るのではなく、全員で数えた行の平均Lvで分ける
+ * （途中で落ちた人ほどレベルが低いので、人を絞ると順位と絡んでしまう）。
+ * 〜7 は 7.5 未満、10 は 9.5 以上、8・9 はその値 ±0.5。
+ */
+export function levelBucketOf(avgLv: number): LevelKey {
+  return avgLv < 7.5 ? '7' : avgLv < 8.5 ? '8' : avgLv < 9.5 ? '9' : '10'
 }
 
 export interface StatRow {

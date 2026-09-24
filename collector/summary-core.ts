@@ -7,7 +7,6 @@
 import type { StaticData } from './cdragon.ts'
 import type {
   EmblemInfo,
-  LevelKey,
   ParticipantRecord,
   TraitInfo,
   WireRecordStat,
@@ -93,13 +92,6 @@ export function uniqueTraitApis(staticData: StaticData): Set<string> {
     for (const t of u.traits) holders.set(t, (holders.get(t) ?? 0) + 1)
   }
   return new Set([...holders].filter(([, n]) => n === 1).map(([t]) => t))
-}
-
-export const LEVEL_KEYS: readonly LevelKey[] = ['7', '8', '9', '10']
-
-/** プレイヤーレベル → 絞り込みの区分（7 以下と 10 以上はまとめる）。 */
-export function levelKeyOf(lv: number): LevelKey {
-  return lv <= 7 ? '7' : lv >= 10 ? '10' : lv === 8 ? '8' : '9'
 }
 
 /** 選択駒: 盤面に置くと、プレイヤーが選んだ特性を上乗せする駒。 */
@@ -217,14 +209,15 @@ function createAcc() {
  *   段が分からないので特性の集計に入れない（紋章の集計には入る）。
  * - 選択駒（choosers）: 盤面に居る人の、選んだ特性（上乗せが選択駒の上乗せ数と一致するもの）ごと。
  *   発動していない選択は tc に出ないので数えられない。
- * - 同じものを、レベル区分（〜7 / 8 / 9 / 10）× 選択駒の有無 の区分ごとにも数える。1人は1区分だけに入り、
- *   画面は選んだ条件に合う区分を足し合わせる。
+ * - 同じものを、選択駒の有無の区分ごとにも数える。1人は1区分だけに入り、画面は選んだ条件に合う区分を足し合わせる。
+ *   プレイヤーのレベルでは分けない（途中で落ちた人ほどレベルが低く、レベルで人を絞ると順位と絡む。
+ *   画面は全員の数字のまま、行の平均レベルでふるい分ける）。
  */
 export function createSummaryBuilder(staticData: StaticData, choosers: readonly Chooser[] = []): SummaryBuilder {
   const emblemIdx = new Map([...staticData.emblems.keys()].map((api, i) => [api, i]))
   const traitIdx = new Map([...staticData.traits.keys()].map((api, i) => [api, i]))
   const all = createAcc()
-  const cells = new Map<string, { lv: LevelKey; c: number; acc: ReturnType<typeof createAcc> }>()
+  const cells = new Map<number, ReturnType<typeof createAcc>>()
   const matches = new Set<string>()
 
   return {
@@ -248,20 +241,15 @@ export function createSummaryBuilder(staticData: StaticData, choosers: readonly 
         }
       }
       all.add(rec, emblemIdxs, entries, pickIdxs)
-      const lv = levelKeyOf(rec.lv)
-      const key = `${lv}|${c}`
-      let cell = cells.get(key)
-      if (!cell) cells.set(key, (cell = { lv, c, acc: createAcc() }))
-      cell.acc.add(rec, emblemIdxs, entries, pickIdxs)
+      let cell = cells.get(c)
+      if (!cell) cells.set(c, (cell = createAcc()))
+      cell.add(rec, emblemIdxs, entries, pickIdxs)
     },
     finish() {
-      const lvOrder = (lv: LevelKey) => LEVEL_KEYS.indexOf(lv)
       return {
         matches: matches.size,
         ...all.finish(),
-        cells: [...cells.values()]
-          .sort((a, b) => lvOrder(a.lv) - lvOrder(b.lv) || a.c - b.c)
-          .map(({ lv, c, acc }) => ({ lv, c, ...acc.finish() })),
+        cells: [...cells.entries()].sort((a, b) => a[0] - b[0]).map(([c, acc]) => ({ c, ...acc.finish() })),
       }
     },
   }
