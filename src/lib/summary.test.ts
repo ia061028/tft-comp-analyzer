@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { WireSummaryFile, WireSummaryView } from '../../shared/types'
-import { emblemRows, filterView, noEmblemRow, pickRows, traitRows, sortRows, placeTone } from './summary'
+import { emblemRows, filterView, isUniqueTrait, noEmblemRow, pickRows, traitRows, sortRows, placeTone } from './summary'
 
 const file: WireSummaryFile = {
   schemaVersion: 1,
@@ -96,4 +96,12 @@ test('filterView: 区分の無い古いファイルはレベルだけで絞る',
   const v: WireSummaryView = { ...view, levels: [lv] }
   assert.equal(filterView(v, '8', []).participants, 3)
   assert.equal(filterView(v, '9', []), v)
+})
+
+test('isUniqueTrait: 集計の unique を優先し、無ければ「1体で発動する段1つだけ」', () => {
+  const solar = { api: 'S', name: 'Solar', nameJa: 'ソーラー', icon: '', tiers: [[3, 5]] as [number, number][] }
+  const solo = { api: 'O', name: 'Solo', nameJa: 'ソロ', icon: '', tiers: [[1, 4]] as [number, number][] }
+  assert.equal(isUniqueTrait(solar), false)
+  assert.equal(isUniqueTrait(solo), true)
+  assert.equal(isUniqueTrait({ ...solo, unique: false }), false)
 })

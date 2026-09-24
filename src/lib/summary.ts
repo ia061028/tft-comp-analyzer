@@ -1,5 +1,12 @@
 // 統計ページ（summary.json）の読み込みと、表の行の組み立て。
-import type { LevelKey, WireRecordStat, WireSummaryCell, WireSummaryFile, WireSummaryView } from '../../shared/types'
+import type {
+  LevelKey,
+  TraitInfo,
+  WireRecordStat,
+  WireSummaryCell,
+  WireSummaryFile,
+  WireSummaryView,
+} from '../../shared/types'
 import { pickName, type Lang } from './i18n'
 import { PRIOR_PLACE, shrunk } from './format'
 
@@ -141,6 +148,14 @@ export function noEmblemRow(view: WireSummaryView, name: string): StatRow | null
 
 export type TraitSplit = 'all' | 'with' | 'without'
 
+/**
+ * 固有特性 ＝ その特性を持つチャンピオンが1体だけ。集計が `unique` を付ける。
+ * 付いていない古いファイルは「段が1体の1つだけ」で代える（1体しか持たない特性は1体で発動するしかない）。
+ */
+export function isUniqueTrait(t: TraitInfo): boolean {
+  return t.unique ?? (t.tiers.length === 1 && t.tiers[0][0] === 1)
+}
+
 export function traitRows(
   file: WireSummaryFile,
   view: WireSummaryView,
@@ -155,8 +170,7 @@ export function traitRows(
     const s = r[col] as WireRecordStat
     if (s[0] === 0) continue
     const t = file.traits[ti]
-    // 固有特性 ＝ 段が1つしかない特性（生涯ブロンズの bronzeTraitCount と同じ定義）。
-    if (!includeUnique && t.tiers.length < 2) continue
+    if (!includeUnique && isUniqueTrait(t)) continue
     const style = t.tiers.find(([m]) => m === min)?.[1]
     rows.push(toRow({ key: `${t.api}|${min}`, name: pickName(lang, t), icon: t.icon, min, style }, s, view.participants))
   }

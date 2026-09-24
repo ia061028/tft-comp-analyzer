@@ -49,6 +49,8 @@ export interface TraitInfo {
   icon: string
   /** 発動ティア [minUnits, style]（昇順）。発動数・配色の算出に使う。 */
   tiers: [number, number][]
+  /** 固有特性（その特性を持つチャンピオンが1体だけ）。summary.json だけが持つ（2026-09-24 から）。 */
+  unique?: boolean
 }
 
 export interface EmblemInfo {

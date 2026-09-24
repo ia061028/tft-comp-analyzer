@@ -14,7 +14,14 @@ import type {
   WireSummaryChooser,
   WireSummaryView,
 } from '../shared/types.ts'
-import { classifyEmblems, classifyRecord, inferTraitGrants, tierOfCount, type GranterGuess } from './aggregate-core.ts'
+import {
+  classifyEmblems,
+  classifyRecord,
+  inferTraitGrants,
+  NON_BOARD_UNIT_RE,
+  tierOfCount,
+  type GranterGuess,
+} from './aggregate-core.ts'
 
 export const emptyStat = (): WireRecordStat => [0, 0, 0, 0, 0]
 
@@ -73,6 +80,19 @@ export function traitTierEntries(
     out.push({ api: t, min: info.tiers[tier - 1][0], split: used.has(t) ? 'with' : equipped.has(t) ? null : 'without' })
   }
   return out
+}
+
+/**
+ * 固有特性: その特性を持つチャンピオン（盤面に置ける駒）が1体だけの特性。
+ * 段の数では決めない（ソーラーは段が1つだが3体が持つので固有ではない）。
+ */
+export function uniqueTraitApis(staticData: StaticData): Set<string> {
+  const holders = new Map<string, number>()
+  for (const [api, u] of staticData.units) {
+    if (u.cost < 1 || u.cost > 5 || NON_BOARD_UNIT_RE.test(api)) continue
+    for (const t of u.traits) holders.set(t, (holders.get(t) ?? 0) + 1)
+  }
+  return new Set([...holders].filter(([, n]) => n === 1).map(([t]) => t))
 }
 
 export const LEVEL_KEYS: readonly LevelKey[] = ['7', '8', '9', '10']
@@ -269,7 +289,15 @@ export function summaryChoosers(staticData: StaticData, choosers: readonly Choos
  */
 export function summaryDictionaries(staticData: StaticData): { traits: TraitInfo[]; emblems: EmblemInfo[] } {
   const traitIdx = new Map([...staticData.traits.keys()].map((api, i) => [api, i]))
-  const traits = [...staticData.traits].map(([api, t]) => ({ api, name: t.name, nameJa: t.nameJa, icon: t.icon, tiers: t.tiers }))
+  const unique = uniqueTraitApis(staticData)
+  const traits = [...staticData.traits].map(([api, t]) => ({
+    api,
+    name: t.name,
+    nameJa: t.nameJa,
+    icon: t.icon,
+    tiers: t.tiers,
+    unique: unique.has(api),
+  }))
   const emblems = [...staticData.emblems].map(([api, e]) => ({
     api,
     name: e.name,

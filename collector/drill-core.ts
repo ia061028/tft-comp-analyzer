@@ -14,7 +14,7 @@ import type {
   WireRecordStat,
 } from '../shared/types.ts'
 import { classifyEmblems, tierOfCount } from './aggregate-core.ts'
-import { addStat, emptyStat, traitTierEntries } from './summary-core.ts'
+import { addStat, emptyStat, traitTierEntries, uniqueTraitApis } from './summary-core.ts'
 
 /** 1つの特性行・分割に出す型の数。後ろはまとめ行（p = -2）に寄せる。 */
 export const DRILL_TYPE_LIMIT = 12
@@ -69,13 +69,14 @@ function addBoard(boards: Map<string, BoardSlot>, key: string, place: number): v
 
 /**
  * 相方特性: 自分以外で段のある特性のうち、段の深さ → 発動数 → 静的データの並び の順で最大のもの。
- * 固有特性（段が1つ）は型の名前にならないので相方にしない。
+ * 固有特性（持つチャンピオンが1体だけ、uniqueTraitApis）は型の名前にならないので相方にしない。
  */
 export function partnerOf(
   rec: ParticipantRecord,
   self: string,
   staticData: StaticData,
   traitIdx: ReadonlyMap<string, number>,
+  unique: ReadonlySet<string>,
 ): number {
   const tc = rec.tc
   if (!tc) return -1
@@ -86,7 +87,7 @@ export function partnerOf(
     if (t === self) continue
     const info = staticData.traits.get(t)
     const count = tc[t]
-    if (!info || info.tiers.length < 2 || count === undefined) continue
+    if (!info || unique.has(t) || count === undefined) continue
     const tier = tierOfCount(info.tiers, count)
     if (tier === 0) continue
     const idx = traitIdx.get(t)!
@@ -107,6 +108,7 @@ export interface DrillBuilder {
 export function createDrillBuilder(staticData: StaticData): DrillBuilder {
   const traitIdx = new Map([...staticData.traits.keys()].map((api, i) => [api, i]))
   const unitIdx = new Map([...staticData.units.keys()].map((api, i) => [api, i]))
+  const unique = uniqueTraitApis(staticData)
   // `${traitIdx}|${min}` → [全体, 紋章あり, 紋章なし] の 相方idx → 型
   type Types = Map<number, TypeAcc>
   const rows = new Map<string, { t: number; m: number; sp: [Types, Types, Types] }>()
@@ -159,7 +161,7 @@ export function createDrillBuilder(staticData: StaticData): DrillBuilder {
         const key = `${ti}|${e.min}`
         let row = rows.get(key)
         if (!row) rows.set(key, (row = { t: ti, m: e.min, sp: [new Map(), new Map(), new Map()] }))
-        const partner = partnerOf(rec, e.api, staticData, traitIdx)
+        const partner = partnerOf(rec, e.api, staticData, traitIdx, unique)
         addType(row.sp[0], partner, rec, units, stars, boardKey)
         if (e.split === 'with') addType(row.sp[1], partner, rec, units, stars, boardKey)
         else if (e.split === 'without') addType(row.sp[2], partner, rec, units, stars, boardKey)
