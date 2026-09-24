@@ -27,8 +27,8 @@ type LoadState =
   | { status: 'ready'; file: WireSummaryFile }
 type DrillState = { status: 'loading' } | { status: 'error' } | { status: 'missing' } | { status: 'ready'; file: WireDrillFile }
 
-/** 「100人以上」で残す人数の下限。 */
-const MIN_N = 100
+/** 「採用1%以上」で残す、表示中の参加者に対する採用の割合の下限。 */
+const MIN_SHARE = 0.01
 
 const LANG_STORAGE_KEY = 'tft-lang'
 
@@ -102,7 +102,8 @@ export default function StatsPage() {
   const rows = useMemo(() => {
     if (!file || !view) return []
     const base = tab === 'emblems' ? emblemRows(file, view, lang) : traitRows(file, view, lang, split, includeUnique)
-    return sortRows(minN ? base.filter((r) => r.n >= MIN_N) : base, sortKey, sortDir, lang)
+    const min = view.participants * MIN_SHARE
+    return sortRows(minN ? base.filter((r) => r.n >= min) : base, sortKey, sortDir, lang)
   }, [file, view, tab, split, includeUnique, minN, sortKey, sortDir, lang])
 
   const drillKey = view ? (levelData ? `${view.key}-lv${levelData.lv}` : view.key) : null
