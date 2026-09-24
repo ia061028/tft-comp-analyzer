@@ -21,6 +21,9 @@ import { drillTypes, loadDrill, type DrillType } from './lib/drill'
 import { costBorder, styleClasses } from './lib/format'
 import { SegmentedControl } from './components/SegmentedControl'
 import { SiteNav } from './components/SiteNav'
+import { UnitTile } from './components/UnitGrid'
+import { markLabel } from './lib/unitFilter'
+import { Tip } from './components/Tip'
 
 /** 数字のタブは選択駒（summary.json の choosers の idx）。 */
 type Tab = 'emblems' | 'traits' | number
@@ -142,8 +145,11 @@ export default function StatsPage() {
     setViewKey(key)
     if (openRow) ensureDrill(level === 'all' ? key : `${key}-lv${level}`)
   }
-  const changeChooser = (i: number, f: ChooserFilter) =>
+  const setChooser = (i: number, f: ChooserFilter) =>
     setChooserFilters(choosers.map((_, k) => (k === i ? f : (cf[k] ?? 'all'))))
+  /** 構成ページのチャンピオン絞り込みと同じ: 押すたびに 全体 → あり → なし → 全体。 */
+  const cycleChooser = (i: number) =>
+    setChooser(i, cf[i] === 'all' ? 'with' : cf[i] === 'with' ? 'without' : 'all')
   const changeLevel = (lv: 'all' | LevelKey) => {
     setLevel(lv)
     if (openRow && view) ensureDrill(lv === 'all' ? view.key : `${view.key}-lv${lv}`)
@@ -241,6 +247,29 @@ export default function StatsPage() {
                 />
               </div>
             )}
+            {/*
+             * 選択駒は構成ページのチャンピオン絞り込みと同じタイル（✓ ＝ あり / ✕ ＝ なし）。
+             * 小さいのでパッチの右に収まり、狭い画面でも段が増えない。
+             */}
+            {choosers.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                {choosers.map((c, i) => {
+                  const mark = cf[i] === 'with' ? 'use' : cf[i] === 'without' ? 'avoid' : undefined
+                  const unit = { ...c, code: 0, traits: [] }
+                  return (
+                    <Tip key={c.api} label={markLabel(lang, pickName(lang, c), mark)} className="h-8 w-8">
+                      <UnitTile
+                        unit={unit}
+                        mark={mark}
+                        lang={lang}
+                        onCycle={() => cycleChooser(i)}
+                        onUnmark={() => setChooser(i, 'all')}
+                      />
+                    </Tip>
+                  )
+                })}
+              </div>
+            )}
             {hasLevels && (
               <SegmentedControl<'all' | LevelKey>
                 ariaLabel={t(lang, 'statsLevel')}
@@ -255,28 +284,6 @@ export default function StatsPage() {
                 ]}
               />
             )}
-            {choosers.map((c, i) => (
-              <div key={c.api} className="flex items-center gap-1.5">
-                <img
-                  src={c.icon}
-                  alt={pickName(lang, c)}
-                  title={pickName(lang, c)}
-                  loading="lazy"
-                  className="h-7 w-7 rounded-full border border-line object-cover"
-                  onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
-                />
-                <SegmentedControl<ChooserFilter>
-                  ariaLabel={pickName(lang, c)}
-                  value={cf[i]}
-                  onChange={(f) => changeChooser(i, f)}
-                  options={[
-                    { key: 'all', label: t(lang, 'statsSplitAll') },
-                    { key: 'with', label: t(lang, 'statsChooserWith') },
-                    { key: 'without', label: t(lang, 'statsChooserWithout') },
-                  ]}
-                />
-              </div>
-            ))}
             {/* 狭い画面ではパッチの右に収まり、絞り込みが2段で済む位置。 */}
             <ToggleButton pressed={minN} onClick={() => setMinN((v) => !v)}>
               {t(lang, 'statsMinN')}

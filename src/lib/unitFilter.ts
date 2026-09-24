@@ -1,5 +1,5 @@
 import type { CompStats, UnitInfo } from '../../shared/types'
-import { pickName, type Lang } from './i18n'
+import { pickName, t, type Lang } from './i18n'
 
 /** レール／ドックに出している選択面。紋章とチャンピオンは同じ場所を切り替えて使う。 */
 export type PickTab = 'emblem' | 'unit'
@@ -71,4 +71,11 @@ export function unitsByCost(units: UnitInfo[], lang: Lang): UnitInfo[][] {
   return [...rows.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([, row]) => row.sort((a, b) => pickName(lang, a).localeCompare(pickName(lang, b), lang)))
+}
+
+/** タイルの読み上げ・吹き出し用のラベル（名前＋印）。 */
+export function markLabel(lang: Lang, name: string, mark: UnitMark | undefined): string {
+  if (mark === 'use') return `${name} ${t(lang, 'unitUse')}`
+  if (mark === 'avoid') return `${name} ${t(lang, 'unitAvoid')}`
+  return name
 }

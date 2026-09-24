@@ -331,6 +331,7 @@ export interface WireSummaryChooser {
   api: string
   name: string
   nameJa: string
+  cost: number
   icon: string
   /** 選べる特性（traits の idx）。 */
   traits: number[]

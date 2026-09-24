@@ -188,5 +188,5 @@ test('区分: 選択駒の有無をビットで分け、選んだ特性を picks
 test('summaryChoosers: 駒の名前と、選べる特性の idx', () => {
   const sd = makeChooserData()
   const [lux] = summaryChoosers(sd, [{ api: 'Lux', delta: 2, traits: new Set(['TraitC', 'TraitA']) }])
-  assert.deepEqual(lux, { api: 'Lux', name: 'Lux', nameJa: 'Lux', icon: 'Lux.png', traits: [0, 2] })
+  assert.deepEqual(lux, { api: 'Lux', name: 'Lux', nameJa: 'Lux', cost: 3, icon: 'Lux.png', traits: [0, 2] })
 })

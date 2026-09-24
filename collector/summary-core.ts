@@ -256,6 +256,7 @@ export function summaryChoosers(staticData: StaticData, choosers: readonly Choos
       api: ch.api,
       name: u?.name ?? ch.api,
       nameJa: u?.nameJa ?? ch.api,
+      cost: u?.cost ?? 1,
       icon: u?.icon ?? '',
       traits: [...ch.traits].map((t) => traitIdx.get(t)!).sort((a, b) => a - b),
     }
