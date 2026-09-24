@@ -67,6 +67,24 @@ test('buildRecords: セット18 の紋章が e/eh に入り、完成アイテム
   assert.deepEqual(r.ui, [['DA_RedBuff', 'DA_SpearOfShojin'], []])
 })
 
+test('buildRecords: オーグメントが返っていれば a に記録し、無ければ項目を作らない', () => {
+  const withAug = makeDetail() as unknown as { info: { participants: Record<string, unknown>[] } }
+  withAug.info.participants[0].augments = ['TFT18_Augment_A', 'TFT18_Augment_B']
+  const recs = buildRecords('VN2_1', withAug as never, makeEmblemCtx())
+  assert.ok(recs !== null)
+  assert.deepEqual(recs[0].a, ['TFT18_Augment_A', 'TFT18_Augment_B'])
+
+  const none = buildRecords('VN2_1', makeDetail() as never, makeEmblemCtx())
+  assert.ok(none !== null)
+  assert.equal('a' in none[0], false)
+
+  const empty = makeDetail() as unknown as { info: { participants: Record<string, unknown>[] } }
+  empty.info.participants[0].augments = []
+  const recsEmpty = buildRecords('VN2_1', empty as never, makeEmblemCtx())
+  assert.ok(recsEmpty !== null)
+  assert.equal('a' in recsEmpty[0], false)
+})
+
 test('buildRecords: tft_set_number を s に記録する', () => {
   const recs = buildRecords('VN2_1', makeDetail() as never, makeEmblemCtx())
   assert.ok(recs !== null)

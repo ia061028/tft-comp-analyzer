@@ -76,6 +76,8 @@ interface MatchParticipant {
   level: number
   traits: MatchTrait[]
   units: MatchUnit[]
+  /** 選んだオーグメントの apiName。Riot が返さないセット・試合では欠落する。 */
+  augments?: string[]
 }
 
 interface MatchDetail {
@@ -250,6 +252,8 @@ interface RouteResult {
  * ここで観測した内部パッチキーを config.tftPatchLabels に登録する。
  */
 const versionSetCounts = new Map<string, number>()
+/** オーグメントの返り方（新規分の参加者数）。Riot が返しているかをログで確かめる。 */
+const augmentCounts = { participants: 0, withField: 0, nonEmpty: 0 }
 
 /** 1マッチの詳細を ParticipantRecord[] に変換。フィルタ通過なら配列、不通過なら null。 */
 export function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: EmblemContext): ParticipantRecord[] | null {
@@ -311,6 +315,11 @@ export function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: Em
     // ユニット別のスターレベル（u と同インデックス）。
     const us: number[] = part.units.map((unit) => unit.tier ?? 0)
 
+    augmentCounts.participants++
+    if (Array.isArray(part.augments)) augmentCounts.withField++
+    const a = Array.isArray(part.augments) ? part.augments.filter((x) => typeof x === 'string' && x) : []
+    if (a.length > 0) augmentCounts.nonEmpty++
+
     records.push({
       m: matchId,
       v,
@@ -325,6 +334,7 @@ export function buildRecords(matchId: string, detail: MatchDetail, emblemCtx: Em
       us,
       lv: part.level,
       ts,
+      ...(a.length > 0 ? { a } : {}),
     })
   }
   return records
@@ -554,6 +564,9 @@ async function main(): Promise<void> {
       .join(' / ')
     console.log(`  パッチ×セット（新規分）: ${cross}`)
   }
+  console.log(
+    `  オーグメント（新規分の参加者）: 項目あり ${augmentCounts.withField} / 中身あり ${augmentCounts.nonEmpty} / 全 ${augmentCounts.participants}`,
+  )
   console.log(`  経過時間: ${elapsedSec}s`)
   console.log(`  Riot統計(全体): req=${stats.total.requests} 429retry=${stats.total.retries429}`)
   console.log(`  ステータス別: ${JSON.stringify(stats.total.byStatus)}`)
