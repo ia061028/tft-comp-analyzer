@@ -37,6 +37,8 @@ export interface ParticipantRecord {
   lv: number
   /** game_datetime（epoch秒） */
   ts: number
+  /** 選んだオーグメントの apiName（Riot が返した試合だけ。2026-09-24 から記録） */
+  a?: string[]
 }
 
 export interface TraitInfo {
