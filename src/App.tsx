@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { StatsFile } from '../shared/types'
 import { t, type Lang } from './lib/i18n'
-import { loadStats, remapSelection, DEFAULT_STATS_FILE, ALL_PATCHES_KEY, type LoadProgress } from './lib/data'
+import { loadStats, remapSelection, DEFAULT_STATS_FILE, viewOptionLabel, type LoadProgress } from './lib/data'
 import { maxEmblemMultiplicity } from './lib/multiset'
 import { effectiveUnits } from './lib/format'
 import { cycleMark, filterByUnits, type PickTab, type UnitMark } from './lib/unitFilter'
@@ -261,7 +261,7 @@ function App() {
   // パッチ選択肢。集計側が全ファイルに同じ一覧を埋め込んでいる。1件以下なら選択 UI は出さない。
   const patchOptions = stats.patches.map((p) => ({
     key: p.file,
-    label: p.key === ALL_PATCHES_KEY ? t(lang, 'all') : p.label,
+    label: viewOptionLabel(lang, p.key, p.label),
   }))
   const currentPatchFile = stats.patches.find((p) => p.key === stats.patch)?.file ?? patchFile
 

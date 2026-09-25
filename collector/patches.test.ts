@@ -6,6 +6,7 @@ import {
   isSynthesizedPatch,
   resolvePatch,
   planPatchViews,
+  planRecentViews,
   ALL_PATCHES_KEY,
 } from './patches.ts'
 
@@ -168,4 +169,50 @@ test('planPatchViews: all ビューは閾値未達パッチも含める（合算
 
 test('planPatchViews: 空 Map は views 空', () => {
   assert.deepEqual(planPatchViews(new Map(), 200), { defaultKey: null, views: [] })
+})
+
+// ---- planRecentViews ----
+
+const DAY = 86400
+/** 0..hours 時間目まで 1 時間ごとに perHour 試合ずつ。 */
+function hourlyMatches(hours: number, perHour: number, start = 1_790_000_000): Map<string, number> {
+  const m = new Map<string, number>()
+  for (let h = 0; h <= hours; h++) for (let k = 0; k < perHour; k++) m.set(`M${h}_${k}`, start + h * 3600)
+  return m
+}
+
+test('planRecentViews: パッチが窓より長ければ長い窓から順に出す（終端は最新の試合）', () => {
+  const ts = hourlyMatches(5 * 24, 10)
+  const plans = planRecentViews(ts, [1, 3], 200)
+  assert.deepEqual(
+    plans.map((p) => [p.key, p.days, p.matches]),
+    [
+      ['recent3d', 3, (3 * 24 + 1) * 10],
+      ['recent1d', 1, (24 + 1) * 10],
+    ],
+  )
+  const maxTs = Math.max(...ts.values())
+  assert.equal(plans[0].since, maxTs - 3 * DAY)
+})
+
+test('planRecentViews: パッチ全体を覆う窓は出さない（パッチビューと同じ中身）', () => {
+  const plans = planRecentViews(hourlyMatches(30, 10), [3, 1], 200)
+  assert.deepEqual(
+    plans.map((p) => p.key),
+    ['recent1d'],
+  )
+  assert.deepEqual(planRecentViews(hourlyMatches(20, 10), [3, 1], 200), [])
+})
+
+test('planRecentViews: 閾値未満の窓と、長い窓と同じ試合数の窓は出さない', () => {
+  // 3 日前に 1 試合だけ、あとは直近 12 時間に固まっている → 3日と1日が同じ中身になる
+  const ts = hourlyMatches(12, 50, 1_790_000_000 + 3 * DAY)
+  ts.set('old', 1_790_000_000 - DAY)
+  const plans = planRecentViews(ts, [3, 1], 200)
+  assert.deepEqual(
+    plans.map((p) => p.key),
+    ['recent3d'],
+  )
+  assert.deepEqual(planRecentViews(hourlyMatches(5 * 24, 1), [3, 1], 200), [])
+  assert.deepEqual(planRecentViews(new Map(), [3, 1], 200), [])
 })

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { decodeStats, remapSelection } from './data.ts'
+import { decodeStats, remapSelection, viewOptionLabel } from './data.ts'
 
 test('remapSelection: apiName で突き合わせてインデックスを写す（多重度維持）', () => {
   const from = [{ api: 'A' }, { api: 'B' }, { api: 'C' }]
@@ -47,4 +47,11 @@ test('decodeStats: schemaVersion 8 の i / h（先頭ごとの塊）と 7 以前
     assert.deepEqual(s.comps[0].unitItems, [[1, 5], [1, 7], [2, 4]])
     assert.deepEqual(s.comps[0].holders, [[0, 2], [0, 1]])
   }
+})
+
+test('viewOptionLabel: 全体と直近N日はキーから言語ごとに作り、パッチは集計側のラベルのまま', () => {
+  assert.equal(viewOptionLabel('ja', 'all', '18.3–18.3b'), '全体')
+  assert.equal(viewOptionLabel('ja', 'recent3d', '18.3b (3d)'), '直近3日')
+  assert.equal(viewOptionLabel('en', 'recent1d', '18.3b (1d)'), 'Last 1d')
+  assert.equal(viewOptionLabel('ja', '18.3b', '18.3b'), '18.3b')
 })

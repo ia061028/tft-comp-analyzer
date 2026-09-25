@@ -10,9 +10,10 @@
 //   パス B（盤面カウント）: 構成キーごとのパッチ別件数（n>=MIN_OUTPUT_N の盤面だけ accumulate するため）
 //   パス C（集計）: ビューごとの StatsBuilder に取り込み
 //
-// 出力は「パッチビュー」ごとに1ファイル:
-//   - 既定ビュー（ヒステリシス選定パッチ）  → stats.json（フロントが最初に読む）
-//   - その他のパッチ / 全パッチ合算("all") → stats-{key}.json
+// 出力は「ビュー」ごとに1ファイル:
+//   - 最初に開くビュー（直近 N 日ビュー、無ければ既定パッチ） → stats.json（フロントが最初に読む）
+//   - その他のパッチ / 全パッチ合算("all") / 直近 N 日("recent{N}d") → stats-{key}.json
+//   直近 N 日ビューは既定パッチの中だけで取る（パッチの境目はまたがない）。
 // 全ファイルに同じ `patches` 一覧を埋め込み、フロントはそれを見て切り替え先を fetch する。
 //
 // 統計ページ用に、全ビューぶんの紋章・特性の成績を summary.json（1ファイル）へ書く。
@@ -23,7 +24,7 @@ import { dirname, join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { fileURLToPath } from 'node:url'
 import { config, KNOWN_ROUTES } from './config.ts'
-import { compareVersions, resolvePatch, planPatchViews, retentionFloor } from './patches.ts'
+import { compareVersions, resolvePatch, planPatchViews, planRecentViews, retentionFloor } from './patches.ts'
 import { getStaticData, type StaticData } from './cdragon.ts'
 import type { ParticipantRecord, WireDrillFile, WireStatsFile, WireSummaryFile, PatchIndexEntry } from '../shared/types.ts'
 import {
@@ -112,7 +113,7 @@ async function main(): Promise<void> {
   // 2. パス A（走査）: セット分布、(セット, パッチ) ごとのユニークマッチ、トレイト名、重複検出。
   let t0 = Date.now()
   const setCounts = new Map<number, number>()
-  const matchSets = new Map<string, Set<string>>() // `${set ?? '-'}|${patch}` → マッチID集合
+  const matchSets = new Map<string, Map<string, number>>() // `${set ?? '-'}|${patch}` → マッチID → game_datetime
   const traitNamesBySet = new Map<string, Set<string>>() // `${set ?? '-'}` → トレイト名集合
   const allMatches = new Set<string>()
   let duplicateMatchGroups = 0
@@ -124,10 +125,10 @@ async function main(): Promise<void> {
     const key = `${setKey}|${patch}`
     let ms = matchSets.get(key)
     if (!ms) {
-      ms = new Set()
+      ms = new Map()
       matchSets.set(key, ms)
     }
-    ms.add(rec.m)
+    ms.set(rec.m, rec.ts)
     let tn = traitNamesBySet.get(setKey)
     if (!tn) {
       tn = new Set()
@@ -189,7 +190,46 @@ async function main(): Promise<void> {
     console.error('対象パッチを選定できません（保持窓内のレコードが空）。')
     process.exit(1)
   }
-  console.log(`既定パッチ（ヒステリシス選定）: ${defaultKey} / 出力ビュー: ${views.map((v) => v.key).join(', ')}`)
+
+  // 4b. 直近 N 日ビュー（鮮度重視）。既定パッチの中だけで取り、パッチの境目はまたがない。
+  const defaultMatchTs = new Map<string, number>()
+  for (const [key, ms] of matchSets) {
+    const [setKey, patch] = key.split('|')
+    if (!inSetKeys.has(setKey) || patch !== defaultKey) continue
+    for (const [m, ts] of ms) defaultMatchTs.set(m, ts)
+  }
+  const recentPlans = planRecentViews(defaultMatchTs, config.recentWindowDays, config.patchSwitchThreshold)
+  for (const r of recentPlans) views.push({ key: r.key, patches: [defaultKey], since: r.since })
+  // 最初に開くビュー（stats.json）。直近ビューが出ていればそれ、無ければ既定パッチ。
+  const openKey = recentPlans.find((r) => r.days === config.defaultRecentDays)?.key ?? defaultKey
+  console.log(
+    `既定パッチ（ヒステリシス選定）: ${defaultKey} / 出力ビュー: ${views.map((v) => v.key).join(', ')} / 最初に開くビュー: ${openKey}`,
+  )
+  for (const r of recentPlans) {
+    console.log(`  ${r.key}: ${new Date(r.since * 1000).toISOString()} 以降 ユニークマッチ=${r.matches}`)
+  }
+
+  // レコード → 所属ビューの添字。パッチビューはパッチで、直近ビューはさらに日時で決まる。
+  const viewsByPatch = new Map<string, number[]>()
+  const windowViews: { i: number; patch: string; since: number }[] = []
+  views.forEach((v, i) => {
+    if (v.since !== undefined) {
+      windowViews.push({ i, patch: v.patches[0], since: v.since })
+      return
+    }
+    for (const p of v.patches) {
+      const list = viewsByPatch.get(p) ?? []
+      list.push(i)
+      viewsByPatch.set(p, list)
+    }
+  })
+  const viewIdxsOf = (patch: string, ts: number): number[] => {
+    const base = viewsByPatch.get(patch) ?? []
+    if (windowViews.length === 0) return base
+    const out = base.slice()
+    for (const w of windowViews) if (w.patch === patch && ts >= w.since) out.push(w.i)
+    return out
+  }
 
   // 5. 静的データ（セット共通なので、対象セットのトレイト名集合から1回だけ解決）
   const recordTraitNames = new Set<string>()
@@ -202,11 +242,9 @@ async function main(): Promise<void> {
       `(${recordTraitNames.size} 種中 ${resolvedTraits} 解決)`,
   )
 
-  // 6. パス B（盤面カウント）: 構成キー → パッチ別件数。
+  // 6. パス B（盤面カウント）: 構成キー → ビュー別件数。
   // 最終的に n < MIN_OUTPUT_N で落ちる盤面（大半）のアキュムレータをパス C で作らないための事前カウント。
   t0 = Date.now()
-  const patchIdx = new Map<string, number>()
-  for (const [p] of patchEntries) patchIdx.set(p, patchIdx.size)
   const boardCounts = new Map<string, number[]>()
   // 統計ページの選択駒（ラックス等）を決めるための付与元推定。構成一覧の推定とは別に、対象レコード全部で数える。
   const granterCounter = createGranterCounter()
@@ -218,14 +256,14 @@ async function main(): Promise<void> {
     const cls = classifyRecord(rec, staticData)
     if (cls.kind !== 'ok') return
     if (rec.tc) granterCounter.add(inferTraitGrants(rec, staticData, cls.boardSet), cls.boardSet)
-    const pi = patchIdx.get(patch)
-    if (pi === undefined) return
+    const vis = viewIdxsOf(patch, rec.ts)
+    if (vis.length === 0) return
     let c = boardCounts.get(cls.boardKey)
     if (!c) {
-      c = new Array<number>(patchIdx.size).fill(0)
+      c = new Array<number>(views.length).fill(0)
       boardCounts.set(cls.boardKey, c)
     }
-    c[pi]++
+    for (const vi of vis) c[vi]++
   })
   console.log(
     `パス B（盤面カウント）: 対象 ${inScopeRecords} レコード / 盤面 ${boardCounts.size} ${secSince(t0)} heap=${heapMB()}`,
@@ -245,66 +283,48 @@ async function main(): Promise<void> {
   }
   const viewLabel = (patches: string[]): string =>
     patches.length === 1 ? labelOf(patches[0]) : `${labelOf(patches[0])}–${labelOf(patches[patches.length - 1])}`
+  // 一覧に出すラベル。直近ビューは「18.3b (3d)」のように窓の日数を添える（UI はキーから「直近3日」を出す）。
+  const recentByKey = new Map(recentPlans.map((r) => [r.key, r]))
+  const indexLabel = (view: (typeof views)[number]): string => {
+    const r = recentByKey.get(view.key)
+    return r ? `${viewLabel(view.patches)} (${r.days}d)` : viewLabel(view.patches)
+  }
 
   const index: PatchIndexEntry[] = views.map((view) => ({
     key: view.key,
-    label: viewLabel(view.patches),
-    file: viewFileName(view.key, defaultKey),
-    matches: view.patches.reduce((s, p) => s + (matchCountByPatch.get(p) ?? 0), 0),
+    label: indexLabel(view),
+    file: viewFileName(view.key, openKey),
+    matches:
+      recentByKey.get(view.key)?.matches ?? view.patches.reduce((s, p) => s + (matchCountByPatch.get(p) ?? 0), 0),
   }))
 
-  const buildersByPatch = new Map<string, StatsBuilder[]>()
+  // 3つとも views と同じ添字で並ぶ（viewIdxsOf の戻り値でそのまま引く）。
   const viewBuilders: { key: string; file: string; builder: StatsBuilder }[] = []
-  const summariesByPatch = new Map<string, SummaryBuilder[]>()
   const summaryBuilders: { key: string; label: string; builder: SummaryBuilder }[] = []
-  const drillsByPatch = new Map<string, DrillBuilder[]>()
   const drillBuilders: { key: string; builder: DrillBuilder }[] = []
-  for (const view of views) {
-    const summary = createSummaryBuilder(staticData, choosers)
-    summaryBuilders.push({ key: view.key, label: viewLabel(view.patches), builder: summary })
-    const drill = createDrillBuilder(staticData)
-    drillBuilders.push({ key: view.key, builder: drill })
-    for (const p of view.patches) {
-      const list = summariesByPatch.get(p) ?? []
-      list.push(summary)
-      summariesByPatch.set(p, list)
-      const dl = drillsByPatch.get(p) ?? []
-      dl.push(drill)
-      drillsByPatch.set(p, dl)
-    }
-
-    const idxs = view.patches.map((p) => patchIdx.get(p)!).filter((i) => i !== undefined)
+  views.forEach((view, vi) => {
+    summaryBuilders.push({ key: view.key, label: indexLabel(view), builder: createSummaryBuilder(staticData, choosers) })
+    drillBuilders.push({ key: view.key, builder: createDrillBuilder(staticData) })
     const builder = createStatsBuilder(staticData, {
       targetPatch: view.key,
       tftPatch: viewLabel(view.patches),
       generatedAt,
       maxComps: config.maxCompsPerView,
-      boardFilter: (key) => {
-        const c = boardCounts.get(key)
-        if (!c) return false
-        let n = 0
-        for (const i of idxs) n += c[i]
-        return n >= MIN_OUTPUT_N
-      },
+      boardFilter: (key) => (boardCounts.get(key)?.[vi] ?? 0) >= MIN_OUTPUT_N,
     })
-    viewBuilders.push({ key: view.key, file: viewFileName(view.key, defaultKey), builder })
-    for (const p of view.patches) {
-      const list = buildersByPatch.get(p) ?? []
-      list.push(builder)
-      buildersByPatch.set(p, list)
-    }
-  }
+    viewBuilders.push({ key: view.key, file: viewFileName(view.key, openKey), builder })
+  })
 
-  // 8. パス C（集計）: 対象レコードを、そのパッチを含む全ビューの builder へ。
+  // 8. パス C（集計）: 対象レコードを、それを含む全ビューの builder へ。
   t0 = Date.now()
   await forEachRecord(routes.values(), (rec, route) => {
     const patch = resolvePatch(rec.v, rec.ts, schedule)
     if (!inScope(rec, patch)) return
-    for (const s of summariesByPatch.get(patch) ?? []) s.add(rec)
-    for (const d of drillsByPatch.get(patch) ?? []) d.add(rec)
-    const bs = buildersByPatch.get(patch)
-    if (!bs) return
-    for (const b of bs) b.add(rec, route)
+    for (const vi of viewIdxsOf(patch, rec.ts)) {
+      summaryBuilders[vi].builder.add(rec)
+      drillBuilders[vi].builder.add(rec)
+      viewBuilders[vi].builder.add(rec, route)
+    }
   })
   console.log(`パス C（集計）: ${secSince(t0)} heap=${heapMB()}`)
 
@@ -334,7 +354,7 @@ async function main(): Promise<void> {
     schemaVersion: 1,
     generatedAt,
     setNumber: staticData.setNumber,
-    defaultKey,
+    defaultKey: openKey,
     ...summaryDictionaries(staticData),
     choosers: summaryChoosers(staticData, choosers),
     views: summaryBuilders.map(({ key, label, builder }) => ({ key, label, ...builder.finish() })),
@@ -392,7 +412,7 @@ async function main(): Promise<void> {
 
   // 10. ログ
   console.log('--- 集計サマリ ---')
-  console.log(`既定パッチ: ${labelOf(defaultKey)}（内部 ${defaultKey}） → ${DEFAULT_FILE}`)
+  console.log(`既定パッチ: ${labelOf(defaultKey)}（内部 ${defaultKey}） / 最初に開くビュー: ${openKey} → ${DEFAULT_FILE}`)
   for (const { file, out } of outputs) {
     const body = serializeStatsFile(out)
     const sizeKB = (Buffer.byteLength(body) / 1024).toFixed(1)

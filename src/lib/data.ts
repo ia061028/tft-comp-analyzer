@@ -8,12 +8,23 @@ import type {
   TraitGrant,
 } from '../../shared/types'
 import { StatsStreamParser } from './statsStream'
+import { t, type Lang } from './i18n'
 
 /** フロントが最初に読む既定ビューのファイル名（集計側の既定パッチ）。 */
 export const DEFAULT_STATS_FILE = 'stats.json'
 
 /** 全パッチ合算ビューの選択キー（集計側 ALL_PATCHES_KEY と対応）。 */
 export const ALL_PATCHES_KEY = 'all'
+
+/** 直近 N 日ビューの選択キー（集計側 recentViewKey と対応）。 */
+const RECENT_KEY_RE = /^recent(\d+)d$/
+
+/** パッチ切り替えに出すビュー名。「全体」と「直近N日」はキーから言語ごとに作る。 */
+export function viewOptionLabel(lang: Lang, key: string, label: string): string {
+  if (key === ALL_PATCHES_KEY) return t(lang, 'all')
+  const m = key.match(RECENT_KEY_RE)
+  return m ? t(lang, 'recentDays', { n: Number(m[1]) }) : label
+}
 
 /**
  * [先頭, 値...] の塊を [先頭, 値] の組へ開く（schemaVersion 8 の i / h）。
