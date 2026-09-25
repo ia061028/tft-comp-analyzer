@@ -161,5 +161,6 @@ export const config = {
     { patch: '18.2', since: '2026-09-10T00:00:00Z' },
     { patch: '18.2b', since: '2026-09-14T17:00:00Z' },
     { patch: '18.3', since: '2026-09-23T00:00:00Z' },
+    { patch: '18.3b', since: '2026-09-24T17:00:00Z' },
   ] as { patch: string; since: string }[],
 }
