@@ -212,7 +212,7 @@ export type TraitGranter = [number, number, number] | [number, number]
  * フロントはこれをパッチ選択 UI に使い、選択に応じて file を fetch する。
  */
 export interface PatchIndexEntry {
-  /** 選択キー。"all" は全パッチ合算、それ以外は TFT パッチ表記（例 "18.2"）。 */
+  /** 選択キー。"all" は全パッチ合算、"recent{N}d" は直近 N 日、それ以外は TFT パッチ表記（例 "18.2"）。 */
   key: string
   /** 表示ラベル（"all" は "18.1–18.2" のような範囲表記。UI 側で「全体」に置き換える）。 */
   label: string

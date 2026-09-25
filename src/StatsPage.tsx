@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { LevelKey, WireDrillFile, WireSummaryFile, WireSummaryView } from '../shared/types'
 import { pickName, t, type Lang } from './lib/i18n'
-import { ALL_PATCHES_KEY } from './lib/data'
+import { viewOptionLabel } from './lib/data'
 import {
   defaultDir,
   emblemRows,
@@ -236,7 +236,7 @@ export default function StatsPage() {
                   onChange={changeView}
                   options={file.views.map((v) => ({
                     key: v.key,
-                    label: v.key === ALL_PATCHES_KEY ? t(lang, 'all') : v.label,
+                    label: viewOptionLabel(lang, v.key, v.label),
                   }))}
                 />
               </div>

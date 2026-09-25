@@ -114,6 +114,8 @@ export interface PatchView {
   key: string
   /** このビューに含めるパッチキー群。 */
   patches: string[]
+  /** 直近ビューのみ: この時刻（game_datetime, epoch 秒）以降の試合だけを含める。 */
+  since?: number
 }
 
 export const ALL_PATCHES_KEY = 'all'
@@ -170,4 +172,54 @@ export function retentionFloor(
   if (live.length === 0) return null
   const keep = Math.max(1, Math.floor(patchesToKeep))
   return live[Math.max(0, live.length - keep)].patch
+}
+
+// ---- 直近ビュー（鮮度） ----
+
+/** 直近 N 日ビューの選択キー（UI はこのキーから「直近N日」を表示する）。 */
+export const recentViewKey = (days: number): string => `recent${days}d`
+
+export interface RecentViewPlan {
+  key: string
+  days: number
+  /** 窓の開始（epoch 秒）。 */
+  since: number
+  /** 窓内のユニークマッチ数。 */
+  matches: number
+}
+
+/**
+ * 直近 N 日ビューを決める。窓は1つのパッチ（既定パッチ）の中だけで取り、パッチの境目はまたがない。
+ * - 窓の終端はそのパッチの最新の試合（集計時刻ではない）。開始 = 終端 − N 日。
+ * - 窓がパッチ全体を覆う（開始 <= 最古の試合）ならパッチビューと同じ中身なので出さない。
+ * - 窓内のマッチ数が threshold 未満なら出さない。
+ * - 長い窓と同じマッチ数になる短い窓も、中身が同じなので出さない。
+ * 戻り値は days の降順（長い窓 → 短い窓）。
+ *
+ * @param matchTs そのパッチのマッチID → game_datetime（epoch 秒）
+ */
+export function planRecentViews(
+  matchTs: Map<string, number>,
+  days: number[],
+  threshold: number,
+): RecentViewPlan[] {
+  if (matchTs.size === 0) return []
+  let minTs = Infinity
+  let maxTs = -Infinity
+  for (const ts of matchTs.values()) {
+    if (ts < minTs) minTs = ts
+    if (ts > maxTs) maxTs = ts
+  }
+  const out: RecentViewPlan[] = []
+  const sorted = [...new Set(days.filter((d) => d > 0))].sort((a, b) => b - a)
+  for (const d of sorted) {
+    const since = maxTs - d * 86400
+    if (since <= minTs) continue
+    let matches = 0
+    for (const ts of matchTs.values()) if (ts >= since) matches++
+    if (matches < threshold) continue
+    if (out.length > 0 && out[out.length - 1].matches === matches) continue
+    out.push({ key: recentViewKey(d), days: d, since, matches })
+  }
+  return out
 }
