@@ -97,3 +97,29 @@ test('型の数の上限を超えた分は、まとめ行（p = -2）に寄せ�
   assert.deepEqual(rest.u, [])
   assert.deepEqual(rest.b, [])
 })
+
+test('枠数の区分ごとの最頻の盤面（lb）。駒がレベルより少なければ1枠多く数える', () => {
+  const b = createDrillBuilder(makeStaticData())
+  const t = { TraitA: 3, TraitB: 1 }
+  const tc = { TraitA: 4, TraitB: 2 }
+  // 2枠: 2人が U1,U2（Lv2）、1人が U3 だけで Lv2（2枠使う駒の相当）→ どれも「〜7」
+  b.add(rec({ p: 2, lv: 2, t, tc, u: ['U1', 'U2'] }))
+  b.add(rec({ p: 4, lv: 2, t, tc, u: ['U2', 'U1'] }))
+  b.add(rec({ p: 6, lv: 2, t, tc, u: ['U3'] }))
+  // Lv8 だが枠を増やして駒9体 → レベルではなく駒の数で「9」
+  const nine = ['U1', 'U2', 'U3', 'U4', 'U1', 'U2', 'U3', 'U4', 'U1']
+  b.add(rec({ p: 1, lv: 8, t, tc, u: nine }))
+  // 駒7体で Lv8（エルダードラゴン相当）→「8」
+  b.add(rec({ p: 3, lv: 8, t, tc, u: nine.slice(0, 7) }))
+  const out = b.finish('v', 't')
+  const [ty] = rowOf(out, 'TraitA', 4).sp[0]
+  const name = (u: number) => out.units[u].name
+  assert.deepEqual(
+    ty.lb!.map(([lv, board, n, place]) => [lv, board.map(name), n, place]),
+    [
+      ['7', ['Ann', 'Bob'], 2, 6],
+      ['8', ['Ann', 'Dee', 'Bob', 'Cid'], 1, 3],
+      ['9', ['Ann', 'Dee', 'Bob', 'Cid'], 1, 1],
+    ],
+  )
+})

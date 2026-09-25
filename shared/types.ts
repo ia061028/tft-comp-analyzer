@@ -369,6 +369,11 @@ export interface WireDrillType {
   b: number[]
   /** その盤面の [人数, 順位合計]（数え始めてからの下限値）。 */
   bs: [number, number]
+  /**
+   * プレイヤーレベルの区分ごとの最頻の盤面 [区分, 盤面, 人数, 順位合計]（2026-09-25 から）。
+   * 統計ページでレベルを選んだとき、盤面の数がそのレベルに合うように出す。人の居ない区分は無い。
+   */
+  lb?: [LevelKey, number[], number, number][]
   /** 採用率の高い順。まとめ行は空。 */
   u: WireDrillUnit[]
 }

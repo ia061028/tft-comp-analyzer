@@ -1,5 +1,5 @@
 // 統計ページの掘り下げ（drill-<ビュー>.json）。特性の行を押したときに、そのビューの分だけ読む。
-import type { WireDrillFile, WireDrillType, WireSummaryFile } from '../../shared/types'
+import type { LevelKey, WireDrillFile, WireDrillType, WireSummaryFile } from '../../shared/types'
 import { pickName, type Lang } from './i18n'
 import type { TraitSplit } from './summary'
 
@@ -46,6 +46,7 @@ const SPLIT_COL: Record<TraitSplit, 0 | 1 | 2> = { all: 0, with: 1, without: 2 }
 /**
  * 特性の段（summary.json の行キー）の型一覧。人数の多い順（まとめ行は最後）。
  * 相方特性は api で summary.json の特性に引き当てる（ファイル間で並びがずれても名前を取り違えない）。
+ * レベルを選んでいるときの盤面は、そのレベルで終えた人の最多の盤面（駒の数がレベルに合う）。
  */
 export function drillTypes(
   drill: WireDrillFile,
@@ -54,6 +55,7 @@ export function drillTypes(
   min: number,
   split: TraitSplit,
   lang: Lang,
+  level: 'all' | LevelKey = 'all',
 ): DrillType[] {
   const ti = drill.traits.indexOf(traitApi)
   const row = drill.rows.find((r) => r.t === ti && r.m === min)
@@ -61,7 +63,7 @@ export function drillTypes(
   const types = row.sp[SPLIT_COL[split]]
   const total = types.reduce((s, ty) => s + ty.s[0], 0)
   const traitByApi = new Map(summary.traits.map((t) => [t.api, t]))
-  return types.map((ty, i) => toType(ty, i, total, drill, traitByApi, lang))
+  return types.map((ty, i) => toType(ty, i, total, drill, traitByApi, lang, level))
 }
 
 function toType(
@@ -71,6 +73,7 @@ function toType(
   drill: WireDrillFile,
   traitByApi: Map<string, WireSummaryFile['traits'][number]>,
   lang: Lang,
+  level: 'all' | LevelKey,
 ): DrillType {
   const [n, place, top4, , lv] = ty.s
   let partner: DrillType['partner']
@@ -80,6 +83,10 @@ function toType(
     partner = t ? { name: pickName(lang, t), icon: t.icon } : undefined
   }
   const unitOf = (u: number) => drill.units[u]
+  // レベル別の盤面が無い古いファイルは全体の盤面のまま。
+  const lvb = level === 'all' || !ty.lb ? undefined : ty.lb.find((l) => l[0] === level)
+  const [board, boardN, boardPlace]: [number[], number, number] =
+    level === 'all' || !ty.lb ? [ty.b, ty.bs[0], ty.bs[1]] : lvb ? [lvb[1], lvb[2], lvb[3]] : [[], 0, 0]
   return {
     key: `${ty.p}|${i}`,
     partner,
@@ -88,9 +95,9 @@ function toType(
     avg: place / n,
     top4: (top4 / n) * 100,
     lv: lv / n,
-    board: ty.b.map((u) => ({ name: pickName(lang, unitOf(u)), icon: unitOf(u).icon, cost: unitOf(u).cost })),
-    boardN: ty.bs[0],
-    boardAvg: ty.bs[0] > 0 ? ty.bs[1] / ty.bs[0] : 0,
+    board: board.map((u) => ({ name: pickName(lang, unitOf(u)), icon: unitOf(u).icon, cost: unitOf(u).cost })),
+    boardN,
+    boardAvg: boardN > 0 ? boardPlace / boardN : 0,
     units: ty.u.map(([u, un, s3, p3, pOther]) => {
       const info = unitOf(u)
       const other = un - s3

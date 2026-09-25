@@ -32,7 +32,14 @@ const drill: WireDrillFile = {
       m: 4,
       sp: [
         [
-          { p: 1, s: [8, 24, 5, 2, 68], b: [0, 1], bs: [4, 10], u: [[1, 8, 6, 15, 12], [0, 4, 0, 0, 14]] },
+          {
+            p: 1,
+            s: [8, 24, 5, 2, 68],
+            b: [0, 1],
+            bs: [4, 10],
+            u: [[1, 8, 6, 15, 12], [0, 4, 0, 0, 14]],
+            lb: [['9', [1], 3, 6]],
+          },
           { p: -1, s: [2, 14, 0, 0, 16], b: [0], bs: [2, 14], u: [[0, 2, 0, 0, 14]] },
         ],
         [],
@@ -70,4 +77,16 @@ test('drillTypes: まとめ行は partner = null、行が無ければ空', () =>
   assert.equal(rest.partner, null)
   assert.deepEqual(drillTypes(drill, summary, 'A', 4, 'with', 'en'), [])
   assert.deepEqual(drillTypes(drill, summary, 'B', 2, 'all', 'en'), [])
+})
+
+test('drillTypes: レベルを選ぶと、その区分の最頻の盤面。無い区分は盤面なし、古いファイルは全体の盤面', () => {
+  const [ty, solo] = drillTypes(drill, summary, 'A', 4, 'all', 'ja', '9')
+  assert.deepEqual(ty.board.map((u) => u.name), ['ボブ'])
+  assert.equal(ty.boardN, 3)
+  assert.equal(ty.boardAvg, 2)
+  // 人数・平均順位は全体のまま
+  assert.equal(ty.n, 8)
+  assert.deepEqual(drillTypes(drill, summary, 'A', 4, 'all', 'ja', '8')[0].board, [])
+  // lb の無い型（古いファイル）は全体の盤面
+  assert.deepEqual(solo.board.map((u) => u.name), ['アン'])
 })
