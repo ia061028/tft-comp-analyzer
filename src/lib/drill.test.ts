@@ -32,7 +32,14 @@ const drill: WireDrillFile = {
       m: 4,
       sp: [
         [
-          { p: 1, s: [8, 24, 5, 2, 68], b: [0, 1], bs: [4, 10], u: [[1, 8, 6, 15, 12], [0, 4, 0, 0, 14]] },
+          {
+            p: 1,
+            s: [8, 24, 5, 2, 68],
+            b: [0, 1],
+            bs: [4, 10],
+            bl: [['8', [0], 3, 6], ['9', [0, 1], 4, 10]],
+            u: [[1, 8, 6, 15, 12], [0, 4, 0, 0, 14]],
+          },
           { p: -1, s: [2, 14, 0, 0, 16], b: [0], bs: [2, 14], u: [[0, 2, 0, 0, 14]] },
         ],
         [],
@@ -70,4 +77,27 @@ test('drillTypes: まとめ行は partner = null、行が無ければ空', () =>
   assert.equal(rest.partner, null)
   assert.deepEqual(drillTypes(drill, summary, 'A', 4, 'with', 'en'), [])
   assert.deepEqual(drillTypes(drill, summary, 'B', 2, 'all', 'en'), [])
+})
+
+test('drillTypes: レベルを選ぶと型を平均Lvでふるい分け、盤面はそのレベルのものを出す', () => {
+  // 型の平均Lv: 相方ブラボー 8.5（区分9）、相方なし 8.0（区分8）
+  const lv9 = drillTypes(drill, summary, 'A', 4, 'all', 'ja', '9')
+  assert.equal(lv9.length, 1)
+  assert.deepEqual(lv9[0].board.map((u) => u.name), ['アン', 'ボブ'])
+  assert.equal(lv9[0].boardN, 4)
+  // 割合の母数は全型のまま
+  assert.equal(lv9[0].share, 80)
+  // レベル別の盤面が無い型（古いファイル）は全員の盤面
+  const [solo] = drillTypes(drill, summary, 'A', 4, 'all', 'ja', '8')
+  assert.equal(solo.partner, undefined)
+  assert.deepEqual(solo.board.map((u) => u.name), ['アン'])
+  assert.equal(solo.boardN, 2)
+})
+
+test('drillTypes: レベル別の盤面があってもその区分に人が居なければ盤面は出さない', () => {
+  const only = structuredClone(drill)
+  only.rows[0].sp[0][0].bl = [['9', [0, 1], 4, 10]]
+  only.rows[0].sp[0][0].s[4] = 64 // 平均Lv 8.0
+  const [ty] = drillTypes(only, summary, 'A', 4, 'all', 'ja', '8')
+  assert.deepEqual(ty.board, [])
 })

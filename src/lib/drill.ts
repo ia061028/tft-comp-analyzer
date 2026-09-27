@@ -1,7 +1,7 @@
 // 統計ページの掘り下げ（drill-<ビュー>.json）。特性の行を押したときに、そのビューの分だけ読む。
-import type { WireDrillFile, WireDrillType, WireSummaryFile } from '../../shared/types'
+import type { LevelKey, WireDrillFile, WireDrillType, WireSummaryFile } from '../../shared/types'
 import { pickName, type Lang } from './i18n'
-import type { TraitSplit } from './summary'
+import { levelBucketOf, type TraitSplit } from './summary'
 
 /** drill-<key>.json が無い（まだ集計が回っていない）ときは null。 */
 export async function loadDrill(key: string): Promise<WireDrillFile | null> {
@@ -46,6 +46,8 @@ const SPLIT_COL: Record<TraitSplit, 0 | 1 | 2> = { all: 0, with: 1, without: 2 }
 /**
  * 特性の段（summary.json の行キー）の型一覧。人数の多い順（まとめ行は最後）。
  * 相方特性は api で summary.json の特性に引き当てる（ファイル間で並びがずれても名前を取り違えない）。
+ * レベルを選んでいるときは、表の行と同じく型も平均Lvでふるい分け（levelBucketOf）、
+ * 最多の盤面はそのレベルのプレイヤーの盤面にする（型の数字は全員分のまま。割合の母数も全型）。
  */
 export function drillTypes(
   drill: WireDrillFile,
@@ -54,6 +56,7 @@ export function drillTypes(
   min: number,
   split: TraitSplit,
   lang: Lang,
+  level: 'all' | LevelKey = 'all',
 ): DrillType[] {
   const ti = drill.traits.indexOf(traitApi)
   const row = drill.rows.find((r) => r.t === ti && r.m === min)
@@ -61,7 +64,9 @@ export function drillTypes(
   const types = row.sp[SPLIT_COL[split]]
   const total = types.reduce((s, ty) => s + ty.s[0], 0)
   const traitByApi = new Map(summary.traits.map((t) => [t.api, t]))
-  return types.map((ty, i) => toType(ty, i, total, drill, traitByApi, lang))
+  return types
+    .map((ty, i) => toType(ty, i, total, drill, traitByApi, lang, level))
+    .filter((ty) => level === 'all' || levelBucketOf(ty.lv) === level)
 }
 
 function toType(
@@ -71,6 +76,7 @@ function toType(
   drill: WireDrillFile,
   traitByApi: Map<string, WireSummaryFile['traits'][number]>,
   lang: Lang,
+  level: 'all' | LevelKey,
 ): DrillType {
   const [n, place, top4, , lv] = ty.s
   let partner: DrillType['partner']
@@ -80,6 +86,12 @@ function toType(
     partner = t ? { name: pickName(lang, t), icon: t.icon } : undefined
   }
   const unitOf = (u: number) => drill.units[u]
+  // レベル別の盤面が無い古いファイルは、全員の最多の盤面を出す。
+  let [board, boardN, boardPlace] = [ty.b, ty.bs[0], ty.bs[1]]
+  if (level !== 'all' && ty.bl) {
+    const hit = ty.bl.find((l) => l[0] === level)
+    ;[board, boardN, boardPlace] = hit ? [hit[1], hit[2], hit[3]] : [[], 0, 0]
+  }
   return {
     key: `${ty.p}|${i}`,
     partner,
@@ -88,9 +100,9 @@ function toType(
     avg: place / n,
     top4: (top4 / n) * 100,
     lv: lv / n,
-    board: ty.b.map((u) => ({ name: pickName(lang, unitOf(u)), icon: unitOf(u).icon, cost: unitOf(u).cost })),
-    boardN: ty.bs[0],
-    boardAvg: ty.bs[0] > 0 ? ty.bs[1] / ty.bs[0] : 0,
+    board: board.map((u) => ({ name: pickName(lang, unitOf(u)), icon: unitOf(u).icon, cost: unitOf(u).cost })),
+    boardN,
+    boardAvg: boardN > 0 ? boardPlace / boardN : 0,
     units: ty.u.map(([u, un, s3, p3, pOther]) => {
       const info = unitOf(u)
       const other = un - s3
