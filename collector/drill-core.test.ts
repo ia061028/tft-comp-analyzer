@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { StaticData } from './cdragon.ts'
 import type { ParticipantRecord } from '../shared/types.ts'
-import { createDrillBuilder, DRILL_TYPE_LIMIT } from './drill-core.ts'
+import { createDrillBuilder, DRILL_TYPE_LIMIT, levelKeyOf } from './drill-core.ts'
 
 // TraitA [2,4] / TraitB [2,4] / TraitC [2,3] / Solo [1]（Dee だけが持つ固有特性）。紋章A は TraitA。
 function makeStaticData(extraTraits = 0): StaticData {
@@ -77,8 +77,39 @@ test('分割（全体・紋章あり・紋章なし）、駒の採用と星3、�
   // 最頻の盤面は紋章なしの2人の盤面（コスト順）
   assert.deepEqual(all[0].b.map(name), ['Ann', 'Bob', 'Cid'])
   assert.deepEqual(all[0].bs, [2, 4])
+  // レベル区分ごとの最頻盤面（rec の既定 lv の区分に全員が入る）
+  assert.deepEqual(
+    all[0].bl!.map(([lv, board, n, place]) => [lv, board.map(name), n, place]),
+    [[levelKeyOf(rec({}).lv), ['Ann', 'Bob', 'Cid'], 2, 4]],
+  )
   // 辞書には使った駒だけが入る
   assert.deepEqual(out.units.map((u) => u.api).sort(), ['U1', 'U2', 'U3', 'U4'])
+})
+
+test('レベル区分ごとの最頻盤面は、そのレベルのプレイヤーの盤面だけで選ぶ', () => {
+  const b = createDrillBuilder(makeStaticData())
+  const t = { TraitA: 3, TraitB: 1 }
+  const tc = { TraitA: 4, TraitB: 2 }
+  // Lv9 の3人は4体盤面、Lv8 の2人は3体盤面。全体の最多は4体盤面
+  for (const p of [1, 2, 3]) b.add(rec({ p, lv: 9, t, tc, u: ['U1', 'U2', 'U3', 'U4'] }))
+  for (const p of [4, 6]) b.add(rec({ p, lv: 8, t, tc, u: ['U1', 'U2', 'U3'] }))
+  b.add(rec({ p: 8, lv: 11, t, tc, u: ['U4'] }))
+  const out = b.finish('v', 't')
+  const [ty] = rowOf(out, 'TraitA', 4).sp[0]
+  const name = (u: number) => out.units[u].name
+  assert.equal(ty.b.length, 4)
+  assert.deepEqual(
+    ty.bl!.map(([lv, board, n, place]) => [lv, board.map(name), n, place]),
+    [
+      ['8', ['Ann', 'Bob', 'Cid'], 2, 10],
+      ['9', ['Ann', 'Dee', 'Bob', 'Cid'], 3, 6],
+      ['10', ['Dee'], 1, 8],
+    ],
+  )
+})
+
+test('levelKeyOf: 7以下と10以上をまとめる', () => {
+  assert.deepEqual([5, 7, 8, 9, 10, 11].map(levelKeyOf), ['7', '7', '8', '9', '10', '10'])
 })
 
 test('型の数の上限を超えた分は、まとめ行（p = -2）に寄せる', () => {

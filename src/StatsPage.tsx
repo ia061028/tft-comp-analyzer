@@ -154,7 +154,7 @@ export default function StatsPage() {
     if (drill.status === 'error') return <p className="text-xs text-red-400/80">{t(lang, 'loadFailed')}</p>
     if (drill.status === 'missing') return <p className="text-xs text-faint">{t(lang, 'drillNotReady')}</p>
     const [api] = r.key.split('|')
-    return <DrillPanel types={drillTypes(drill.file, file!, api, r.min!, split, lang)} lang={lang} />
+    return <DrillPanel types={drillTypes(drill.file, file!, api, r.min!, split, lang, level)} lang={lang} />
   }
   const refRow = tab === 'emblems' && view ? noEmblemRow(view, t(lang, 'statsNoEmblem')) : null
 

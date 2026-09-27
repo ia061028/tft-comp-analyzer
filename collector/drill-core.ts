@@ -6,6 +6,7 @@
 
 import type { StaticData } from './cdragon.ts'
 import type {
+  LevelKey,
   ParticipantRecord,
   WireDrillFile,
   WireDrillRow,
@@ -37,11 +38,28 @@ interface TypeAcc {
   /** unitIdx → [採用人数, 星3人数, 星3の順位合計, 星3以外の順位合計] */
   units: Map<number, [number, number, number, number]>
   boards: Map<string, BoardSlot>
+  /** プレイヤーレベルの区分ごとの最頻盤面の候補 */
+  boardsByLv: Map<LevelKey, Map<string, BoardSlot>>
 }
 
 function newType(): TypeAcc {
-  return { s: emptyStat(), units: new Map(), boards: new Map() }
+  return { s: emptyStat(), units: new Map(), boards: new Map(), boardsByLv: new Map() }
 }
+
+const LEVEL_KEYS: readonly LevelKey[] = ['7', '8', '9', '10']
+
+/** プレイヤーレベル → 区分（7 以下と 10 以上はまとめる。画面のレベル選択と同じ区切り）。 */
+export function levelKeyOf(lv: number): LevelKey {
+  return lv <= 7 ? '7' : lv >= 10 ? '10' : lv === 8 ? '8' : '9'
+}
+
+function bestBoard(boards: Map<string, BoardSlot>): [string, BoardSlot] | null {
+  let best: [string, BoardSlot] | null = null
+  for (const e of boards) if (!best || e[1].n > best[1].n) best = e
+  return best
+}
+
+const boardUnits = (key: string): number[] => key.split(',').map(Number)
 
 function addBoard(boards: Map<string, BoardSlot>, key: string, place: number): void {
   const hit = boards.get(key)
@@ -135,7 +153,13 @@ export function createDrillBuilder(staticData: StaticData): DrillBuilder {
         a[2] += rec.p
       } else a[3] += rec.p
     }
-    if (boardKey) addBoard(acc.boards, boardKey, rec.p)
+    if (boardKey) {
+      addBoard(acc.boards, boardKey, rec.p)
+      const lv = levelKeyOf(rec.lv)
+      let byLv = acc.boardsByLv.get(lv)
+      if (!byLv) acc.boardsByLv.set(lv, (byLv = new Map()))
+      addBoard(byLv, boardKey, rec.p)
+    }
   }
 
   return {
@@ -183,6 +207,7 @@ export function createDrillBuilder(staticData: StaticData): DrillBuilder {
         for (const types of row.sp) {
           for (const ty of types) {
             ty.b = ty.b.map((u) => remap.get(u)!)
+            for (const l of ty.bl ?? []) l[1] = l[1].map((u) => remap.get(u)!)
             for (const u of ty.u) u[0] = remap.get(u[0])!
           }
         }
@@ -195,7 +220,10 @@ export function createDrillBuilder(staticData: StaticData): DrillBuilder {
       for (const row of outRows) {
         for (const types of row.sp) {
           for (const ty of types) {
-            ty.b.sort((a, b) => units[a].cost - units[b].cost || (units[a].name < units[b].name ? -1 : 1))
+            const byCost = (a: number, b: number) =>
+              units[a].cost - units[b].cost || (units[a].name < units[b].name ? -1 : 1)
+            ty.b.sort(byCost)
+            for (const l of ty.bl ?? []) l[1].sort(byCost)
           }
         }
       }
@@ -219,12 +247,18 @@ function finishTypes(types: Map<number, TypeAcc>, used: Set<number>): WireDrillT
       .sort((a, b) => b[1][0] - a[1][0] || a[0] - b[0])
       .slice(0, DRILL_UNIT_LIMIT)
       .map(([u, a]) => [u, a[0], a[1], a[2], a[3]])
-    let best: [string, BoardSlot] | null = null
-    for (const e of acc.boards) if (!best || e[1].n > best[1].n) best = e
-    const board = best ? best[0].split(',').map(Number) : []
+    const best = bestBoard(acc.boards)
+    const board = best ? boardUnits(best[0]) : []
+    const byLv: NonNullable<WireDrillType['bl']> = []
+    for (const lv of LEVEL_KEYS) {
+      const b = acc.boardsByLv.get(lv)
+      const top = b && bestBoard(b)
+      if (top) byLv.push([lv, boardUnits(top[0]), top[1].n, top[1].place])
+    }
     for (const u of units) used.add(u[0])
     for (const u of board) used.add(u)
-    out.push({ p, s: acc.s, b: board, bs: best ? [best[1].n, best[1].place] : [0, 0], u: units })
+    for (const l of byLv) for (const u of l[1]) used.add(u)
+    out.push({ p, s: acc.s, b: board, bs: best ? [best[1].n, best[1].place] : [0, 0], bl: byLv, u: units })
   })
   if (rest[0] > 0) out.push({ p: -2, s: rest, b: [], bs: [0, 0], u: [] })
   return out
