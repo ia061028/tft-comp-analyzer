@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "routes": {
+    "sea": {
+      "lastRunStartedAt": 1791027374
+    },
+    "americas": {
+      "lastRunStartedAt": 1791027374
+    },
+    "asia": {
+      "lastRunStartedAt": 1791027374
+    },
+    "europe": {
+      "lastRunStartedAt": 1791027374
+    }
+  },
+  "collectSince": 1787702400
+}
