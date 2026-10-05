@@ -1172,7 +1172,9 @@
    * 下にはその駒が持つ発動中の特性を段の色の小さな角丸で並べる。
    */
   .lunit {
-    --lunit-size: 52px;
+    --lunit-size: 48px;
+    --lunit-trait: 15px;
+    --lunit-trait-icon: 11px;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -1183,6 +1185,13 @@
   .lunit .utile {
     width: var(--lunit-size);
     height: var(--lunit-size);
+  }
+  @media (min-width: 48rem) {
+    .lunit {
+      --lunit-size: 52px;
+      --lunit-trait: 16px;
+      --lunit-trait-icon: 12px;
+    }
   }
   .lunit__mark {
     position: absolute;
@@ -1217,21 +1226,31 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 2px;
+    gap: 1px;
   }
   .lunit__trait {
     display: flex;
-    width: 16px;
-    height: 16px;
+    width: var(--lunit-trait);
+    height: var(--lunit-trait);
     align-items: center;
     justify-content: center;
     border-radius: 4px;
     border-width: 1px;
   }
   .lunit__trait img {
-    width: 12px;
-    height: 12px;
+    width: var(--lunit-trait-icon);
+    height: var(--lunit-trait-icon);
     object-fit: contain;
+  }
+  .lunit__trait--chosen {
+    box-shadow: 0 0 0 1.5px var(--color-hand);
+  }
+  .lunit__emblem {
+    border-color: var(--color-hand);
+    box-shadow: 0 0 12px -4px var(--color-hand);
+  }
+  .lunit__emblem img {
+    opacity: 1;
   }
   /* コストごとに段を分ける。見出しは置かず、枠の色と段の切れ目だけで読ませる。 */
   .ugrid {

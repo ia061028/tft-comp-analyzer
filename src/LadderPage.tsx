@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { StatsFile } from '../shared/types'
 import { pickName, t, type Lang } from './lib/i18n'
 import { DEFAULT_STATS_FILE, loadStatsHead } from './lib/data'
@@ -6,7 +6,6 @@ import { activeTier, buildPlannerCode, styleClasses } from './lib/format'
 import { LADDER_REWARDS, TEAM_SIZE_STEP, candidateUnits, splitGranters, type LadderData } from './lib/ladder'
 import type { LadderRequest, LadderResponse, WireStep } from './lib/ladder.worker'
 import { nextMark, type UnitMark } from './lib/unitFilter'
-import { SegmentedControl } from './components/SegmentedControl'
 import { SiteNav } from './components/SiteNav'
 import { UnitGrid } from './components/UnitGrid'
 
@@ -67,7 +66,11 @@ export default function LadderPage() {
     loadLadderDictionaries()
       .then((stats) => !cancelled && setLoad({ status: 'ready', stats }))
       .catch((e: unknown) => {
-        if (!cancelled) setLoad({ status: 'error', message: e instanceof Error ? e.message : String(e) })
+        if (!cancelled)
+          setLoad({
+            status: 'error',
+            message: e instanceof Error ? e.message : String(e),
+          })
       })
     return () => {
       cancelled = true
@@ -90,10 +93,7 @@ export default function LadderPage() {
   )
   const emblemTraits = useMemo(() => (stats ? picked.map((i) => stats.emblems[i].trait) : []), [stats, picked])
   // 印を付けられるのは盤面に置ける駒だけ（チームプランナーに無い変種は出さない）。
-  const pickable = useMemo(
-    () => (stats ? candidateUnits(stats.units, true).map((i) => stats.units[i]) : []),
-    [stats],
-  )
+  const pickable = useMemo(() => (stats ? candidateUnits(stats.units, true).map((i) => stats.units[i]) : []), [stats])
   const { locked, excluded } = useMemo(() => {
     const locked: number[] = []
     const excluded: number[] = []
@@ -109,7 +109,9 @@ export default function LadderPage() {
   const workerRef = useRef<Worker | null>(null)
   const reqId = useRef(0)
   useEffect(() => {
-    const w = new Worker(new URL('./lib/ladder.worker.ts', import.meta.url), { type: 'module' })
+    const w = new Worker(new URL('./lib/ladder.worker.ts', import.meta.url), {
+      type: 'module',
+    })
     workerRef.current = w
     w.onmessage = (e: MessageEvent<LadderResponse>) => {
       const r = e.data
@@ -118,8 +120,7 @@ export default function LadderPage() {
         // 前の入力の結果は消さずに残し、届いたレベルから差し替える（毎回空にすると画面がちらつく）。
         setSteps((s) => [...s.filter((x) => x.level !== r.step.level), r.step].sort((a, b) => a.level - b.level))
         setFreshLevels((f) => new Set(f).add(r.step.level))
-      }
-      else if (r.kind === 'emblem') setGains((g) => new Map(g).set(r.emblem, r.gain))
+      } else if (r.kind === 'emblem') setGains((g) => new Map(g).set(r.emblem, r.gain))
       else setComputing(false)
     }
     return () => w.terminate()
@@ -144,8 +145,7 @@ export default function LadderPage() {
     workerRef.current.postMessage(req)
   }, [data, emblemTraits, allowFive, bonus, locked, excluded])
 
-  const toggleEmblem = (i: number) =>
-    setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]))
+  const toggleEmblem = (i: number) => setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]))
   const cycleUnit = (api: string) =>
     setMarks((m) => {
       const next = new Map(m)
@@ -179,7 +179,7 @@ export default function LadderPage() {
         </button>
       </header>
 
-      <main className="flex flex-1 flex-col gap-4 px-4 py-4 md:px-5">
+      <main className="flex flex-1 flex-col gap-3 px-4 py-3 md:px-5 md:gap-4">
         {load.status === 'loading' && <p className="text-sm text-muted">{t(lang, 'loading')}</p>}
         {load.status === 'error' && (
           <div className="flex items-center gap-3 text-sm text-muted">
@@ -201,70 +201,85 @@ export default function LadderPage() {
 
         {stats && data && (
           <>
-            <section className="flex flex-col gap-2" aria-label={t(lang, 'ladderEmblems')}>
-              <h2 className="text-xs font-semibold text-muted" title={t(lang, 'ladderEmblemsHint')}>
-                {t(lang, 'ladderEmblems')}
-              </h2>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(40px,1fr))] gap-1.5">
-                {stats.emblems.map((e, i) => {
-                  const on = picked.includes(i)
-                  const name = pickName(lang, e)
-                  return (
-                    <button
-                      key={e.api}
-                      type="button"
-                      aria-pressed={on}
-                      aria-label={name}
-                      title={name}
-                      onClick={() => toggleEmblem(i)}
-                      className={`aspect-square overflow-hidden rounded-md border-2 bg-surface-2 transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
-                        on ? 'border-gold shadow-[0_0_14px_-4px_var(--color-hand)]' : 'border-line'
-                      }`}
-                    >
-                      <img src={e.icon} alt="" className={`h-full w-full object-cover ${on ? '' : 'opacity-60'}`} />
-                    </button>
-                  )
-                })}
-              </div>
-            </section>
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:gap-8">
+              <section className="flex min-w-0 flex-1 flex-col gap-2" aria-label={t(lang, 'ladderEmblems')}>
+                <h2 className="text-xs font-semibold text-muted" title={t(lang, 'ladderEmblemsHint')}>
+                  {t(lang, 'ladderEmblems')}
+                </h2>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(44px,1fr))] gap-2 xl:grid-cols-[repeat(auto-fill,44px)]">
+                  {stats.emblems.map((e, i) => {
+                    const on = picked.includes(i)
+                    const name = pickName(lang, e)
+                    const gain = on ? gains.get(e.trait) : undefined
+                    const verdict =
+                      gain === undefined
+                        ? undefined
+                        : gain > 0
+                          ? t(lang, 'ladderEmblemUse', { name, n: gain })
+                          : t(lang, 'ladderEmblemReroll', { name })
+                    return (
+                      <button
+                        key={e.api}
+                        type="button"
+                        aria-pressed={on}
+                        aria-label={verdict ?? name}
+                        title={verdict ?? name}
+                        onClick={() => toggleEmblem(i)}
+                        className={`relative aspect-square rounded-md border-2 bg-surface-2 transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                          on ? 'border-gold shadow-[0_0_14px_-4px_var(--color-hand)]' : 'border-line'
+                        }`}
+                      >
+                        <img
+                          src={e.icon}
+                          alt=""
+                          className={`h-full w-full rounded-[4px] object-cover ${on ? '' : 'opacity-60'}`}
+                        />
+                        {/* 判定は紋章の角に出す。金の +n＝使う、灰の ×＝再合成。 */}
+                        {gain !== undefined && (
+                          <span
+                            aria-hidden
+                            className={`absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums ring-2 ring-base ${
+                              gain > 0 ? 'bg-gold text-base' : 'bg-line-strong text-ink'
+                            }`}
+                          >
+                            {gain > 0 ? `+${gain}` : '×'}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
 
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-              <label className="flex items-center gap-2 text-xs font-semibold text-muted">
-                {t(lang, 'ladderFive')}
-                <SegmentedControl
-                  ariaLabel={t(lang, 'ladderFive')}
-                  value={allowFive ? 'on' : 'off'}
-                  onChange={(k) => setAllowFive(k === 'on')}
-                  options={[
-                    { key: 'off', label: t(lang, 'ladderFiveOff') },
-                    { key: 'on', label: t(lang, 'ladderFiveOn') },
-                  ]}
-                />
-              </label>
-              <label className="flex items-center gap-2 text-xs font-semibold text-muted">
-                {t(lang, 'ladderBonus')}
-                <SegmentedControl
-                  ariaLabel={t(lang, 'ladderBonus')}
-                  value={bonus ? 'plus' : 'none'}
-                  onChange={(k) => setBonus(k === 'plus' ? 1 : 0)}
-                  options={[
-                    { key: 'none', label: '±0' },
-                    { key: 'plus', label: '+1' },
-                  ]}
-                />
-              </label>
-              <button
-                type="button"
-                aria-expanded={unitsOpen}
-                onClick={() => setUnitsOpen((o) => !o)}
-                className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-3 py-1 text-sm font-medium text-ink hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
-              >
-                {t(lang, 'ladderUnits')}
-                {marks.size > 0 && <span className="tabular-nums text-gold">{marks.size}</span>}
-                <span aria-hidden className={`text-[10px] text-faint transition-transform ${unitsOpen ? 'rotate-180' : ''}`}>
-                  ▼
-                </span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2 xl:shrink-0 xl:pb-0.5">
+                <Toggle on={allowFive} onClick={() => setAllowFive((v) => !v)} title={t(lang, 'ladderFiveHint')}>
+                  <span
+                    className="h-3 w-3 rounded-sm border-2"
+                    style={{ borderColor: 'var(--color-cost-5)' }}
+                    aria-hidden
+                  />
+                  {t(lang, 'ladderFive')}
+                </Toggle>
+                <Toggle on={bonus > 0} onClick={() => setBonus((b) => (b ? 0 : 1))} title={t(lang, 'ladderBonusHint')}>
+                  {t(lang, 'ladderBonus')}
+                </Toggle>
+                <button
+                  type="button"
+                  aria-expanded={unitsOpen}
+                  onClick={() => setUnitsOpen((o) => !o)}
+                  title={t(lang, 'ladderUnitsHint')}
+                  className="flex h-8 items-center gap-1.5 rounded-md border border-line bg-surface-2 px-3 text-sm font-medium text-ink hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+                >
+                  {t(lang, 'ladderUnits')}
+                  {marks.size > 0 && <span className="tabular-nums text-gold">{marks.size}</span>}
+                  <span
+                    aria-hidden
+                    className={`text-[10px] text-faint transition-transform ${unitsOpen ? 'rotate-180' : ''}`}
+                  >
+                    ▼
+                  </span>
+                </button>
+              </div>
             </div>
 
             {unitsOpen && (
@@ -272,51 +287,29 @@ export default function LadderPage() {
                 className="flex flex-col gap-2 rounded-md border border-line bg-surface p-3"
                 style={{ '--tile-size': '40px' } as CSSProperties}
               >
-                <div className="flex items-center gap-2">
-                  <p className="flex-1 text-[11px] text-faint">{t(lang, 'ladderUnitsHint')}</p>
-                  {marks.size > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setMarks(new Map())}
-                      className="rounded border border-line px-2 py-0.5 text-xs text-muted hover:text-ink"
-                    >
-                      {t(lang, 'ladderUnitsClear')}
-                    </button>
-                  )}
-                </div>
+                {marks.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setMarks(new Map())}
+                    className="self-end rounded border border-line px-2 py-0.5 text-xs text-muted hover:text-ink"
+                  >
+                    {t(lang, 'ladderUnitsClear')}
+                  </button>
+                )}
                 <UnitGrid units={pickable} marks={marks} lang={lang} onCycle={cycleUnit} onUnmark={unmarkUnit} />
               </section>
             )}
 
-            {picked.length > 0 && (
-              <ul className="flex flex-col gap-1 text-sm xl:flex-row xl:flex-wrap xl:gap-x-6">
-                {[...new Set(emblemTraits)].map((tr) => {
-                  const gain = gains.get(tr)
-                  const e = stats.emblems.find((x) => x.trait === tr)!
-                  const name = pickName(lang, e)
-                  if (gain === undefined)
-                    return (
-                      <li key={tr} className="text-faint">
-                        {name}: {t(lang, 'ladderComputing')}
-                      </li>
-                    )
-                  return (
-                    <li key={tr} className={gain > 0 ? 'text-ink' : 'text-ember-warm'}>
-                      {gain > 0 ? t(lang, 'ladderEmblemUse', { name, n: gain }) : t(lang, 'ladderEmblemReroll', { name })}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-
-            <section className="flex flex-col gap-2" aria-label={t(lang, 'ladderRoute')}>
-              <h2 className="flex items-center gap-2 text-xs font-semibold text-muted">
-                {t(lang, 'ladderRoute')}
-                {computing && <span className="font-normal text-faint">{t(lang, 'ladderComputing')}</span>}
-              </h2>
-              <ol className="flex flex-col gap-2 xl:grid xl:grid-cols-[auto_auto_minmax(0,1fr)_auto] xl:gap-x-5">
+            <section aria-label={t(lang, 'ladderRoute')} aria-busy={computing}>
+              <ol className="flex flex-col gap-2 xl:grid xl:gap-y-1.5 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:gap-x-5">
                 {steps.map((s) => (
-                  <RouteRow key={s.level} step={s} stats={stats} lang={lang} stale={computing && !freshLevels.has(s.level)} />
+                  <RouteRow
+                    key={s.level}
+                    step={s}
+                    stats={stats}
+                    lang={lang}
+                    stale={computing && !freshLevels.has(s.level)}
+                  />
                 ))}
               </ol>
             </section>
@@ -326,16 +319,17 @@ export default function LadderPage() {
               <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
                 {Object.entries(LADDER_REWARDS).map(([n, r]) => (
                   <div key={n} className="contents">
-                    <dt className={`tabular-nums ${Number(n) === TEAM_SIZE_STEP ? 'font-bold text-gold' : 'text-muted'}`}>
+                    <dt
+                      className={`tabular-nums ${Number(n) === TEAM_SIZE_STEP ? 'font-bold text-gold' : 'text-muted'}`}
+                    >
                       {t(lang, 'ladderTraits', { n })}
                     </dt>
                     <dd className={Number(n) === TEAM_SIZE_STEP ? 'text-ink' : 'text-muted'}>{r[lang]}</dd>
                   </div>
                 ))}
               </dl>
+              <p className="mt-3 text-[11px] leading-relaxed text-faint">{t(lang, 'ladderNote')}</p>
             </details>
-
-            <p className="text-[11px] leading-relaxed text-faint">{t(lang, 'ladderNote')}</p>
           </>
         )}
       </main>
@@ -367,16 +361,25 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
       pickName(lang, stats.units[a]).localeCompare(pickName(lang, stats.units[b]), lang),
   )
   const traits = board.counts
-    .map(([ti, n]) => ({ ti, n, tier: activeTier(n, stats.traits[ti]?.tiers ?? []) }))
+    .map(([ti, n]) => ({
+      ti,
+      n,
+      tier: activeTier(n, stats.traits[ti]?.tiers ?? []),
+    }))
     .filter((x) => x.tier)
-    .sort((a, b) => (b.tier!.style - a.tier!.style) || b.n - a.n)
+    .sort((a, b) => b.tier!.style - a.tier!.style || b.n - a.n)
   const tierOf = new Map(traits.map((x) => [x.ti, x.tier!.style]))
   /** 駒が持つ特性のうち、この盤面で発動しているもの（選択式で選んだ特性を含む）。 */
   const activeTraitsOf = (u: number, pick: number | undefined) =>
     [...new Set([...stats.units[u].traits, ...(pick !== undefined ? [pick] : [])])]
       .filter((ti) => tierOf.has(ti))
       .sort((a, b) => tierOf.get(b)! - tierOf.get(a)!)
-      .map((ti) => ({ icon: stats.traits[ti].icon, name: pickName(lang, stats.traits[ti]), style: tierOf.get(ti)! }))
+      .map((ti) => ({
+        chosen: ti === pick,
+        icon: stats.traits[ti].icon,
+        name: pickName(lang, stats.traits[ti]),
+        style: tierOf.get(ti)!,
+      }))
   const reward = LADDER_REWARDS[board.active]
   const copy = async () => {
     try {
@@ -389,10 +392,10 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
   }
   return (
     <li
-      className={`flex flex-col gap-2 rounded-md border border-line bg-surface p-3 transition-opacity xl:col-span-4 xl:grid xl:grid-cols-subgrid xl:items-center ${stale ? 'opacity-40' : ''}`}
+      className={`flex flex-col gap-2 rounded-md border border-line bg-surface px-3 pb-2.5 pt-3 transition-opacity xl:col-span-3 xl:py-2.5 xl:grid xl:grid-cols-subgrid xl:items-center ${stale ? 'opacity-40' : ''}`}
     >
-      <div className="flex items-baseline gap-3 xl:contents">
-        <div className="flex min-w-0 flex-1 items-baseline gap-3 xl:col-start-1 xl:row-start-1 xl:w-52 xl:flex-none xl:flex-col xl:gap-0.5">
+      <div className="flex items-start gap-3 xl:contents">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5 md:flex-row md:items-baseline md:gap-3 xl:col-start-1 xl:row-start-1 xl:w-44 xl:flex-none xl:flex-col xl:gap-0.5">
           <span className="flex items-baseline gap-3">
             <span className="text-xs font-semibold text-muted">{t(lang, 'ladderLevel', { n: step.level })}</span>
             <span
@@ -403,7 +406,7 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
           </span>
           {reward && (
             <span
-              className="min-w-0 flex-1 truncate text-[11px] text-faint xl:max-w-full xl:whitespace-normal"
+              className="min-w-0 flex-1 text-[11px] leading-snug text-faint md:truncate xl:max-w-full xl:whitespace-normal"
               title={t(lang, 'ladderReward', { n: board.active })}
             >
               {reward[lang]}
@@ -414,7 +417,7 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
           type="button"
           onClick={copy}
           title={t(lang, 'ladderCopyTitle')}
-          className="ml-auto shrink-0 xl:col-start-4 xl:row-start-1 rounded border border-line px-2 py-0.5 text-[11px] text-muted hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+          className="ml-auto shrink-0 xl:col-start-3 xl:row-start-1 rounded border border-line px-2 py-0.5 text-[11px] text-muted hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
         >
           {copied ? t(lang, 'ladderCopied') : t(lang, 'ladderCopy')}
         </button>
@@ -444,6 +447,10 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
             />
           )
         })}
+        {board.emblemsUsed.map((tr) => {
+          const e = stats.emblems.find((x) => x.trait === tr)
+          return e ? <EmblemChip key={`e${tr}`} icon={e.icon} label={pickName(lang, e)} /> : null
+        })}
         {removed.map((u) => (
           <UnitChip
             key={`x${u}`}
@@ -454,22 +461,6 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
             traits={[]}
           />
         ))}
-      </div>
-
-      <div className="flex flex-wrap gap-1 xl:col-start-3 xl:row-start-1">
-        {traits.map(({ ti, n, tier }) => {
-          const tr = stats.traits[ti]
-          return (
-            <span
-              key={ti}
-              title={pickName(lang, tr)}
-              className={`inline-flex h-[22px] items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold tabular-nums ${styleClasses(tier!.style)}`}
-            >
-              <img src={tr.icon} alt="" className="h-3.5 w-3.5 object-contain" />
-              {n}
-            </span>
-          )
-        })}
       </div>
     </li>
   )
@@ -490,11 +481,14 @@ function UnitChip({
   cost: number
   label: string
   mark?: 'add' | 'remove'
-  traits: { icon: string; name: string; style: number }[]
+  traits: { icon: string; name: string; style: number; chosen: boolean }[]
 }) {
   return (
     <span className="lunit" title={label}>
-      <span data-cost={cost} className={`utile ${mark === 'add' ? 'utile--use' : mark === 'remove' ? 'utile--avoid' : ''}`}>
+      <span
+        data-cost={cost}
+        className={`utile ${mark === 'add' ? 'utile--use' : mark === 'remove' ? 'utile--avoid' : ''}`}
+      >
         <img src={icon} alt={label} />
       </span>
       {mark && (
@@ -505,12 +499,56 @@ function UnitChip({
       {traits.length > 0 && (
         <span className="lunit__traits">
           {traits.map((tr) => (
-            <span key={tr.name} title={tr.name} className={`lunit__trait ${styleClasses(tr.style)}`}>
+            <span
+              key={tr.name}
+              title={tr.name}
+              className={`lunit__trait ${styleClasses(tr.style)} ${tr.chosen ? 'lunit__trait--chosen' : ''}`}
+            >
               <img src={tr.icon} alt={tr.name} />
             </span>
           ))}
         </span>
       )}
     </span>
+  )
+}
+
+/** 盤面の列に置く「使う紋章」。駒と同じ大きさの金枠のタイル。 */
+function EmblemChip({ icon, label }: { icon: string; label: string }) {
+  return (
+    <span className="lunit" title={label}>
+      <span className="utile lunit__emblem">
+        <img src={icon} alt={label} />
+      </span>
+    </span>
+  )
+}
+
+/** 押し込み式の切り替え（5コスト・チームサイズ）。押されている間は金で光る。 */
+function Toggle({
+  on,
+  onClick,
+  title,
+  children,
+}: {
+  on: boolean
+  onClick: () => void
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      title={title}
+      className={`flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+        on
+          ? 'border-gold bg-gold/15 text-ink'
+          : 'border-line bg-surface-2 text-muted hover:border-line-strong hover:text-ink'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
