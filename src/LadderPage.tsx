@@ -162,7 +162,7 @@ export default function LadderPage() {
     })
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[960px] flex-col">
+    <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-2.5 md:px-5 md:py-3.5">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="h-5 w-1 shrink-0 rounded-full bg-gold" aria-hidden />
@@ -289,7 +289,7 @@ export default function LadderPage() {
             )}
 
             {picked.length > 0 && (
-              <ul className="flex flex-col gap-1 text-sm">
+              <ul className="flex flex-col gap-1 text-sm xl:flex-row xl:flex-wrap xl:gap-x-6">
                 {[...new Set(emblemTraits)].map((tr) => {
                   const gain = gains.get(tr)
                   const e = stats.emblems.find((x) => x.trait === tr)!
@@ -314,7 +314,7 @@ export default function LadderPage() {
                 {t(lang, 'ladderRoute')}
                 {computing && <span className="font-normal text-faint">{t(lang, 'ladderComputing')}</span>}
               </h2>
-              <ol className="flex flex-col gap-2">
+              <ol className="flex flex-col gap-2 xl:grid xl:grid-cols-[auto_auto_minmax(0,1fr)_auto] xl:gap-x-5">
                 {steps.map((s) => (
                   <RouteRow key={s.level} step={s} stats={stats} lang={lang} stale={computing && !freshLevels.has(s.level)} />
                 ))}
@@ -382,25 +382,32 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
   }
   return (
     <li
-      className={`flex flex-col gap-2 rounded-md border border-line bg-surface p-3 transition-opacity ${stale ? 'opacity-40' : ''}`}
+      className={`flex flex-col gap-2 rounded-md border border-line bg-surface p-3 transition-opacity xl:col-span-4 xl:grid xl:grid-cols-subgrid xl:items-center ${stale ? 'opacity-40' : ''}`}
     >
-      <div className="flex items-baseline gap-3">
-        <span className="text-xs font-semibold text-muted">{t(lang, 'ladderLevel', { n: step.level })}</span>
-        <span
-          className={`text-lg font-extrabold tabular-nums ${board.active >= TEAM_SIZE_STEP ? 'text-gold' : 'text-ink'}`}
-        >
-          {t(lang, 'ladderTraits', { n: board.active })}
-        </span>
-        {reward && (
-          <span className="min-w-0 flex-1 truncate text-[11px] text-faint" title={t(lang, 'ladderReward', { n: board.active })}>
-            {reward[lang]}
+      <div className="flex items-baseline gap-3 xl:contents">
+        <div className="flex min-w-0 flex-1 items-baseline gap-3 xl:col-start-1 xl:row-start-1 xl:w-52 xl:flex-none xl:flex-col xl:gap-0.5">
+          <span className="flex items-baseline gap-3">
+            <span className="text-xs font-semibold text-muted">{t(lang, 'ladderLevel', { n: step.level })}</span>
+            <span
+              className={`text-lg font-extrabold tabular-nums ${board.active >= TEAM_SIZE_STEP ? 'text-gold' : 'text-ink'}`}
+            >
+              {t(lang, 'ladderTraits', { n: board.active })}
+            </span>
           </span>
-        )}
+          {reward && (
+            <span
+              className="min-w-0 flex-1 truncate text-[11px] text-faint xl:max-w-full xl:whitespace-normal"
+              title={t(lang, 'ladderReward', { n: board.active })}
+            >
+              {reward[lang]}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={copy}
           title={t(lang, 'ladderCopyTitle')}
-          className="ml-auto shrink-0 rounded border border-line px-2 py-0.5 text-[11px] text-muted hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+          className="ml-auto shrink-0 xl:col-start-4 xl:row-start-1 rounded border border-line px-2 py-0.5 text-[11px] text-muted hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
         >
           {copied ? t(lang, 'ladderCopied') : t(lang, 'ladderCopy')}
         </button>
@@ -410,7 +417,7 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
        * 盤面: 残す駒 → 足す駒（金の枠と＋）→ 外す駒（灰色と−）の順に1列で並べる。
        * 外す駒も同じ大きさで同じ列に置く。小さく脇に添えると、外すのか残すのか読み取れない。
        */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 xl:col-start-2 xl:row-start-1">
         {units.map((u) => {
           const unit = stats.units[u]
           const pick = choices.get(u)
@@ -441,7 +448,7 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1 xl:col-start-3 xl:row-start-1">
         {traits.map(({ ti, n, tier }) => {
           const tr = stats.traits[ti]
           return (
