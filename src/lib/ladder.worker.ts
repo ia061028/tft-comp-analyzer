@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
-import { buildRoute, emblemGain, maxCostAt, type LadderData, type LadderBoard, type RouteStep } from './ladder'
+import { bestBoard, buildRoute, maxCostAt, type LadderData, type LadderBoard, type RouteStep } from './ladder'
 
 /**
- * 特性ラダーの探索をメインスレッドの外で回す。ルート1本で 1 秒前後かかるので、
+ * 特性ラダーの探索をメインスレッドの外で回す。ルート1本で数百ミリ秒かかるので、
  * そのままだと入力のたびに画面が固まる。レベルごとに出来た順で返し、画面は上から埋まる。
  */
 export interface LadderRequest {
@@ -32,41 +32,47 @@ export type LadderResponse =
 
 const wire = (b: LadderBoard): WireBoard => ({ ...b, counts: [...b.counts], choices: [...b.choices] })
 
-let latest = 0
+/** 同じ入力の結果は覚えておく（紋章を付けたり外したりして戻ったときは計算しない）。 */
+const cache = new Map<string, LadderResponse[]>()
+const CACHE_MAX = 64
 
-/** 次のメッセージ（新しい依頼）を受け取れるよう、いったん手放す。 */
-const yieldNow = () => new Promise((r) => setTimeout(r, 0))
-
-self.onmessage = async (e: MessageEvent<LadderRequest>) => {
+self.onmessage = (e: MessageEvent<LadderRequest>) => {
   const req = e.data
-  latest = req.id
   const post = (r: LadderResponse) => (self as unknown as DedicatedWorkerGlobalScope).postMessage(r)
+  const key = JSON.stringify([req.levels, req.bonus, req.emblems, req.allowFive, req.locked, req.excluded, req.judgeLevel])
+  const hit = cache.get(key)
+  if (hit) {
+    for (const r of hit) post({ ...r, id: req.id })
+    return
+  }
+  const out: LadderResponse[] = []
+  const send = (r: LadderResponse) => {
+    out.push(r)
+    post(r)
+  }
   const common = { emblems: req.emblems, allowFive: req.allowFive, locked: req.locked, excluded: req.excluded }
-  // レベルを1つずつ求めて返す。レベルの合間に手放すので、入力が変わって新しい依頼が来たら
-  // latest が進み、古い依頼はそこで打ち切られる。
-  let prev: number[] | undefined
-  for (const level of req.levels) {
-    await yieldNow()
-    if (latest !== req.id) return
-    const [step] = buildRoute(req.data, { ...common, levels: [level], bonus: req.bonus, prevBoard: prev })
-    prev = step.board.units
-    post({ id: req.id, kind: 'step', step: { ...step, board: wire(step.board) } })
+  // ルートはレベルが1つ決まるたびに返す（画面は上から埋まる）。
+  buildRoute(req.data, { ...common, levels: req.levels, bonus: req.bonus }, (step) =>
+    send({ id: req.id, kind: 'step', step: { ...step, board: wire(step.board) } }),
+  )
+  // 紋章ごとに「判定レベルで、その紋章を外すと何種類減るか」。全部持った盤面は1回だけ求める。
+  if (req.emblems.length > 0) {
+    const judge = {
+      allowFive: req.allowFive,
+      locked: req.locked,
+      excluded: req.excluded,
+      size: req.judgeLevel + req.bonus,
+      maxCost: maxCostAt(req.judgeLevel, req.allowFive),
+    }
+    const withAll = bestBoard(req.data, { ...judge, emblems: req.emblems }).active
+    for (const emblem of new Set(req.emblems)) {
+      const others = [...req.emblems]
+      others.splice(others.indexOf(emblem), 1)
+      const without = bestBoard(req.data, { ...judge, emblems: others }).active
+      send({ id: req.id, kind: 'emblem', emblem, gain: Math.max(0, withAll - without) })
+    }
   }
-  // 紋章ごとに「判定レベルで、その紋章を外すと何種類減るか」。
-  for (const emblem of new Set(req.emblems)) {
-    await yieldNow()
-    if (latest !== req.id) return
-    const others = [...req.emblems]
-    others.splice(others.indexOf(emblem), 1)
-    const { emblems: _all, ...rest } = common
-    void _all
-    const { gain } = emblemGain(
-      req.data,
-      { ...rest, size: req.judgeLevel + req.bonus, maxCost: maxCostAt(req.judgeLevel, req.allowFive) },
-      emblem,
-      others,
-    )
-    post({ id: req.id, kind: 'emblem', emblem, gain })
-  }
-  post({ id: req.id, kind: 'done' })
+  send({ id: req.id, kind: 'done' })
+  if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value!)
+  cache.set(key, out)
 }

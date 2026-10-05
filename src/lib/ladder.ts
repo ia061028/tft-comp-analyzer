@@ -207,7 +207,9 @@ interface Node {
  * 一番得な特性を選ぶ（駒どうしの干渉は無視する。最後に evaluateBoard で厳密に数え直す）。
  */
 function quickScore(ctx: Ctx, n: Pick<Node, 'units' | 'counts' | 'raw'>, emblems: number[], useChoices: boolean): [number, number] {
-  const c = n.counts.slice()
+  // 紋章も選択式の付与も無ければ、配列を写さずにそのまま数える（探索の大半はこの場合）。
+  const needsCopy = emblems.length > 0 || (useChoices && n.units.some((u) => ctx.choice.has(u)))
+  const c = needsCopy ? n.counts.slice() : n.counts
   const placed = new Map<number, number>()
   let holdersLeft = n.units.length
   for (const t of emblems) {
@@ -259,98 +261,172 @@ function better(a: Node, b: Node): number {
   return b.active - a.active || b.ov - a.ov || b.near - a.near || a.cost - b.cost
 }
 
-const BEAM = 120
+const BEAM = 60
+/** 山登りを始める上位の件数。 */
+const CLIMB_STARTS = 4
+
+function overlap(units: number[], prev: Set<number> | undefined): number {
+  if (!prev) return 0
+  let n = 0
+  for (const u of units) if (prev.has(u)) n++
+  return n
+}
 
 /**
- * 枠数ぶんの駒で、発動する特性の種類数が最大になる盤面を探す。
- *
- * 1体ずつ足すビームサーチ（各段で上位 BEAM 件を残す）の後、1体の入れ替えで山登りする。
- * 厳密解ではないが、候補が50体前後・枠が10以下なら実用上は十分。
+ * 駒ごとの乱数（2^40 未満の整数）。盤面の鍵はその和で、10体足しても 2^44 に収まり誤差なく数えられる。
+ * 和が偶然一致する確率は1回の探索で 10^-5 程度で、一致しても候補が1つ減るだけ。
+ * 乱数は固定の種から作る（同じ入力で毎回同じ盤面を返すため）。
  */
-export function bestBoard(data: LadderData, opts: LadderOptions): LadderBoard {
-  const ctx = ctxOf(data)
-  const T = data.traits.length
-  const excluded = new Set(opts.excluded ?? [])
-  const maxCost = opts.maxCost ?? (opts.allowFive ? 5 : 4)
-  const pool = candidateUnits(data.units, opts.allowFive).filter(
-    (i) => !excluded.has(i) && data.units[i].cost <= maxCost,
-  )
-  const locked = [...new Set(opts.locked ?? [])].filter((i) => data.units[i]).slice(0, opts.size)
-  const lockedSet = new Set(locked)
-  const free = pool.filter((i) => !lockedSet.has(i))
-  const useChoices = opts.useChoices ?? true
-  const prev = opts.prev ? new Set(opts.prev) : undefined
+const UNIT_KEY: number[] = (() => {
+  let x = 0x2545f491
+  const out: number[] = []
+  for (let i = 0; i < 512; i++) {
+    // xorshift32 を2回回して 40 ビットにする
+    x ^= x << 13
+    x ^= x >>> 17
+    x ^= x << 5
+    const hi = (x >>> 0) & 0xff
+    x ^= x << 13
+    x ^= x >>> 17
+    x ^= x << 5
+    out.push(hi * 2 ** 32 + (x >>> 0))
+  }
+  return out
+})()
 
-  const withUnit = (n: Pick<Node, 'units' | 'counts' | 'raw' | 'cost' | 'ov'>, u: number, sign: 1 | -1) => {
+function keyOf(units: number[]): number {
+  let k = 0
+  for (const u of units) k += UNIT_KEY[u]
+  return k
+}
+
+type Partial = Pick<Node, 'units' | 'counts' | 'raw' | 'cost'>
+
+/**
+ * 探索の本体。1体ずつ足すビームサーチ（各段で上位 BEAM 件を残す）の後、1体の入れ替えで山登りする。
+ * 厳密解ではないが、候補が50体前後・枠が10以下なら実用上は十分（テストで総当たりと突き合わせる）。
+ *
+ * ルート表ではコスト上限が同じレベルの間はビームを持ち越して1体ずつ伸ばす。Lv4〜10 を毎回
+ * 0体から探すと延べ49段ぶん広げることになり、1回の入力で1秒かかっていた（実測）。持ち越せば22段で済む。
+ */
+class Search {
+  private data: LadderData
+  private emblems: number[]
+  private excluded: Set<number>
+  private allowFive: boolean
+  private ctx: Ctx
+  private root: Partial
+  private beam: Node[]
+  private lockedSet: Set<number>
+  private prev: Set<number> | undefined
+  /** 直前に探したときのコスト上限。上限が上がったらビームを捨てて探し直す。 */
+  private lastMaxCost = -1
+
+  constructor(data: LadderData, emblems: number[], locked: number[], excluded: Set<number>, allowFive: boolean) {
+    this.data = data
+    this.emblems = emblems
+    this.excluded = excluded
+    this.allowFive = allowFive
+    this.ctx = ctxOf(data)
+    this.lockedSet = new Set(locked)
+    const T = data.traits.length
+    let root: Partial = { units: [], counts: new Int16Array(T), raw: new Int16Array(T), cost: 0 }
+    for (const u of locked) root = { units: [...root.units, u], ...this.withUnit(root, u, 1) }
+    this.root = root
+    this.beam = []
+  }
+
+  private withUnit(n: Partial, u: number, sign: 1 | -1): Omit<Partial, 'units'> {
     const counts = n.counts.slice()
     const raw = n.raw.slice()
-    const unit = data.units[u]
+    const unit = this.data.units[u]
     for (const t of unit.traits) {
       counts[t] += sign
       raw[t] += sign
     }
-    for (const [t, d] of ctx.fixed.get(u) ?? []) counts[t] += sign * d
-    return { counts, raw, cost: n.cost + sign * unit.cost, ov: n.ov + (prev?.has(u) ? sign : 0) }
-  }
-  const finish = (units: number[], p: Pick<Node, 'counts' | 'raw' | 'cost' | 'ov'>): Node => {
-    const [active, near] = quickScore(ctx, { units, counts: p.counts, raw: p.raw }, opts.emblems, useChoices)
-    return { units, ...p, active, near }
+    for (const [t, d] of this.ctx.fixed.get(u) ?? []) counts[t] += sign * d
+    return { counts, raw, cost: n.cost + sign * unit.cost }
   }
 
-  let root: Pick<Node, 'units' | 'counts' | 'raw' | 'cost' | 'ov'> = {
-    units: [],
-    counts: new Int16Array(T),
-    raw: new Int16Array(T),
-    cost: 0,
-    ov: 0,
+  private score(p: Partial, useChoices: boolean): Node {
+    const [active, near] = quickScore(this.ctx, p, this.emblems, useChoices)
+    return { ...p, active, near, ov: overlap(p.units, this.prev) }
   }
-  for (const u of locked) root = { units: [...root.units, u], ...withUnit(root, u, 1) }
-  let beam: Node[] = [finish(root.units, root)]
-  for (let n = locked.length; n < opts.size; n++) {
-    const seen = new Set<string>()
-    const next: Node[] = []
-    for (const st of beam) {
-      const have = new Set(st.units)
-      for (const c of free) {
-        if (have.has(c)) continue
-        const units = [...st.units, c].sort((x, y) => x - y)
-        const key = units.join(',')
-        if (seen.has(key)) continue
-        seen.add(key)
-        next.push(finish(units, withUnit(st, c, 1)))
-      }
+
+  /**
+   * 枠 size・コスト上限 maxCost で一番良い盤面。prev はルートの直前の盤面（同じ種類数なら重なる方を選ぶ）。
+   * 呼ぶたびに size を大きくしていけば、ビームはそのまま持ち越される。
+   */
+  next(size: number, maxCost: number, useChoices: boolean, prev: number[] | undefined): LadderBoard {
+    this.prev = prev ? new Set(prev) : undefined
+    const free = candidateUnits(this.data.units, this.allowFive).filter(
+      (i) => !this.excluded.has(i) && !this.lockedSet.has(i) && this.data.units[i].cost <= maxCost,
+    )
+    // コスト上限が上がったら探し直す。安い駒だけで伸ばしたビームからは、高い駒を何体も
+    // 入れ替える盤面に届かない（実データで Lv6 が 9 → 8 種類に落ちた）。
+    // 上限が同じ間は持ち越す。選択式の付与の数え方と直前の盤面は変わるので採点し直す。
+    if (maxCost !== this.lastMaxCost) {
+      this.beam = [this.score(this.root, useChoices)]
+      this.lastMaxCost = maxCost
     }
-    if (next.length === 0) break
-    next.sort(better)
-    beam = next.slice(0, BEAM)
-  }
-
-  // 山登り: 上位いくつかから、ロック外の1体を入れ替えて良くなる限り続ける。
-  let best = beam[0]
-  for (const start of beam.slice(0, 4)) {
-    let cur = start
-    for (let improved = true; improved; ) {
-      improved = false
-      const have = new Set(cur.units)
-      for (const out of cur.units) {
-        if (lockedSet.has(out)) continue
-        const without = { units: cur.units, ...withUnit(cur, out, -1) }
+    this.beam = this.beam.map((n) => this.score(n, useChoices)).sort(better)
+    while ((this.beam[0]?.units.length ?? size) < size) {
+      // 同じ駒の組を2回数えないための鍵。駒ごとの乱数の和（集合なので順序に依らない）。
+      // 文字列の鍵だと1回の入力で十数万個作ることになり、それだけで探索時間の3割を食っていた。
+      const seen = new Set<number>()
+      const next: Node[] = []
+      for (const st of this.beam) {
+        const have = new Set(st.units)
+        const base = keyOf(st.units)
         for (const c of free) {
           if (have.has(c)) continue
-          const units = cur.units.map((x) => (x === out ? c : x)).sort((x, y) => x - y)
-          const cand = finish(units, withUnit(without, c, 1))
-          if (better(cand, cur) < 0) {
-            cur = cand
-            improved = true
-            break
-          }
+          const key = base + UNIT_KEY[c]
+          if (seen.has(key)) continue
+          seen.add(key)
+          next.push(this.score({ units: [...st.units, c], ...this.withUnit(st, c, 1) }, useChoices))
         }
-        if (improved) break
       }
+      if (next.length === 0) break
+      next.sort(better)
+      this.beam = next.slice(0, BEAM)
     }
-    if (better(cur, best) < 0) best = cur
+
+    // 山登り: 上位いくつかから、ロック外の1体を入れ替えて良くなる限り続ける。
+    let best = this.beam[0]
+    for (const start of this.beam.slice(0, CLIMB_STARTS)) {
+      let cur = start
+      for (let improved = true; improved; ) {
+        improved = false
+        const have = new Set(cur.units)
+        for (const out of cur.units) {
+          if (this.lockedSet.has(out)) continue
+          const without = { units: cur.units, ...this.withUnit(cur, out, -1) }
+          for (const c of free) {
+            if (have.has(c)) continue
+            const units = cur.units.map((x) => (x === out ? c : x))
+            const cand = this.score({ units, ...this.withUnit(without, c, 1) }, useChoices)
+            if (better(cand, cur) < 0) {
+              cur = cand
+              improved = true
+              break
+            }
+          }
+          if (improved) break
+        }
+      }
+      if (better(cur, best) < 0) best = cur
+    }
+    // 山登りで見つけた盤面も次のレベルの出発点に入れる。
+    if (!this.beam.includes(best)) this.beam = [best, ...this.beam].slice(0, BEAM)
+    return evaluateBoard(best.units, this.data, this.emblems, useChoices)
   }
-  return evaluateBoard(best.units, data, opts.emblems, useChoices)
+}
+
+/** 枠数ぶんの駒で、発動する特性の種類数が最大になる盤面を探す。 */
+export function bestBoard(data: LadderData, opts: LadderOptions): LadderBoard {
+  const locked = [...new Set(opts.locked ?? [])].filter((i) => data.units[i]).slice(0, opts.size)
+  const search = new Search(data, opts.emblems, locked, new Set(opts.excluded ?? []), opts.allowFive)
+  return search.next(opts.size, opts.maxCost ?? (opts.allowFive ? 5 : 4), opts.useChoices ?? true, opts.prev)
 }
 
 export interface RouteStep {
@@ -380,35 +456,36 @@ export const CHOICE_FROM_LEVEL = 7
 
 /**
  * レベルごとの盤面を順に求める（ルート表）。各レベルは直前の盤面との重なりを優先するので、
- * 上から順に「足す駒」を読めばそのまま試合の進め方になる。
+ * 上から順に「足す駒」を読めばそのまま試合の進め方になる。onStep はレベルが1つ決まるたびに呼ぶ。
  */
 export function buildRoute(
   data: LadderData,
-  opts: Omit<LadderOptions, 'size' | 'prev' | 'maxCost' | 'useChoices'> & {
-    levels: number[]
-    bonus: number
-    /** levels の手前のレベルの盤面（1レベルずつ求めるときに渡す）。 */
-    prevBoard?: number[]
-  },
+  opts: Omit<LadderOptions, 'size' | 'prev' | 'maxCost' | 'useChoices'> & { levels: number[]; bonus: number },
+  onStep?: (step: RouteStep) => void,
 ): RouteStep[] {
+  const levels = [...opts.levels].sort((a, b) => a - b)
+  const maxSize = (levels[levels.length - 1] ?? 0) + opts.bonus
+  const locked = [...new Set(opts.locked ?? [])].filter((i) => data.units[i]).slice(0, maxSize)
+  const search = new Search(data, opts.emblems, locked, new Set(opts.excluded ?? []), opts.allowFive)
   const out: RouteStep[] = []
-  let prev: number[] | undefined = opts.prevBoard
-  for (const level of opts.levels) {
-    const board = bestBoard(data, {
-      ...opts,
-      size: level + opts.bonus,
+  let prev: number[] | undefined
+  for (const level of levels) {
+    const board = search.next(
+      level + opts.bonus,
+      maxCostAt(level, opts.allowFive),
+      level >= CHOICE_FROM_LEVEL,
       prev,
-      maxCost: maxCostAt(level, opts.allowFive),
-      useChoices: level >= CHOICE_FROM_LEVEL,
-    })
+    )
     const p = new Set(prev ?? [])
     const now = new Set(board.units)
-    out.push({
+    const step = {
       level,
       board,
       added: board.units.filter((u) => !p.has(u)),
       removed: [...p].filter((u) => !now.has(u)),
-    })
+    }
+    out.push(step)
+    onStep?.(step)
     prev = board.units
   }
   return out

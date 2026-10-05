@@ -57,6 +57,8 @@ export default function LadderPage() {
   const [marks, setMarks] = useState<Map<string, UnitMark>>(() => new Map())
   const [unitsOpen, setUnitsOpen] = useState(false)
   const [steps, setSteps] = useState<WireStep[]>([])
+  /** 計算中の依頼で、もう新しい結果に置き換わったレベル。それ以外の行は前の入力の結果なので淡く描く。 */
+  const [freshLevels, setFreshLevels] = useState<Set<number>>(() => new Set())
   const [gains, setGains] = useState<Map<number, number>>(() => new Map())
   const [computing, setComputing] = useState(false)
 
@@ -112,7 +114,11 @@ export default function LadderPage() {
     w.onmessage = (e: MessageEvent<LadderResponse>) => {
       const r = e.data
       if (r.id !== reqId.current) return
-      if (r.kind === 'step') setSteps((s) => [...s, r.step])
+      if (r.kind === 'step') {
+        // 前の入力の結果は消さずに残し、届いたレベルから差し替える（毎回空にすると画面がちらつく）。
+        setSteps((s) => [...s.filter((x) => x.level !== r.step.level), r.step].sort((a, b) => a.level - b.level))
+        setFreshLevels((f) => new Set(f).add(r.step.level))
+      }
       else if (r.kind === 'emblem') setGains((g) => new Map(g).set(r.emblem, r.gain))
       else setComputing(false)
     }
@@ -121,7 +127,7 @@ export default function LadderPage() {
   useEffect(() => {
     if (!data || !workerRef.current) return
     const id = ++reqId.current
-    setSteps([])
+    setFreshLevels(new Set())
     setGains(new Map())
     setComputing(true)
     const req: LadderRequest = {
@@ -310,7 +316,7 @@ export default function LadderPage() {
               </h2>
               <ol className="flex flex-col gap-2">
                 {steps.map((s) => (
-                  <RouteRow key={s.level} step={s} stats={stats} lang={lang} />
+                  <RouteRow key={s.level} step={s} stats={stats} lang={lang} stale={computing && !freshLevels.has(s.level)} />
                 ))}
               </ol>
             </section>
@@ -343,15 +349,20 @@ export default function LadderPage() {
 }
 
 /** ルート表の1行: レベル・種類数・盤面（足す駒を金で囲む）・発動特性・プランナーコード。 */
-function RouteRow({ step, stats, lang }: { step: WireStep; stats: StatsFile; lang: Lang }) {
+function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFile; lang: Lang; stale: boolean }) {
   const [copied, setCopied] = useState(false)
   const { board } = step
   const added = new Set(step.added)
   const choices = new Map(board.choices)
   const { choice } = useMemo(() => splitGranters(stats.granters), [stats])
-  // 盤面は安い順（ゲームで買う順に近い）。同コストは名前順。
+  // 盤面は 残す駒 → 足す駒 の順、その中は安い順（ゲームで買う順に近い）。同コストは名前順。
+  const byCost = (a: number, b: number) =>
+    stats.units[a].cost - stats.units[b].cost ||
+    pickName(lang, stats.units[a]).localeCompare(pickName(lang, stats.units[b]), lang)
+  const removed = [...step.removed].sort(byCost)
   const units = [...board.units].sort(
     (a, b) =>
+      Number(added.has(a)) - Number(added.has(b)) ||
       stats.units[a].cost - stats.units[b].cost ||
       pickName(lang, stats.units[a]).localeCompare(pickName(lang, stats.units[b]), lang),
   )
@@ -370,7 +381,9 @@ function RouteRow({ step, stats, lang }: { step: WireStep; stats: StatsFile; lan
     }
   }
   return (
-    <li className="flex flex-col gap-2 rounded-md border border-line bg-surface p-3">
+    <li
+      className={`flex flex-col gap-2 rounded-md border border-line bg-surface p-3 transition-opacity ${stale ? 'opacity-40' : ''}`}
+    >
       <div className="flex items-baseline gap-3">
         <span className="text-xs font-semibold text-muted">{t(lang, 'ladderLevel', { n: step.level })}</span>
         <span
@@ -393,47 +406,39 @@ function RouteRow({ step, stats, lang }: { step: WireStep; stats: StatsFile; lan
         </button>
       </div>
 
+      {/*
+       * 盤面: 残す駒 → 足す駒（金の枠と＋）→ 外す駒（灰色と−）の順に1列で並べる。
+       * 外す駒も同じ大きさで同じ列に置く。小さく脇に添えると、外すのか残すのか読み取れない。
+       */}
       <div className="flex flex-wrap items-center gap-1.5">
         {units.map((u) => {
           const unit = stats.units[u]
           const pick = choices.get(u)
-          const pickTrait = pick !== undefined ? stats.traits[pick] : undefined
+          const pickTrait = pick !== undefined && choice.has(u) ? stats.traits[pick] : undefined
           const name = pickName(lang, unit)
           const label = pickTrait
             ? `${name}（${t(lang, 'ladderChoice', { unit: name })}: ${pickName(lang, pickTrait)}）`
             : name
           return (
-            <span key={u} className="relative" title={label}>
-              <img
-                src={unit.icon}
-                alt={label}
-                data-cost={unit.cost}
-                className={`utile block !h-10 !w-10 ${added.has(u) ? 'utile--use' : ''}`}
-              />
-              {pickTrait && choice.has(u) && (
-                <img
-                  src={pickTrait.icon}
-                  alt=""
-                  className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-base p-0.5 ring-1 ring-gold"
-                />
-              )}
-            </span>
+            <UnitChip
+              key={u}
+              icon={unit.icon}
+              cost={unit.cost}
+              label={added.has(u) ? `${t(lang, 'ladderAdd')}: ${label}` : label}
+              mark={added.has(u) ? 'add' : undefined}
+              badge={pickTrait?.icon}
+            />
           )
         })}
-        {step.removed.length > 0 && (
-          <span className="ml-1 flex items-center gap-1 text-[11px] text-faint">
-            {t(lang, 'ladderRemove')}
-            {step.removed.map((u) => (
-              <img
-                key={u}
-                src={stats.units[u].icon}
-                alt={pickName(lang, stats.units[u])}
-                title={pickName(lang, stats.units[u])}
-                className="h-6 w-6 rounded-sm opacity-40 grayscale"
-              />
-            ))}
-          </span>
-        )}
+        {removed.map((u) => (
+          <UnitChip
+            key={`x${u}`}
+            icon={stats.units[u].icon}
+            cost={stats.units[u].cost}
+            label={`${t(lang, 'ladderRemove')}: ${pickName(lang, stats.units[u])}`}
+            mark="remove"
+          />
+        ))}
       </div>
 
       <div className="flex flex-wrap gap-1">
@@ -452,5 +457,46 @@ function RouteRow({ step, stats, lang }: { step: WireStep; stats: StatsFile; lan
         })}
       </div>
     </li>
+  )
+}
+
+/**
+ * ルート表の駒1体。足す駒は金の枠と右上の＋、外す駒は灰色と右上の−。
+ * 印の形は構成ページの駒タイル（使う＝金のバッジ / 使わない＝灰のバッジ）とそろえる。
+ */
+function UnitChip({
+  icon,
+  cost,
+  label,
+  mark,
+  badge,
+}: {
+  icon: string
+  cost: number
+  label: string
+  mark?: 'add' | 'remove'
+  /** 選択式の付与で選んだ特性のアイコン（右下）。 */
+  badge?: string
+}) {
+  return (
+    <span
+      title={label}
+      data-cost={cost}
+      className={`utile relative block !h-10 !w-10 shrink-0 ${mark === 'add' ? 'utile--use' : mark === 'remove' ? 'utile--avoid' : ''}`}
+    >
+      <img src={icon} alt={label} />
+      {mark && (
+        <span className="utile__mark" aria-hidden>
+          <svg viewBox="0 0 10 10">{mark === 'add' ? <path d="M5 2v6M2 5h6" /> : <path d="M2 5h6" />}</svg>
+        </span>
+      )}
+      {badge && (
+        <img
+          src={badge}
+          alt=""
+          className="absolute bottom-0 right-0 h-4 w-4 rounded-full bg-base p-0.5 ring-1 ring-gold"
+        />
+      )}
+    </span>
   )
 }
