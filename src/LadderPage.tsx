@@ -145,7 +145,9 @@ export default function LadderPage() {
     workerRef.current.postMessage(req)
   }, [data, emblemTraits, allowFive, bonus, locked, excluded])
 
-  const toggleEmblem = (i: number) => setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]))
+  // 同じ紋章も何枚でも持てる。一覧を押すと1枚足し、選んだ列の紋章を押すとその1枚を外す。
+  const addEmblem = (i: number) => setPicked((p) => [...p, i])
+  const removeEmblemAt = (k: number) => setPicked((p) => p.filter((_, j) => j !== k))
   const cycleUnit = (api: string) =>
     setMarks((m) => {
       const next = new Map(m)
@@ -203,12 +205,54 @@ export default function LadderPage() {
           <>
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:gap-8">
               <section className="flex min-w-0 flex-1 flex-col gap-2" aria-label={t(lang, 'ladderEmblems')}>
-                <h2 className="text-xs font-semibold text-muted" title={t(lang, 'ladderEmblemsHint')}>
-                  {t(lang, 'ladderEmblems')}
-                </h2>
+                <div className="flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <h2 className="text-xs font-semibold text-muted" title={t(lang, 'ladderEmblemsHint')}>
+                    {t(lang, 'ladderEmblems')}
+                  </h2>
+                  {/* 選んだ紋章（押した順）。押すとその1枚を外す。右端の × で全部外す。 */}
+                  {picked.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {picked.map((i, k) => {
+                        const e = stats.emblems[i]
+                        const name = pickName(lang, e)
+                        return (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => removeEmblemAt(k)}
+                            title={t(lang, 'ladderEmblemRemove', { name })}
+                            aria-label={t(lang, 'ladderEmblemRemove', { name })}
+                            className="group relative h-7 w-7 overflow-hidden rounded border-2 border-gold bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+                          >
+                            <img src={e.icon} alt="" className="h-full w-full object-cover group-hover:opacity-40" />
+                            <span
+                              aria-hidden
+                              className="absolute inset-0 hidden items-center justify-center text-sm font-bold text-ink group-hover:flex"
+                            >
+                              −
+                            </span>
+                          </button>
+                        )
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setPicked([])}
+                        title={t(lang, 'ladderEmblemsClear')}
+                        aria-label={t(lang, 'ladderEmblemsClear')}
+                        className="ml-1 flex h-7 items-center gap-1 rounded border border-line px-2 text-xs text-muted hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+                      >
+                        <svg viewBox="0 0 10 10" className="h-2.5 w-2.5" aria-hidden>
+                          <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                        </svg>
+                        {t(lang, 'ladderUnitsClear')}
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(44px,1fr))] gap-2 xl:grid-cols-[repeat(auto-fill,44px)]">
                   {stats.emblems.map((e, i) => {
-                    const on = picked.includes(i)
+                    const count = picked.filter((x) => x === i).length
+                    const on = count > 0
                     const name = pickName(lang, e)
                     const gain = on ? gains.get(e.trait) : undefined
                     const verdict =
@@ -221,10 +265,9 @@ export default function LadderPage() {
                       <button
                         key={e.api}
                         type="button"
-                        aria-pressed={on}
                         aria-label={verdict ?? name}
                         title={verdict ?? name}
-                        onClick={() => toggleEmblem(i)}
+                        onClick={() => addEmblem(i)}
                         className={`relative aspect-square rounded-md border-2 bg-surface-2 transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
                           on ? 'border-gold shadow-[0_0_14px_-4px_var(--color-hand)]' : 'border-line'
                         }`}
@@ -243,6 +286,15 @@ export default function LadderPage() {
                             }`}
                           >
                             {gain > 0 ? `+${gain}` : '×'}
+                          </span>
+                        )}
+                        {/* 2枚以上は左下に枚数。 */}
+                        {count > 1 && (
+                          <span
+                            aria-hidden
+                            className="absolute -bottom-1.5 -left-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink px-1 text-[10px] font-bold tabular-nums text-base ring-2 ring-base"
+                          >
+                            {count}
                           </span>
                         )}
                       </button>
