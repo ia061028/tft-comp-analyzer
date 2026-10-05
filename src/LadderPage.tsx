@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import type { StatsFile } from '../shared/types'
+import type { StatsFile, TraitInfo } from '../shared/types'
 import { pickName, t, type Lang } from './lib/i18n'
 import { DEFAULT_STATS_FILE, loadStatsHead } from './lib/data'
 import { activeTier, buildPlannerCode, styleClasses } from './lib/format'
@@ -301,7 +301,7 @@ export default function LadderPage() {
             )}
 
             <section aria-label={t(lang, 'ladderRoute')} aria-busy={computing}>
-              <ol className="flex flex-col gap-2 xl:grid xl:gap-y-1.5 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:gap-x-5">
+              <ol className="flex flex-col gap-2 xl:grid xl:gap-y-1.5 xl:grid-cols-[auto_auto_minmax(0,1fr)_auto] xl:gap-x-5">
                 {steps.map((s) => (
                   <RouteRow
                     key={s.level}
@@ -360,14 +360,17 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
       stats.units[a].cost - stats.units[b].cost ||
       pickName(lang, stats.units[a]).localeCompare(pickName(lang, stats.units[b]), lang),
   )
-  const traits = board.counts
-    .map(([ti, n]) => ({
-      ti,
-      n,
-      tier: activeTier(n, stats.traits[ti]?.tiers ?? []),
-    }))
-    .filter((x) => x.tier)
-    .sort((a, b) => b.tier!.style - a.tier!.style || b.n - a.n)
+  const allTraits = board.counts.map(([ti, n]) => ({
+    ti,
+    n,
+    min: stats.traits[ti]?.tiers[0]?.[0] ?? 0,
+    tier: activeTier(n, stats.traits[ti]?.tiers ?? []),
+  }))
+  const traits = allTraits.filter((x) => x.tier).sort((a, b) => b.tier!.style - a.tier!.style || b.n - a.n)
+  // 未発動は発動に近い順（1/2 → 1/3 → 2/4 …）。
+  const inactive = allTraits
+    .filter((x) => !x.tier && x.min > 0)
+    .sort((a, b) => a.min - a.n - (b.min - b.n) || b.n - a.n)
   const tierOf = new Map(traits.map((x) => [x.ti, x.tier!.style]))
   /** 駒が持つ特性のうち、この盤面で発動しているもの（選択式で選んだ特性を含む）。 */
   const activeTraitsOf = (u: number, pick: number | undefined) =>
@@ -392,7 +395,7 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
   }
   return (
     <li
-      className={`flex flex-col gap-2 rounded-md border border-line bg-surface px-3 pb-2.5 pt-3 transition-opacity xl:col-span-3 xl:py-2.5 xl:grid xl:grid-cols-subgrid xl:items-center ${stale ? 'opacity-40' : ''}`}
+      className={`flex flex-col gap-2 rounded-md border border-line bg-surface px-3 pb-2.5 pt-3 transition-opacity xl:col-span-4 xl:py-2.5 xl:grid xl:grid-cols-subgrid xl:items-center ${stale ? 'opacity-40' : ''}`}
     >
       <div className="flex items-start gap-3 xl:contents">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 md:flex-row md:items-baseline md:gap-3 xl:col-start-1 xl:row-start-1 xl:w-44 xl:flex-none xl:flex-col xl:gap-0.5">
@@ -417,7 +420,7 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
           type="button"
           onClick={copy}
           title={t(lang, 'ladderCopyTitle')}
-          className="ml-auto shrink-0 xl:col-start-3 xl:row-start-1 rounded border border-line px-2 py-0.5 text-[11px] text-muted hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+          className="ml-auto shrink-0 xl:col-start-4 xl:row-start-1 rounded border border-line px-2 py-0.5 text-[11px] text-muted hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
         >
           {copied ? t(lang, 'ladderCopied') : t(lang, 'ladderCopy')}
         </button>
@@ -462,7 +465,43 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
           />
         ))}
       </div>
+
+      {/* 発動している特性（段の色と数）と、未発動の特性（薄く n/発動数）。余白に置き、駒の下の特性と同じ順。 */}
+      <div className="flex flex-wrap items-center gap-1 xl:col-start-3 xl:row-start-1">
+        {traits.map(({ ti, n, tier }) => (
+          <TraitPill key={ti} trait={stats.traits[ti]} lang={lang} className={styleClasses(tier!.style)}>
+            {n}
+          </TraitPill>
+        ))}
+        {inactive.map(({ ti, n, min }) => (
+          <TraitPill key={ti} trait={stats.traits[ti]} lang={lang} className="border-line text-faint">
+            {n}/{min}
+          </TraitPill>
+        ))}
+      </div>
     </li>
+  )
+}
+
+function TraitPill({
+  trait,
+  lang,
+  className,
+  children,
+}: {
+  trait: TraitInfo
+  lang: Lang
+  className: string
+  children: ReactNode
+}) {
+  return (
+    <span
+      title={pickName(lang, trait)}
+      className={`inline-flex h-[22px] items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold tabular-nums ${className}`}
+    >
+      <img src={trait.icon} alt="" className="h-3.5 w-3.5 object-contain" />
+      {children}
+    </span>
   )
 }
 
