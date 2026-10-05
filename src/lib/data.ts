@@ -154,6 +154,34 @@ export async function loadStats(file: string = DEFAULT_STATS_FILE, cb: LoadCallb
 }
 
 /**
+ * data/{file} の辞書（1行目）だけを読み、構成の行は読まずに打ち切る。comps は空。
+ * 特性ラダーの計算機は駒・特性・付与元の辞書しか使わないので、数MBの本体を落とさない。
+ * 行の置き方が違う旧ファイルでは最後まで読んでから返す（comps は捨てる）。
+ */
+export async function loadStatsHead(file: string = DEFAULT_STATS_FILE): Promise<StatsFile> {
+  const res = await fetch(`${import.meta.env.BASE_URL}data/${file}`)
+  if (!res.ok) {
+    throw new Error(`${file} fetch failed (${res.status} ${res.statusText})`)
+  }
+  const strip = (w: WireStatsFile): StatsFile => decodeStats({ ...w, comps: [] }, file)
+  if (!res.body) return strip((await res.json()) as WireStatsFile)
+  const parser = new StatsStreamParser()
+  const decoder = new TextDecoder()
+  const reader = res.body.getReader()
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    parser.push(decoder.decode(value, { stream: true }))
+    if (parser.head) {
+      void reader.cancel()
+      return strip(parser.head)
+    }
+  }
+  parser.push(decoder.decode())
+  return strip(parser.finish())
+}
+
+/**
  * 紋章選択（emblems 配列インデックスの多重集合）を別ファイルのインデックス体系へ写す。
  * 紋章の intern はファイルごとに「レコードに現れた紋章」だけなので、同じ紋章でも
  * インデックスが変わりうる。apiName で突き合わせ、移行先に無い紋章は落とす。

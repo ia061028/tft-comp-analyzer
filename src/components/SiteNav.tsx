@@ -1,10 +1,11 @@
 import { t, type Lang } from '../lib/i18n'
 
-/** 構成一覧（/）と統計（/stats.html）の行き来。見た目は SegmentedControl に揃える。 */
-export function SiteNav({ current, lang }: { current: 'comps' | 'stats'; lang: Lang }) {
+/** 構成一覧（/）・統計（/stats.html）・特性ラダー（/ladder.html）の行き来。見た目は SegmentedControl に揃える。 */
+export function SiteNav({ current, lang }: { current: 'comps' | 'stats' | 'ladder'; lang: Lang }) {
   const links = [
     { key: 'comps', href: '/', label: t(lang, 'navComps') },
     { key: 'stats', href: '/stats.html', label: t(lang, 'navStats') },
+    { key: 'ladder', href: '/ladder.html', label: t(lang, 'navLadder') },
   ] as const
   return (
     <nav className="inline-flex overflow-hidden rounded-md border border-line bg-surface-2 p-0.5">
