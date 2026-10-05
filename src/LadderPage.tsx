@@ -370,6 +370,13 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
     .map(([ti, n]) => ({ ti, n, tier: activeTier(n, stats.traits[ti]?.tiers ?? []) }))
     .filter((x) => x.tier)
     .sort((a, b) => (b.tier!.style - a.tier!.style) || b.n - a.n)
+  const tierOf = new Map(traits.map((x) => [x.ti, x.tier!.style]))
+  /** 駒が持つ特性のうち、この盤面で発動しているもの（選択式で選んだ特性を含む）。 */
+  const activeTraitsOf = (u: number, pick: number | undefined) =>
+    [...new Set([...stats.units[u].traits, ...(pick !== undefined ? [pick] : [])])]
+      .filter((ti) => tierOf.has(ti))
+      .sort((a, b) => tierOf.get(b)! - tierOf.get(a)!)
+      .map((ti) => ({ icon: stats.traits[ti].icon, name: pickName(lang, stats.traits[ti]), style: tierOf.get(ti)! }))
   const reward = LADDER_REWARDS[board.active]
   const copy = async () => {
     try {
@@ -417,7 +424,7 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
        * 盤面: 残す駒 → 足す駒（金の枠と＋）→ 外す駒（灰色と−）の順に1列で並べる。
        * 外す駒も同じ大きさで同じ列に置く。小さく脇に添えると、外すのか残すのか読み取れない。
        */}
-      <div className="flex flex-wrap items-center gap-1.5 xl:col-start-2 xl:row-start-1">
+      <div className="flex flex-wrap items-start gap-1.5 xl:col-start-2 xl:row-start-1">
         {units.map((u) => {
           const unit = stats.units[u]
           const pick = choices.get(u)
@@ -433,7 +440,7 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
               cost={unit.cost}
               label={added.has(u) ? `${t(lang, 'ladderAdd')}: ${label}` : label}
               mark={added.has(u) ? 'add' : undefined}
-              badge={pickTrait?.icon}
+              traits={activeTraitsOf(u, pickTrait ? pick : undefined)}
             />
           )
         })}
@@ -444,6 +451,7 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
             cost={stats.units[u].cost}
             label={`${t(lang, 'ladderRemove')}: ${pickName(lang, stats.units[u])}`}
             mark="remove"
+            traits={[]}
           />
         ))}
       </div>
@@ -468,41 +476,40 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
 }
 
 /**
- * ルート表の駒1体。足す駒は金の枠と右上の＋、外す駒は灰色と右上の−。
- * 印の形は構成ページの駒タイル（使う＝金のバッジ / 使わない＝灰のバッジ）とそろえる。
+ * ルート表の駒1体。足す駒は金の＋、外す駒は灰色の顔と−。印は駒の角の外側に置き、顔を隠さない。
+ * 駒の下には、その駒が持つ特性のうちこの盤面で発動しているものを段の色で並べる。
  */
 function UnitChip({
   icon,
   cost,
   label,
   mark,
-  badge,
+  traits,
 }: {
   icon: string
   cost: number
   label: string
   mark?: 'add' | 'remove'
-  /** 選択式の付与で選んだ特性のアイコン（右下）。 */
-  badge?: string
+  traits: { icon: string; name: string; style: number }[]
 }) {
   return (
-    <span
-      title={label}
-      data-cost={cost}
-      className={`utile relative block !h-10 !w-10 shrink-0 ${mark === 'add' ? 'utile--use' : mark === 'remove' ? 'utile--avoid' : ''}`}
-    >
-      <img src={icon} alt={label} />
+    <span className="lunit" title={label}>
+      <span data-cost={cost} className={`utile ${mark === 'add' ? 'utile--use' : mark === 'remove' ? 'utile--avoid' : ''}`}>
+        <img src={icon} alt={label} />
+      </span>
       {mark && (
-        <span className="utile__mark" aria-hidden>
+        <span className={`lunit__mark lunit__mark--${mark}`} aria-hidden>
           <svg viewBox="0 0 10 10">{mark === 'add' ? <path d="M5 2v6M2 5h6" /> : <path d="M2 5h6" />}</svg>
         </span>
       )}
-      {badge && (
-        <img
-          src={badge}
-          alt=""
-          className="absolute bottom-0 right-0 h-4 w-4 rounded-full bg-base p-0.5 ring-1 ring-gold"
-        />
+      {traits.length > 0 && (
+        <span className="lunit__traits">
+          {traits.map((tr) => (
+            <span key={tr.name} title={tr.name} className={`lunit__trait ${styleClasses(tr.style)}`}>
+              <img src={tr.icon} alt={tr.name} />
+            </span>
+          ))}
+        </span>
       )}
     </span>
   )
