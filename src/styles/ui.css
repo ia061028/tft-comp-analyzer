@@ -1167,6 +1167,91 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
+  /*
+   * 特性ラダーのルート表の駒。印（＋/−）は角の外側に出し、顔に重ねない。
+   * 下にはその駒が持つ発動中の特性を段の色の小さな角丸で並べる。
+   */
+  .lunit {
+    --lunit-size: 48px;
+    --lunit-trait: 15px;
+    --lunit-trait-icon: 11px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    width: var(--lunit-size);
+  }
+  .lunit .utile {
+    width: var(--lunit-size);
+    height: var(--lunit-size);
+  }
+  @media (min-width: 48rem) {
+    .lunit {
+      --lunit-size: 52px;
+      --lunit-trait: 16px;
+      --lunit-trait-icon: 12px;
+    }
+  }
+  .lunit__mark {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    z-index: 1;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 2px var(--color-g-1);
+  }
+  .lunit__mark--add {
+    background-color: var(--color-hand);
+    color: var(--color-g-0);
+  }
+  .lunit__mark--remove {
+    background-color: var(--color-g-4);
+    color: var(--color-ink);
+  }
+  .lunit__mark svg {
+    width: 10px;
+    height: 10px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+  }
+  .lunit__traits {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1px;
+  }
+  .lunit__trait {
+    display: flex;
+    width: var(--lunit-trait);
+    height: var(--lunit-trait);
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border-width: 1px;
+  }
+  .lunit__trait img {
+    width: var(--lunit-trait-icon);
+    height: var(--lunit-trait-icon);
+    object-fit: contain;
+  }
+  .lunit__trait--chosen {
+    box-shadow: 0 0 0 1.5px var(--color-hand);
+  }
+  .lunit__emblem {
+    border-color: var(--color-hand);
+    box-shadow: 0 0 12px -4px var(--color-hand);
+  }
+  .lunit__emblem img {
+    opacity: 1;
+  }
   /* コストごとに段を分ける。見出しは置かず、枠の色と段の切れ目だけで読ませる。 */
   .ugrid {
     display: flex;
