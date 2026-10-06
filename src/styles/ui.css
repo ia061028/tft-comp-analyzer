@@ -1245,6 +1245,22 @@
   .lunit__trait--chosen {
     box-shadow: 0 0 0 1.5px var(--color-hand);
   }
+  /* 手持ちの駒のコストの段。数字と枠をコストの色に、選んでいる段は塗る。 */
+  .ladder-cost {
+    border-color: color-mix(in oklab, var(--cost) 45%, transparent);
+    color: var(--cost);
+    background-color: var(--color-g-2);
+    --cost: var(--color-cost-1);
+  }
+  .ladder-cost[data-cost="2"] { --cost: var(--color-cost-2); }
+  .ladder-cost[data-cost="3"] { --cost: var(--color-cost-3); }
+  .ladder-cost[data-cost="4"] { --cost: var(--color-cost-4); }
+  .ladder-cost[data-cost="5"] { --cost: var(--color-cost-5); }
+  .ladder-cost--on {
+    border-color: var(--cost);
+    background-color: color-mix(in oklab, var(--cost) 22%, var(--color-g-2));
+    color: var(--color-ink);
+  }
   .lunit__emblem {
     border-color: var(--color-hand);
     box-shadow: 0 0 12px -4px var(--color-hand);

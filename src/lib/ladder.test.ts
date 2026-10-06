@@ -124,6 +124,29 @@ test('bestBoard: 固定した駒は必ず入り、使わない駒は入らない
   assert.ok(!b.units.includes(0))
 })
 
+test('bestBoard: 固定した駒が枠より多いときは、その中から枠数ぶんを選ぶ', () => {
+  // 固定 5体・枠 3: 盤面は3体で、全員が固定した駒の中から選ばれ、その中の最大種類数になる。
+  const locked = [0, 1, 2, 3, 4]
+  const b = bestBoard(data, { size: 3, emblems: [], allowFive: false, locked })
+  assert.equal(b.units.length, 3)
+  assert.ok(b.units.every((u) => locked.includes(u)))
+  let best = 0
+  for (let i = 0; i < 5; i++)
+    for (let j = i + 1; j < 5; j++)
+      for (let k = j + 1; k < 5; k++) best = Math.max(best, evaluateBoard([i, j, k], data, []).active)
+  assert.equal(b.active, best)
+})
+
+test('buildRoute: 固定した駒が枠を超える低いレベルは選んだ駒の中から、枠に収まれば全員入れる', () => {
+  const locked = [0, 1, 2, 3]
+  const route = buildRoute(data, { levels: [2, 3, 4, 5], bonus: 0, emblems: [], allowFive: false, locked })
+  for (const s of route) {
+    assert.equal(s.board.units.length, s.level)
+    if (s.level < locked.length) assert.ok(s.board.units.every((u) => locked.includes(u)))
+    else assert.ok(locked.every((u) => s.board.units.includes(u)))
+  }
+})
+
 test('bestBoard: 同じ種類数なら直前の盤面と重なる方を選ぶ', () => {
   // 2枠の最大は1種類で、該当する盤面はいくつもある。直前が無ければ安い [ab, ac]、
   // 直前に solo が居れば solo を残す盤面が選ばれる。
