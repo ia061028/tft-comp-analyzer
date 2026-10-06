@@ -321,9 +321,19 @@ class Search {
   private prev: Set<number> | undefined
   /** 直前に探したときのコスト上限。上限が上がったらビームを捨てて探し直す。 */
   private lastMaxCost = -1
+  /** 候補をこの駒だけに絞る（選んだ駒が枠より多いとき、その中から選ぶ）。コスト上限は掛けない。 */
+  private pool: Set<number> | undefined
 
-  constructor(data: LadderData, emblems: number[], locked: number[], excluded: Set<number>, allowFive: boolean) {
+  constructor(
+    data: LadderData,
+    emblems: number[],
+    locked: number[],
+    excluded: Set<number>,
+    allowFive: boolean,
+    pool?: Set<number>,
+  ) {
     this.data = data
+    this.pool = pool
     this.emblems = emblems
     this.excluded = excluded
     this.allowFive = allowFive
@@ -359,9 +369,12 @@ class Search {
    */
   next(size: number, maxCost: number, useChoices: boolean, prev: number[] | undefined): LadderBoard {
     this.prev = prev ? new Set(prev) : undefined
-    const free = candidateUnits(this.data.units, this.allowFive).filter(
-      (i) => !this.excluded.has(i) && !this.lockedSet.has(i) && this.data.units[i].cost <= maxCost,
-    )
+    if (this.pool) maxCost = Infinity
+    const free = this.pool
+      ? [...this.pool].filter((i) => !this.excluded.has(i))
+      : candidateUnits(this.data.units, this.allowFive).filter(
+          (i) => !this.excluded.has(i) && !this.lockedSet.has(i) && this.data.units[i].cost <= maxCost,
+        )
     // コスト上限が上がったら探し直す。安い駒だけで伸ばしたビームからは、高い駒を何体も
     // 入れ替える盤面に届かない（実データで Lv6 が 9 → 8 種類に落ちた）。
     // 上限が同じ間は持ち越す。選択式の付与の数え方と直前の盤面は変わるので採点し直す。
@@ -422,11 +435,42 @@ class Search {
   }
 }
 
+/**
+ * 固定した駒の扱い。枠に収まるなら全員入れて残りを探し、枠より多ければその中から枠数ぶんを選ぶ。
+ * レベルが上がって枠が増えると前者に切り替わるので、探索は両方を必要になったときに作る。
+ */
+class Searches {
+  private lockedSearch: Search | undefined
+  private poolSearch: Search | undefined
+  private data: LadderData
+  private opts: Pick<LadderOptions, 'emblems' | 'excluded' | 'allowFive'>
+  private locked: number[]
+
+  constructor(data: LadderData, opts: Pick<LadderOptions, 'emblems' | 'excluded' | 'allowFive' | 'locked'>) {
+    this.data = data
+    this.opts = opts
+    this.locked = [...new Set(opts.locked ?? [])].filter((i) => data.units[i])
+  }
+
+  next(size: number, maxCost: number, useChoices: boolean, prev: number[] | undefined): LadderBoard {
+    const excluded = new Set(this.opts.excluded ?? [])
+    if (this.locked.length > size) {
+      this.poolSearch ??= new Search(this.data, this.opts.emblems, [], excluded, this.opts.allowFive, new Set(this.locked))
+      return this.poolSearch.next(size, maxCost, useChoices, prev)
+    }
+    this.lockedSearch ??= new Search(this.data, this.opts.emblems, this.locked, excluded, this.opts.allowFive)
+    return this.lockedSearch.next(size, maxCost, useChoices, prev)
+  }
+}
+
 /** 枠数ぶんの駒で、発動する特性の種類数が最大になる盤面を探す。 */
 export function bestBoard(data: LadderData, opts: LadderOptions): LadderBoard {
-  const locked = [...new Set(opts.locked ?? [])].filter((i) => data.units[i]).slice(0, opts.size)
-  const search = new Search(data, opts.emblems, locked, new Set(opts.excluded ?? []), opts.allowFive)
-  return search.next(opts.size, opts.maxCost ?? (opts.allowFive ? 5 : 4), opts.useChoices ?? true, opts.prev)
+  return new Searches(data, opts).next(
+    opts.size,
+    opts.maxCost ?? (opts.allowFive ? 5 : 4),
+    opts.useChoices ?? true,
+    opts.prev,
+  )
 }
 
 export interface RouteStep {
@@ -464,9 +508,7 @@ export function buildRoute(
   onStep?: (step: RouteStep) => void,
 ): RouteStep[] {
   const levels = [...opts.levels].sort((a, b) => a - b)
-  const maxSize = (levels[levels.length - 1] ?? 0) + opts.bonus
-  const locked = [...new Set(opts.locked ?? [])].filter((i) => data.units[i]).slice(0, maxSize)
-  const search = new Search(data, opts.emblems, locked, new Set(opts.excluded ?? []), opts.allowFive)
+  const search = new Searches(data, opts)
   const out: RouteStep[] = []
   let prev: number[] | undefined
   for (const level of levels) {
