@@ -361,6 +361,8 @@ export default function LadderPage() {
                     stats={stats}
                     lang={lang}
                     stale={computing && !freshLevels.has(s.level)}
+                    bonus={bonus}
+                    lockedCount={locked.length}
                   />
                 ))}
               </ol>
@@ -395,7 +397,22 @@ export default function LadderPage() {
 }
 
 /** ルート表の1行: レベル・種類数・盤面（足す駒を金で囲む）・発動特性・プランナーコード。 */
-function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFile; lang: Lang; stale: boolean }) {
+function RouteRow({
+  step,
+  stats,
+  lang,
+  stale,
+  bonus,
+  lockedCount,
+}: {
+  step: WireStep
+  stats: StatsFile
+  lang: Lang
+  stale: boolean
+  bonus: number
+  /** 手持ちの駒で固定した数。盤面の枠（レベル＋1枠）と並べて「固定/枠」で出す。 */
+  lockedCount: number
+}) {
   const [copied, setCopied] = useState(false)
   const { board } = step
   const added = new Set(step.added)
@@ -452,7 +469,23 @@ function RouteRow({ step, stats, lang, stale }: { step: WireStep; stats: StatsFi
       <div className="flex items-start gap-3 xl:contents">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 md:flex-row md:items-baseline md:gap-3 xl:col-start-1 xl:row-start-1 xl:w-44 xl:flex-none xl:flex-col xl:gap-0.5">
           <span className="flex items-baseline gap-3">
-            <span className="text-xs font-semibold text-muted">{t(lang, 'ladderLevel', { n: step.level })}</span>
+            <span className="flex items-baseline gap-1.5">
+              <span className="text-xs font-semibold text-muted">{t(lang, 'ladderLevel', { n: step.level })}</span>
+              {/* 盤面の枠＝レベル＋1枠。駒を固定していれば「固定/枠」。枠を超えたら灯の色。 */}
+              <span
+                title={t(lang, lockedCount > 0 ? 'ladderSlotsLockedTitle' : 'ladderSlotsTitle', {
+                  n: step.level + bonus,
+                  k: lockedCount,
+                })}
+                className={`text-[11px] font-semibold tabular-nums ${
+                  lockedCount > step.level + bonus ? 'text-ember-warm' : bonus > 0 ? 'text-gold' : 'text-faint'
+                }`}
+              >
+                {lockedCount > 0
+                  ? t(lang, 'ladderSlotsLocked', { k: lockedCount, n: step.level + bonus })
+                  : t(lang, 'ladderSlots', { n: step.level + bonus })}
+              </span>
+            </span>
             <span
               className={`text-lg font-extrabold tabular-nums ${board.active >= TEAM_SIZE_STEP ? 'text-gold' : 'text-ink'}`}
             >
