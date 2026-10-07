@@ -5,7 +5,7 @@ name: cdragon-snapshot
 on:
   push:
     branches: [claude/project-thread-m3hkxs]
-    paths: [.github/workflows/cdragon-snapshot.yml, tools/cdragon-snapshot.mjs]
+    paths: [.github/workflows/cdragon-snapshot.yml, tools/*.mjs]
   workflow_dispatch:
 
 permissions:
@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: node tools/cdragon-snapshot.mjs snapshots
+      - run: node tools/cdragon-bins.mjs snapshots 16.19,16.20
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
