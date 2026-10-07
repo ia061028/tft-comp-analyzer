@@ -1,3 +1,5 @@
+import type { PatchScheduleEntry } from './patches.ts'
+
 export type RegionalRoute = 'americas' | 'asia' | 'europe' | 'sea'
 
 /** TFTの全15プラットフォームとリージョナルルーティングの対応（oc1 は sea 扱い） */
@@ -179,7 +181,7 @@ export const config = {
       patch: '18.4',
       since: '2026-10-07T00:00:00Z',
       // 各プラットフォームの配信前後の試合の空白（メンテナンス）の中の時刻。2026-10-07 の data で確認。
-      // 南北アメリカは 08:00Z の時点でまだ未配信。
+      // 南北アメリカは 15:21Z の data で確認。
       sinceByPlatform: {
         oc1: '2026-10-06T18:00:00Z',
         jp1: '2026-10-06T20:00:00Z',
@@ -192,11 +194,11 @@ export const config = {
         ru: '2026-10-07T02:00:00Z',
         me1: '2026-10-07T02:00:00Z',
         euw1: '2026-10-07T04:00:00Z',
-        na1: null,
-        br1: null,
-        la1: null,
-        la2: null,
+        na1: '2026-10-07T10:00:00Z',
+        br1: '2026-10-07T08:00:00Z',
+        la1: '2026-10-07T09:00:00Z',
+        la2: '2026-10-07T07:00:00Z',
       },
     },
-  ] as { patch: string; since: string }[],
+  ] as PatchScheduleEntry[],
 }
