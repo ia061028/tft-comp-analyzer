@@ -1,0 +1,28 @@
+name: cdragon-snapshot
+
+# 一時的な調査用（main には入れない）。サンドボックスから CDragon に届かないため、
+# Actions で live / 直近の版の TFT 静的データを取り、セット18のユニットと特性だけをこのブランチへコミットする。
+on:
+  push:
+    branches: [claude/project-thread-m3hkxs]
+    paths: [.github/workflows/cdragon-snapshot.yml, tools/cdragon-snapshot.mjs]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node tools/cdragon-snapshot.mjs snapshots
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add snapshots
+          git commit -m "chore: cdragon snapshot $(date -u +%FT%TZ)" || exit 0
+          git push
