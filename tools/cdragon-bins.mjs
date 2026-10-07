@@ -35,6 +35,7 @@ for (const v of versions) {
     const n = (c.characterName ?? c.apiName).toLowerCase()
     let ok = false
     for (const u of [
+      `${BASE}/${v}/game/characters/${n}.cdtb.bin.json`,
       `${BASE}/${v}/game/characters/${n}/${n}.cdtb.bin.json`,
       `${BASE}/${v}/game/data/characters/${n}/${n}.bin.json`,
       `${BASE}/${v}/game/data/characters/${n}/${n}.cdtb.bin.json`,
