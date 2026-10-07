@@ -1,0 +1,4247 @@
+{
+ "version": "16.19",
+ "meta": {
+  "version": "16.19.8217343+branch.releases-16-19.content.release"
+ },
+ "mutator": "TFTSet18",
+ "champions": [
+  {
+   "ability": {
+    "desc": "対象を激しく殴打し、<magicDamage>@ModifiedDamage@&nbsp;(%i:scaleAP%)</magicDamage>の魔法ダメージを与える。",
+    "icon": "assets/characters/tft_bluegolem/hud/tft_bluegolem_spell.tex",
+    "name": "ゴーレムスマッシュ",
+    "variables": [
+     {
+      "name": "Damage",
+      "value": [
+       100,
+       300,
+       480,
+       750,
+       1125,
+       100,
+       100
+      ]
+     }
+    ]
+   },
+   "apiName": "TFT_BlueGolem",
+   "characterName": "TFT_BlueGolem",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tft_bluegolem.tex",
+   "name": "ゴーレム",
+   "role": "APTank",
+   "squareIcon": "assets/ux/tft/championsplashes/tft_bluegolem_mobile.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.550000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 55,
+    "hp": 600,
+    "initialMana": 30,
+    "magicResist": 40,
+    "mana": 100,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft_bluegolem/hud/tft_bluegolem_spell.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "<spellPassive>自動効果: </spellPassive>稀にボード内をダッシュで動き回る。",
+    "icon": "assets/characters/tft9_slime_crab/hud/icons2d/tft9_slime_crab_spell.tex",
+    "name": "遊泳速度",
+    "variables": []
+   },
+   "apiName": "TFT9_SLIME_Crab",
+   "characterName": "TFT9_SLIME_Crab",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tft_scuttlecrab.tex",
+   "name": "リフトスカトル",
+   "role": null,
+   "squareIcon": "assets/ux/tft/championsplashes/tft_scuttlecrab_mobile.tex",
+   "stats": {
+    "armor": 10,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 20,
+    "hp": null,
+    "initialMana": 0,
+    "magicResist": 10,
+    "mana": 100,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft9_slime_crab/hud/icons2d/tft9_slime_crab_spell.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "移動も攻撃もできない。また、悪魔的なまでにハンサムなヨードルの姿をしている。",
+    "icon": "assets/characters/tft_trainingdummy/hud/icons2d/tftdebug_dummy_donothing.tex",
+    "name": "任務中！",
+    "variables": []
+   },
+   "apiName": "TFT_TrainingDummy",
+   "characterName": "TFT_TrainingDummy",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tftdebug_dummy.tex",
+   "name": "ダミー",
+   "role": "ADTank",
+   "squareIcon": "assets/ux/tft/championsplashes/tftdebug_dummy_mobile.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.5,
+    "critChance": null,
+    "critMultiplier": 0,
+    "damage": 50,
+    "hp": 550,
+    "initialMana": 0,
+    "magicResist": 40,
+    "mana": 0,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft_trainingdummy/hud/icons2d/tft_trainingdummy_donothing.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "「ヴォイドスポーン」は現在のステージに応じた体力と攻撃力を追加で獲得する。 ",
+    "icon": "assets/characters/tft_voidspawn/hud/icons2d/voidspawn_squarefixed.tex",
+    "name": "ヴォイドの子ら",
+    "variables": []
+   },
+   "apiName": "TFT_Voidspawn",
+   "characterName": "TFT_VoidSpawn",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tft_voidspawn.tex",
+   "name": "ヴォイドスポーン",
+   "role": null,
+   "squareIcon": "assets/ux/tft/championsplashes/tft_voidspawn_mobile.tex",
+   "stats": {
+    "armor": 30,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 0,
+    "hp": null,
+    "initialMana": 0,
+    "magicResist": 30,
+    "mana": 0,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft_voidspawn/hud/icons2d/voidspawn_squarecopy.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "自動効果: 味方のクルーグが倒されるたびに体力が全回復する。",
+    "icon": "assets/characters/tft_krug/hud/ancientkrug_square.tex",
+    "name": "ストーンサルベージ",
+    "variables": []
+   },
+   "apiName": "TFT_Krug",
+   "characterName": "TFT_Krug",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tft_krug.tex",
+   "name": "クルーグ",
+   "role": "ADTank",
+   "squareIcon": "assets/ux/tft/championsplashes/tft_krug_mobile.tex",
+   "stats": {
+    "armor": 50,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 110,
+    "hp": 1200,
+    "initialMana": 0,
+    "magicResist": 25,
+    "mana": 0,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft_krug/hud/ancientkrug_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "自動効果: 戦闘開始時に敵の後列に飛びかかる。",
+    "icon": "assets/characters/tft_murkwolf/hud/tft_murkwolf_square.tex",
+    "name": "パックアタック",
+    "variables": []
+   },
+   "apiName": "TFT_Murkwolf",
+   "characterName": "TFT_MurkWolf",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tft_murkwolf.tex",
+   "name": "マークウルフ",
+   "role": "ADTank",
+   "squareIcon": "assets/ux/tft/championsplashes/tft_murkwolf_mobile.tex",
+   "stats": {
+    "armor": 15,
+    "attackSpeed": 1,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 230,
+    "hp": 1300,
+    "initialMana": 0,
+    "magicResist": 15,
+    "mana": 0,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft_murkwolf/hud/tft_murkwolf_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "自動効果: 戦闘開始時に敵の後列に飛びかかる。",
+    "icon": "assets/characters/tft_murkwolf/hud/tft_murkwolf_square.tex",
+    "name": "パックアタック",
+    "variables": []
+   },
+   "apiName": "TFT_MurkwolfMini",
+   "characterName": "TFT_MurkwolfMini",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tft_murkwolf.tex",
+   "name": "マークウルフ",
+   "role": "ADTank",
+   "squareIcon": "assets/ux/tft/championsplashes/tft_murkwolf_mobile.tex",
+   "stats": {
+    "armor": 15,
+    "attackSpeed": 1,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 135,
+    "hp": 550,
+    "initialMana": 0,
+    "magicResist": 15,
+    "mana": 0,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft_murkwolf/hud/tft_murkwolf_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "自動効果: 味方のレイザービークが倒されるたびに攻撃速度が増加する。",
+    "icon": "assets/characters/tft_razorbeak/hud/razorbeak_square.tex",
+    "name": "激怒する群れ",
+    "variables": []
+   },
+   "apiName": "TFT_Razorbeak",
+   "characterName": "TFT_Razorbeak",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tft_razorbeak.tex",
+   "name": "レイザービーク",
+   "role": "ADTank",
+   "squareIcon": "assets/ux/tft/championsplashes/tft_razorbeak_mobile.tex",
+   "stats": {
+    "armor": 25,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 230,
+    "hp": 2400,
+    "initialMana": 0,
+    "magicResist": 25,
+    "mana": 0,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft_razorbeak/hud/razorbeak_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "自動効果: 味方のレイザービークが倒されるたびに攻撃速度が増加する。",
+    "icon": "assets/characters/tft_razorbeak/hud/razorbeak_square.tex",
+    "name": "激怒する群れ",
+    "variables": []
+   },
+   "apiName": "TFT_RazorbeakMini",
+   "characterName": "TFT_RazorbeakMini",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tft_razorbeak.tex",
+   "name": "レイザービーク",
+   "role": "ADTank",
+   "squareIcon": "assets/ux/tft/championsplashes/tft_razorbeak_mobile.tex",
+   "stats": {
+    "armor": 25,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 180,
+    "hp": 1450,
+    "initialMana": 0,
+    "magicResist": 25,
+    "mana": 0,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft_razorbeak/hud/razorbeak_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "戦闘開始時: 前方に突進し、最大体力の<magicDamage>@MaxHealthPct*100@%</magicDamage>の魔法ダメージを与え、敵をスタンさせる。",
+    "icon": "assets/characters/tft_riftherald/hud/tft9_riftherald_square.tex",
+    "name": "ヴォイドチャージ",
+    "variables": [
+     {
+      "name": "MaxHealthPct",
+      "value": [
+       0.5,
+       0.5,
+       0.5,
+       0.5,
+       0.5,
+       0.5,
+       0.5
+      ]
+     }
+    ]
+   },
+   "apiName": "TFT_RiftHerald",
+   "characterName": "TFT_RiftHerald",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tft_riftherald.tex",
+   "name": "リフトヘラルド",
+   "role": "ADTank",
+   "squareIcon": "assets/ux/tft/championsplashes/tft_riftherald_mobile.tex",
+   "stats": {
+    "armor": 100,
+    "attackSpeed": 1,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 600,
+    "hp": 10000,
+    "initialMana": 0,
+    "magicResist": 100,
+    "mana": 0,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft_riftherald/hud/tft9_riftherald_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "<spellPassive>自動効果:</spellPassive> 対象の背後の扇形範囲にダメージを与える。",
+    "icon": "assets/characters/tft_elderdragon/hud/dragon_square_elder.tex",
+    "name": "原始の息吹",
+    "variables": []
+   },
+   "apiName": "TFT_ElderDragon",
+   "characterName": "TFT_ElderDragon",
+   "cost": 1,
+   "icon": "assets/ux/tft/championsplashes/tft_elderdragon.tex",
+   "name": "エルダードラゴン",
+   "role": "ADTank",
+   "squareIcon": "assets/ux/tft/championsplashes/tft_elderdragon_mobile.tex",
+   "stats": {
+    "armor": 50,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 900,
+    "hp": 10000,
+    "initialMana": 0,
+    "magicResist": 50,
+    "mana": 0,
+    "range": 2
+   },
+   "tileIcon": "assets/characters/tft_elderdragon/hud/dragon_square_elder.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "<Bright>アダプター</Bright>%i:scaleAP%<Bright>: </Bright>現在の対象に向かって有毒な泡を吐き出す。泡は最初の敵に命中した時点で爆発し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。爆発の1マス以内にいる敵は@PoisonDurationAP@秒かけて@MagicDamageCalc2@%i:scaleAP%の魔法ダメージを受ける。\r\\n\r\\n<dim>アダプター</dim>%i:scaleAD%<dim>: 対象に強力なスロウ効果を付与する。</dim>\r\\n\r\\nパープルバフ: @TraitTimer@秒ごとに魔力が@TraitTimedAP@増加する。",
+    "icon": "None",
+    "name": "ベルチーバブル",
+    "variables": []
+   },
+   "apiName": "DA_Gromp18_AP",
+   "characterName": "DA_Gromp18_AP",
+   "cost": 2,
+   "icon": "{f3b734c3102f71ed}",
+   "name": "グロンプ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_gromp/skins/base/images/t_18_gromp_teamplannersplash.tex",
+   "stats": {
+    "armor": 30,
+    "attackSpeed": 0.699999988079071,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 30,
+    "hp": 550,
+    "initialMana": 0,
+    "magicResist": 30,
+    "mana": 45,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_gromp/tft18_gromp_square.tex",
+   "traits": [
+    "リフトビースト",
+    "アダプター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@LeapHexRadius@マス以内で最も体力の低い敵に跳びかかり、@PhysicalDamageCalc1@%i:scaleAD%%i:scaleAP%の物理ダメージを与える。次の@NumEmpoweredAttacks@回の通常攻撃の攻撃速度が@EmpowerAspd@増加し、@PhysicalDamageCalc2@%i:scaleAD%の追加物理ダメージを与える。\r\\n\r\\nグレーバフ: 「正確無比」を獲得し、クリティカル率が@TraitBaseCrit@増加する。この効果は減少体力に応じて最大@TraitBonusCrit@まで増加する。",
+    "icon": "None",
+    "name": "引き裂く爪",
+    "variables": []
+   },
+   "apiName": "DA_Murkwolf18",
+   "characterName": "DA_Murkwolf18",
+   "cost": 2,
+   "icon": "{0ea96b4d47691e31}",
+   "name": "マークウルフ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_murkwolf/skins/base/images/t_18_murkwolf_teamplannersplash.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 700,
+    "initialMana": 0,
+    "magicResist": 40,
+    "mana": 40,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_murkwolf/tft18_murkwolf_square.tex",
+   "traits": [
+    "リフトビースト",
+    "ラヴィジャー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "毎秒最大マナの@PercentManaPerSecond@を消費し始めて、対象に向けてレーザーを詠唱する。詠唱中は毎秒、対象に@MagicDamageCalc1@ %i:scaleAP%の魔法ダメージを与え、魔法防御を@MRReduction@低下させる。\r\\n\r\\nティールバフ: 詠唱@TraitChannelSecondsTooltip@秒ごとに、@TraitManaRegenTooltip@のマナ自動回復を獲得する。",
+    "icon": "None",
+    "name": "蒼き光線",
+    "variables": []
+   },
+   "apiName": "DA_18_Sentry",
+   "characterName": "DA_18_Sentry",
+   "cost": 1,
+   "icon": "{e8a95eea9697c960}",
+   "name": "小石",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_sentry/skins/base/images/t_18_sentry_teamplannersplash.tex",
+   "stats": {
+    "armor": 25,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 35,
+    "hp": 500,
+    "initialMana": 30,
+    "magicResist": 25,
+    "mana": 70,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_sentry/tft18_sentry_square.tex",
+   "traits": [
+    "リフトビースト",
+    "インヴォーカー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "鋭い刃のような葉を5枚召喚して現在の対象に収束させ、合計@PhysicalDamageCalc1@%i:scaleAD%%i:scaleAP%の物理ダメージを与え、@WoundDuration@秒間、@WoundLevel@%の<Keyword>負傷</Keyword>と@BurnAmount@%の<Keyword>燃焼</Keyword>を付与する。\r\\n\r\\nスカーレットバフ: スキルを使用するたびにシンダーリングの攻撃力が@TraitADOnCast@増加する。\r\\n\r\\n<rules>負傷: 受ける回復効果を低下させる。</rules>\r\\n<rules>燃焼: 毎秒、対象の最大体力の一定割合にあたる確定ダメージを与える。</rules>",
+    "icon": "None",
+    "name": "鋭葉カッター",
+    "variables": []
+   },
+   "apiName": "DA_Cinderling18",
+   "characterName": "DA_Cinderling18",
+   "cost": 1,
+   "icon": "{3bcbfdbd732c6323}",
+   "name": "シンダーリング",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_cinderling/skins/base/images/t_18_cinderling_teamplannersplash.tex",
+   "stats": {
+    "armor": 25,
+    "attackSpeed": 0.699999988079071,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 500,
+    "initialMana": 0,
+    "magicResist": 25,
+    "mana": 50,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_cinderling/tft18_cinderling_square.tex",
+   "traits": [
+    "リフトビースト",
+    "ハンター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果</bright>: 通常攻撃がダンスに変化し、隣接するすべての敵に@PhysicalDamageCalc1@%i:scaleAD%の物理ダメージを与える。\r\\n\r\\n<bright>発動効果:</bright> 地下に潜り、@BurrowDuration@秒間、耐久力が@BurrowDurability@増加し、効果時間中@HealthCalc1@%i:scaleAP%の体力を回復する。\r\\n\r\\nグリーンバフ: 体力が@TraitHealthThreshold@を下回った味方は、最大体力の@TraitPercentHeal@にあたる体力を回復する。",
+    "icon": "None",
+    "name": "掘り起こせるか？",
+    "variables": []
+   },
+   "apiName": "DA_Scuttlecrab18",
+   "characterName": "DA_Scuttlecrab18",
+   "cost": 2,
+   "icon": "{56c0d241812da38a}",
+   "name": "スカトルクラブ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_scuttlecrab/skins/base/images/t_18_scuttlecrab_teamplannersplash.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.6499999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 950,
+    "initialMana": 40,
+    "magicResist": 45,
+    "mana": 100,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_scuttlecrab/tft18_scuttlecrab_square.tex",
+   "traits": [
+    "リフトビースト",
+    "ジャガーノート"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果:</Bright> 倒されると、体力@HealthCalc1@%i:scaleHealth%のクルーグレット2体に分裂し、即座に敵を挑発して自身に攻撃させる。\r\\n\r\\n<Bright>発動効果:</Bright> 最大体力を@HealthCalc2@%i:scaleAP%獲得し、対象に向かって転がって@PhysicalDamageCalc1@%i:scaleAD%%i:scaleHealth%のダメージを与える。\r\\n\r\\nスレートバフ: 倒されると、クルーグとクルーグレットが味方に最大体力@TraitShieldHealth@分の耐久値を持つシールドを付与する。",
+    "icon": "None",
+    "name": "ロック＆リロール",
+    "variables": []
+   },
+   "apiName": "DA_Krug18",
+   "characterName": "DA_Krug18",
+   "cost": 3,
+   "icon": "{3d59606a1e414504}",
+   "name": "クルーグ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_krug/skins/base/images/t_18_krug_teamplannersplash.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.6000000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 55,
+    "hp": 1100,
+    "initialMana": 80,
+    "magicResist": 40,
+    "mana": 135,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_krug/tft18_krug_square.tex",
+   "traits": [
+    "リフトビースト",
+    "ブローラー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@ShieldDuration@秒間、耐久値@ShieldCalc1@ %i:scaleAP%%i:scaleHealth%のシールドを獲得する。地面を叩きつけ、最も多くの敵がいる方向に地割れを発生させる。命中した敵は短時間ノックアップされ、@MagicDamageCalc1@ %i:scaleAP%の魔法ダメージを受け、@ManaReaveFlat@の<keyword>マナリーヴ</keyword>を付与される。\r\\n\r\\nブルーバフ: 守護神がスキルを使用するたび、味方のマナ自動回復が@TraitAlliesManaRegen@増加する。\r\\n\r\\n<rules>マナリーヴ: 次に使用するスキルのマナコストを増加させる。</rules>",
+    "icon": "None",
+    "name": "蒼き衝撃波",
+    "variables": []
+   },
+   "apiName": "DA_Sentinel18",
+   "characterName": "DA_Sentinel18",
+   "cost": 4,
+   "icon": "{94230c60604bffc1}",
+   "name": "センチネル",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_sentinel/skins/base/images/t_18_sentinel_teamplannersplash.tex",
+   "stats": {
+    "armor": 60,
+    "attackSpeed": 0.6000000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 75,
+    "hp": 1300,
+    "initialMana": 60,
+    "magicResist": 60,
+    "mana": 150,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_sentinel/tft18_sentinel_square.tex",
+   "traits": [
+    "リフトビースト",
+    "ヴァンガード",
+    "インヴォーカー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果: </bright>対象を倒すと次の対象に跳びかかり、@PhysicalDamageCalc1@%i:scaleAD%の物理ダメージを与える。\r\\n\r\\n<bright>発動効果: </bright>@Duration@秒間、攻撃力が@FrenzyADPercent@増加する。この効果時間中は@GenericCalc1@%i:scaleAP%の物理防御を無視する。\r\\n\r\\nレッドバフ: 通常攻撃が敵に@BurnAmount@%の燃焼を付与し、最大体力の@TraitMaxHealthHeal@を回復する。",
+    "icon": "None",
+    "name": "深紅の憤怒",
+    "variables": []
+   },
+   "apiName": "DA_Brambleback18",
+   "characterName": "DA_Brambleback18",
+   "cost": 4,
+   "icon": "{0c5a019370385aa2}",
+   "name": "ブランブルバック",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_brambleback/skins/base/images/t_18_brambleback_teamplannersplash.tex",
+   "stats": {
+    "armor": 65,
+    "attackSpeed": 0.550000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 120,
+    "hp": 1100,
+    "initialMana": 0,
+    "magicResist": 65,
+    "mana": 40,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_brambleback/tft18_brambleback_square.tex",
+   "traits": [
+    "リフトビースト",
+    "ラヴィジャー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "次の通常攻撃@NumAttacks@回の間、攻撃速度を@AttackSpeed@獲得する。これらの通常攻撃は羽根に置き換わり、@PhysicalDamageCalc1@ %i:scaleAD%の物理ダメージを与え、物理防御を@GenericCalc1@ %i:scaleAP%低下させる。",
+    "icon": "None",
+    "name": "デッドリープルーム",
+    "variables": []
+   },
+   "apiName": "DA_18_Xayah",
+   "characterName": "DA_18_Xayah",
+   "cost": 1,
+   "icon": "assets/characters/tft18_xayah/skins/base/images/tft18_xayah_splash_centered_8.tex",
+   "name": "ザヤ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_xayah/skins/base/images/tft18_xayah_splash_tile_8.tex",
+   "stats": {
+    "armor": 25,
+    "attackSpeed": 0.699999988079071,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 45,
+    "hp": 450,
+    "initialMana": 0,
+    "magicResist": 25,
+    "mana": 50,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_xayah/tft18_xayah_square.tex",
+   "traits": [
+    "エルダーウッド",
+    "フェイ",
+    "ラピッドファイア"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>発動効果: </Bright>@ShieldDuration@秒間、耐久値@ShieldCalc1@%i:scaleAP%のシールドを獲得し、扇形範囲内の敵に@MagicDamageCalc1@%i:scaleAP%魔法ダメージを与える。\r\\n\r\\n<Bright>クエスト: </Bright>各対人戦でオーンがブロックしたダメージを「鍛冶場パワー」として蓄える。★3になるとこの効果が2倍になる。 十分な「鍛冶場パワー」を獲得するたびに、「アーティファクトの金床」を1個獲得する。<Rules>(鍛冶場パワー: </Rules>@Stack@<Rules> / </Rules>@GenericCalc1@<Rules>)</Rules>",
+    "icon": "None",
+    "name": "ふいごの息",
+    "variables": []
+   },
+   "apiName": "DA_18_Ornn",
+   "characterName": "DA_18_Ornn",
+   "cost": 1,
+   "icon": "assets/characters/tft18_ornn/skins/base/images/tft18_ornn_splash_centered_2.tex",
+   "name": "オーン",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_ornn/skins/base/images/tft18_ornn_splash_tile_2.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.6000000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 700,
+    "initialMana": 40,
+    "magicResist": 40,
+    "mana": 100,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_ornn/tft18_ornn_square.tex",
+   "traits": [
+    "エルダーウッド",
+    "ディフェンダー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>アダプター </Bright>%i:scaleAP%<Bright>:</Bright> 次の通常攻撃@NumEmpoweredAttacks@回の間、攻撃速度を@BonusAttackSpeed@獲得する。これらの通常攻撃は槍に変化し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。3回目の通常攻撃はアイテム数が最も少ない最も遠くの敵を狙うようになり、@MagicDamageCalc2@%i:scaleAP%の魔法ダメージを与える。\r\\n\r\\n<dim>アダプター</dim>%i:scaleAD%<dim>: 敵を薙ぎ払う近接型のクーガーアサシンに変身する。</dim>",
+    "icon": "None",
+    "name": "槍投げ",
+    "variables": []
+   },
+   "apiName": "DA_Nidalee18_AP",
+   "characterName": "DA_Nidalee18_AP",
+   "cost": 4,
+   "icon": "assets/characters/tft18_nidalee/skins/base/images/tft18_nidalee_splash_centered_0.tex",
+   "name": "ニダリー",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_nidalee/skins/base/images/tft18_nidalee_splash_tile_0.tex",
+   "stats": {
+    "armor": 30,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 35,
+    "hp": 850,
+    "initialMana": 0,
+    "magicResist": 30,
+    "mana": 45,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_nidalee/tft18_nidalee_square.tex",
+   "traits": [
+    "プライマル",
+    "アダプター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "3秒間、@Resists@の物理防御と魔法防御を獲得し、効果時間中に体力を@HealthCalc1@%i:scaleAP%回復する。@NumEnemies@体の最も近い敵に向かって亡霊の騎士たちを放ち、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与え、@StunDuration@秒間スタンさせる。",
+    "icon": "None",
+    "name": "ソウルドレイン",
+    "variables": []
+   },
+   "apiName": "DA_18_Hecarim",
+   "characterName": "DA_18_Hecarim",
+   "cost": 3,
+   "icon": "assets/characters/tft18_hecarim/skins/base/images/tft18_hecarim_splash_centered_5.tex",
+   "name": "ヘカリム",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_hecarim/skins/base/images/tft18_hecarim_splash_tile_5.tex",
+   "stats": {
+    "armor": 50,
+    "attackSpeed": 0.6499999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 1100,
+    "initialMana": 30,
+    "magicResist": 50,
+    "mana": 110,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_hecarim/tft18_hecarim_square.tex",
+   "traits": [
+    "エルダーウッド",
+    "ヴァンガード"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "現在対象としている敵から離れるようにブリンクして、対象に@PhysicalDamageCalc1@%i:scaleAD%の物理ダメージを与え、攻撃速度を@AttackSpeedCalc1@%i:scaleAP%獲得する。\r\\n\r\\n4回目のスキル発動時に「大地の激憤」で獲得した攻撃速度をすべて消費し、最も多くの敵がいる集団を貫通する衝撃波を放つ。この衝撃波は、@PhysicalDamageCalc2@ %i:scaleAD%の物理ダメージを与え、敵を1体貫通するごとにダメージが@DamageReductionPerHit@ずつ減少する(最低@MinDamagePercent@)。",
+    "icon": "None",
+    "name": "森の突風",
+    "variables": []
+   },
+   "apiName": "DA_18_Ezreal",
+   "characterName": "DA_18_Ezreal",
+   "cost": 4,
+   "icon": "assets/characters/tft18_ezreal/skins/base/images/tft18_ezreal_splash_centered_1.tex",
+   "name": "エズリアル",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_ezreal/skins/base/images/tft18_ezreal_splash_tile_1.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 45,
+    "hp": 850,
+    "initialMana": 0,
+    "magicResist": 40,
+    "mana": 30,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_ezreal/tft18_ezreal_square.tex",
+   "traits": [
+    "エルダーウッド",
+    "エクセキューショナー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "攻撃速度が@AttackSpeed@増加し、次の通常攻撃@NumAttacks@回の間、兵士を@SoldiersToSpawn@体召喚する。これらの通常攻撃は指令に置き換わり、各兵士がそれぞれ@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与えるようになる。",
+    "icon": "None",
+    "name": "目覚めよ！",
+    "variables": []
+   },
+   "apiName": "DA_18_Azir",
+   "characterName": "DA_18_Azir",
+   "cost": 3,
+   "icon": "assets/characters/tft18_azir/skins/base/images/tft18_azir_splash_centered_5.tex",
+   "name": "アジール",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_azir/skins/base/images/tft18_azir_splash_tile_5.tex",
+   "stats": {
+    "armor": 35,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 30,
+    "hp": 650,
+    "initialMana": 0,
+    "magicResist": 35,
+    "mana": 35,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_azir/tft18_azir_square.tex",
+   "traits": [
+    "ブラックソーン",
+    "エクセキューショナー",
+    "サモナー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果: </bright>体力を毎秒@HealthCalc2@%i:scaleHealth%回復する。スキル使用後@SpellMultiplierDuration@秒間は回復量が3倍になる。\r\\n\r\\n<bright>発動効果: </bright>地面から飛び出して隣接する敵を@KnockupDuration@秒間スタンさせ、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。",
+    "icon": "None",
+    "name": "抜根",
+    "variables": []
+   },
+   "apiName": "DA_18_RekSai",
+   "characterName": "DA_18_RekSai",
+   "cost": 1,
+   "icon": "assets/characters/tft18_reksai/skins/base/images/tft18_reksai_splash_centered_17.tex",
+   "name": "レク＝サイ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_reksai/skins/base/images/tft18_reksai_splash_tile_17.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.550000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 700,
+    "initialMana": 40,
+    "magicResist": 40,
+    "mana": 100,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_reksai/tft18_reksai_square.tex",
+   "traits": [
+    "ブラックソーン",
+    "ブローラー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "指定した対象に巨大な魔弾を放ち、@MagicDamageCalc1@ %i:scaleAP%の魔法ダメージを与える。対象の体力が最大体力の@HPThreshold@を下回っていた場合は、このダメージが@MagicDamageCalc2@ %i:scaleAP%に増加する。\r\\n\r\\n対象が倒されると、魔力が恒久的に@APOnKill@%増加する。\r\\n\r\\n現在の増加量: @Stack@% %i:scaleAP%",
+    "icon": "None",
+    "name": "メテオバースト",
+    "variables": []
+   },
+   "apiName": "DA_18_Veigar",
+   "characterName": "DA_18_Veigar",
+   "cost": 1,
+   "icon": "assets/characters/tft18_veigar/skins/base/images/tft18_veigar_splash_centered_13.tex",
+   "name": "ベイガー",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_veigar/skins/base/images/tft18_veigar_splash_tile_13.tex",
+   "stats": {
+    "armor": 25,
+    "attackSpeed": 0.699999988079071,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 25,
+    "hp": 500,
+    "initialMana": 0,
+    "magicResist": 25,
+    "mana": 30,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_veigar/tft18_veigar_square.tex",
+   "traits": [
+    "ブラックソーン",
+    "スプライキン",
+    "スペルウィーバー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果: </Bright>@DamageMitigatedPerSapling@ダメージをブロックするたびに、苗木が近くの敵に向かって飛びかかり、@MagicDamageCalc1@%i:scaleHealth%の魔法ダメージを与える。デスすると苗木が@SaplingsOnDeath@体飛び出す。\r\\n\r\\n<Bright>発動効果: </Bright>対象に@MagicDamageCalc2@%i:scaleHealth%の魔法ダメージを与え、@HealthCalc1@%i:scaleAP% + 減少体力の@ActiveMissingHealthHeal@にあたる体力を回復する。",
+    "icon": "None",
+    "name": "種を蒔く",
+    "variables": []
+   },
+   "apiName": "DA_18_Maokai",
+   "characterName": "DA_18_Maokai",
+   "cost": 5,
+   "icon": "assets/characters/tft18_maokai/skins/base/images/tft18_maokai_splash_centered_0.tex",
+   "name": "マオカイ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_maokai/skins/base/images/tft18_maokai_splash_tile_0.tex",
+   "stats": {
+    "armor": 60,
+    "attackSpeed": 0.6499999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 80,
+    "hp": 1150,
+    "initialMana": 30,
+    "magicResist": 60,
+    "mana": 90,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_maokai/tft18_maokai_square.tex",
+   "traits": [
+    "原生林",
+    "ジャガーノート"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@ShieldDuration@秒間、耐久値@ShieldCalc1@%i:scaleAP%のシールドを獲得して「石化」状態になる。シールドが破壊されると闇の気の波を放ち、@AoEHexRange@マス以内の敵に@MagicDamageCalc1@%i:scaleAP%%i:scaleArmor%%i:scaleMR%の魔法ダメージを与える。",
+    "icon": "None",
+    "name": "石化した樹皮",
+    "variables": []
+   },
+   "apiName": "DA_18_Malphite",
+   "characterName": "DA_18_Malphite",
+   "cost": 4,
+   "icon": "assets/characters/tft18_malphite/skins/base/images/tft18_malphite_splash_centered_27.tex",
+   "name": "マルファイト",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_malphite/skins/base/images/tft18_malphite_splash_tile_27.tex",
+   "stats": {
+    "armor": 70,
+    "attackSpeed": 0.550000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 70,
+    "hp": 1300,
+    "initialMana": 30,
+    "magicResist": 70,
+    "mana": 80,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_malphite/tft18_malphite_square.tex",
+   "traits": [
+    "ブラックソーン",
+    "モノリス"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果:</Bright> デス時に@HealthCalc2@%i:scaleHealth%の最大体力を持つ「スピリットウォーカー」を召喚し、即座に敵を挑発して自身に攻撃させる。\r\\n\r\\n<Bright>発動効果:</Bright> 体力を@HealthCalc1@%i:scaleAP%回復して対象を攻撃し、@PhysicalDamageCalc1@%i:scaleAD%の物理ダメージを与える。",
+    "icon": "None",
+    "name": "葬送",
+    "variables": []
+   },
+   "apiName": "DA_18_Yorick",
+   "characterName": "DA_18_Yorick",
+   "cost": 1,
+   "icon": "assets/characters/tft18_yorick/skins/base/images/tft18_yorick_splash_centered_30.tex",
+   "name": "ヨリック",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_yorick/skins/base/images/tft18_yorick_splash_tile_30.tex",
+   "stats": {
+    "armor": 35,
+    "attackSpeed": 0.6000000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 650,
+    "initialMana": 50,
+    "magicResist": 35,
+    "mana": 110,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_yorick/tft18_yorick_square.tex",
+   "traits": [
+    "ブロッサム",
+    "ジャガーノート",
+    "サモナー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "ダッシュして現在の対象にオーブを放つ。オーブは@PhysicalDamageCalc1@ %i:scaleAD%%i:scaleAP%の物理ダメージを与えて分裂し、周囲の敵@NumSecondaryTargets@体に@PhysicalDamageCalc2@ %i:scaleAD%%i:scaleAP%の物理ダメージを与える。",
+    "icon": "None",
+    "name": "精神修養",
+    "variables": []
+   },
+   "apiName": "DA_18_Yunara",
+   "characterName": "DA_18_Yunara",
+   "cost": 2,
+   "icon": "assets/characters/tft18_yunara/skins/base/images/tft18_yunara_splash_centered_0.tex",
+   "name": "ユナラ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_yunara/skins/base/images/tft18_yunara_splash_tile_0.tex",
+   "stats": {
+    "armor": 30,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 42,
+    "hp": 550,
+    "initialMana": 0,
+    "magicResist": 30,
+    "mana": 35,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_yunara/tft18_yunara_square.tex",
+   "traits": [
+    "ブロッサム",
+    "エクセキューショナー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果:</Bright> 各戦闘で初めて体力が最大体力の@ManaHPThreshold@を下回った際、マナを100獲得する。\r\\n\r\\n<Bright>発動効果:</Bright> 強烈なパンチをため、体力を急速に@HealthCalc1@ %i:scaleHealth%%i:scaleAP%回復してから、扇状の広範囲に@PhysicalDamageCalc1@ %i:scaleHealth%%i:scaleAD%の物理ダメージを与える。",
+    "icon": "None",
+    "name": "ヘイメイカー",
+    "variables": []
+   },
+   "apiName": "DA_18_Sett",
+   "characterName": "DA_18_Sett",
+   "cost": 4,
+   "icon": "assets/characters/tft18_sett/skins/base/images/tft18_sett_splash_centered_38.tex",
+   "name": "セト",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_sett/skins/base/images/tft18_sett_splash_tile_38.tex",
+   "stats": {
+    "armor": 60,
+    "attackSpeed": 0.6499999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 80,
+    "hp": 1200,
+    "initialMana": 60,
+    "magicResist": 60,
+    "mana": 135,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_sett/tft18_sett_square.tex",
+   "traits": [
+    "ブロッサム",
+    "ブローラー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@AbilityCenterHexRange@マス以内で、周囲に最も多くの敵がいる地点にスピリットボムを放つ。スピリットボムは@HexRadius@マス以内の敵に@MagicDamageCalc1@ %i:scaleAP%の魔法ダメージを与える。このダメージは爆発地点から1マス離れるごとに@HexPercentDamageFalloffTooltip@ずつ減少する。",
+    "icon": "None",
+    "name": "スピリットボム",
+    "variables": []
+   },
+   "apiName": "DA_18_Ahri",
+   "characterName": "DA_18_Ahri",
+   "cost": 4,
+   "icon": "assets/characters/tft18_ahri/skins/base/images/tft18_ahri_splash_centered_27.tex",
+   "name": "アーリ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_ahri/skins/base/images/tft18_ahri_splash_tile_27.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 850,
+    "initialMana": 20,
+    "magicResist": 40,
+    "mana": 100,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_ahri/tft18_ahri_square.tex",
+   "traits": [
+    "ブロッサム",
+    "スペルウィーバー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "最も敵の数が多い直線上に向かって貫通する矢を放ち、@PhysicalDamageCalc1@%i:scaleAD%の物理ダメージを与える。このダメージは敵に命中するたびに@DamageFalloffPerEnemy@ずつ減少する(最小@MinDamagePercent@)。\r\\n\r\\n矢が@RiftDuration@秒間軌跡を残す。軌跡の中の敵に@PhysicalDamageCalc2@%i:scaleAD%%i:scaleAP% + 最大体力の@MaxHealthDamagePerSecond@にあたる物理ダメージを毎秒与え、@ChillPercent@%の<Keyword>スロウ効果</Keyword>を付与する。\r\\n\r\\n<Rules>スロウ効果: 攻撃速度が低下する。</Rules>",
+    "icon": "None",
+    "name": "精霊の裂け目",
+    "variables": []
+   },
+   "apiName": "DA_18_Ashe",
+   "characterName": "DA_18_Ashe",
+   "cost": 5,
+   "icon": "assets/characters/tft18_ashe/skins/base/images/tft18_ashe_splash_centered_76.tex",
+   "name": "アッシュ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_ashe/skins/base/images/tft18_ashe_splash_tile_76.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 75,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 80,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_ashe/tft18_ashe_square.tex",
+   "traits": [
+    "ブロッサム",
+    "ハンター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "蜘蛛に変身し、最大体力が@SpiderHealthBuff@増加する。蜘蛛形態での通常攻撃は@MagicDamageCalc1@%i:scaleAP%の追加魔法ダメージを与え、自身を@HealthCalc1@%i:scaleAP%回復させる。その後の発動で、@ASBuffDuration@秒間、攻撃速度が@DecayingAS@増加する。この効果は徐々に減衰する。",
+    "icon": "None",
+    "name": "蜘蛛の女帝",
+    "variables": []
+   },
+   "apiName": "DA_18_Elise",
+   "characterName": "DA_18_Elise",
+   "cost": 2,
+   "icon": "assets/characters/tft18_elise/skins/base/images/tft18_elise_splash_centered_24.tex",
+   "name": "エリス",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_elise/skins/base/images/tft18_elise_splash_tile_24.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.6499999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 20,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 70,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_elise/tft18_elise_square.tex",
+   "traits": [
+    "魔女",
+    "ヴァンガード"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果: </Bright>通常攻撃が3回ごとに「ヘッドショット」に置き換わり、@PhysicalDamageCalc1@%i:scaleAD%%i:scaleAP%の物理ダメージを与える。",
+    "icon": "None",
+    "name": "ヘッドショット",
+    "variables": []
+   },
+   "apiName": "DA_18_Caitlyn",
+   "characterName": "DA_18_Caitlyn",
+   "cost": 2,
+   "icon": "assets/characters/tft18_caitlyn/skins/base/images/tft18_caitlyn_splash_centered_30.tex",
+   "name": "ケイトリン",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_caitlyn/skins/base/images/tft18_caitlyn_splash_tile_30.tex",
+   "stats": {
+    "armor": 30,
+    "attackSpeed": 0.699999988079071,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 550,
+    "initialMana": 0,
+    "magicResist": 30,
+    "mana": 3,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_caitlyn/tft18_caitlyn_square.tex",
+   "traits": [
+    "魔女",
+    "ハンター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "対象と最も近い毒を受けていない敵を毒状態にし、@Duration@秒かけて@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。毒はスタックする。",
+    "icon": "None",
+    "name": "ノクサスブラスト",
+    "variables": []
+   },
+   "apiName": "DA_18_Cassiopeia",
+   "characterName": "DA_18_Cassiopeia",
+   "cost": 3,
+   "icon": "assets/characters/tft18_cassiopeia/skins/base/images/tft18_cassiopeia_splash_centered_18.tex",
+   "name": "カシオペア",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_cassiopeia/skins/base/images/tft18_cassiopeia_splash_tile_18.tex",
+   "stats": {
+    "armor": 35,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 30,
+    "hp": 650,
+    "initialMana": 0,
+    "magicResist": 35,
+    "mana": 30,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_cassiopeia/tft18_cassiopeia_square.tex",
+   "traits": [
+    "魔女",
+    "スペルウィーバー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果: </bright>@Omnivamp@のオムニヴァンプを獲得する。\r\\n\r\\n<bright>発動効果: </bright>付近の敵@NumEnemiesCursed@体に闇の波動を放ち、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与えて、@SpellDuration@秒間呪いをかける。その後、同じ時間、@HexRangeAOE@マスの衰弱ゾーンを発生させ、毎秒@MagicDamageCalc2@%i:scaleAP%の魔法ダメージを与える。呪われた敵は、呪われるたびに受けるダメージが@MagicDamageCalc3@%i:scaleAP%増加する。",
+    "icon": "None",
+    "name": "衰弱の呪い",
+    "variables": []
+   },
+   "apiName": "DA_18_Morgana",
+   "characterName": "DA_18_Morgana",
+   "cost": 4,
+   "icon": "assets/characters/tft18_morgana/skins/base/images/tft18_morgana_splash_centered_26.tex",
+   "name": "モルガナ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_morgana/skins/base/images/tft18_morgana_splash_tile_26.tex",
+   "stats": {
+    "armor": 60,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 45,
+    "hp": 1100,
+    "initialMana": 0,
+    "magicResist": 60,
+    "mana": 65,
+    "range": 2
+   },
+   "tileIcon": "assets/characters/tft18_morgana/tft18_morgana_square.tex",
+   "traits": [
+    "魔女",
+    "インヴォーカー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@ShieldDuration@秒間シールドを@ShieldCalc1@%i:scaleAP%獲得する。その後、この戦闘で最も多くのダメージを与えた味方に、@AttackSpeedDuration@秒間、徐々に減少する攻撃速度を@AttackSpeedCalc1@%i:scaleAP%付与する。 ",
+    "icon": "None",
+    "name": "魅惑の舞踊",
+    "variables": []
+   },
+   "apiName": "DA_18_Rakan",
+   "characterName": "DA_18_Rakan",
+   "cost": 1,
+   "icon": "assets/characters/tft18_rakan/skins/base/images/tft18_rakan_splash_centered_9.tex",
+   "name": "ラカン",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_rakan/skins/base/images/tft18_rakan_splash_tile_9.tex",
+   "stats": {
+    "armor": 35,
+    "attackSpeed": 0.6000000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 45,
+    "hp": 700,
+    "initialMana": 35,
+    "magicResist": 35,
+    "mana": 105,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_rakan/tft18_rakan_square.tex",
+   "traits": [
+    "フェイ",
+    "ジャガーノート",
+    "ヴァンガード"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "体力を@HealthCalc1@%i:scaleAP%回復し、近くの敵に@NumEnemiesToFireAt@匹の蝶を放つ。命中した敵に@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与え、@SleepDuration@秒間、睡眠状態にする。対象は@DamageNeededToAwaken@のダメージを受けると眠りから覚め、追加で最大体力の@WakeupDamage@の魔法ダメージを受ける。",
+    "icon": "None",
+    "name": "夢見の子守唄",
+    "variables": []
+   },
+   "apiName": "DA_18_Lillia",
+   "characterName": "DA_18_Lillia",
+   "cost": 4,
+   "icon": "assets/characters/tft18_lillia/skins/base/images/tft18_lillia_splash_centered_28.tex",
+   "name": "リリア",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lillia/skins/base/images/tft18_lillia_splash_tile_28.tex",
+   "stats": {
+    "armor": 60,
+    "attackSpeed": 0.6499999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 1300,
+    "initialMana": 40,
+    "magicResist": 60,
+    "mana": 140,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_lillia/tft18_lillia_square.tex",
+   "traits": [
+    "フェイ",
+    "ディフェンダー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@Duration@秒間かけて体力を@HealthCalc1@%i:scaleHealth%%i:scaleAP%回復する。次の通常攻撃がバッシュになり、@MagicDamageCalc1@%i:scaleHealth%%i:scaleAP%の魔法ダメージを与える。",
+    "icon": "None",
+    "name": "命のダンス",
+    "variables": [
+     {
+      "name": "PermanentHealthPerInterest",
+      "value": [
+       30,
+       10,
+       12,
+       20,
+       30,
+       30,
+       30
+      ]
+     },
+     {
+      "name": "Duration",
+      "value": [
+       2,
+       2,
+       2,
+       2,
+       2,
+       2,
+       2
+      ]
+     },
+     {
+      "name": "Heal",
+      "value": [
+       60,
+       350,
+       400,
+       475,
+       100,
+       110,
+       120
+      ]
+     },
+     {
+      "name": "DamageHPPercent",
+      "value": [
+       0.15000000596046448,
+       0.15000000596046448,
+       0.15000000596046448,
+       0.15000000596046448,
+       0.15000000596046448,
+       0.15000000596046448,
+       0.15000000596046448
+      ]
+     },
+     {
+      "name": "HRHealthPerRound",
+      "value": [
+       15,
+       60,
+       80,
+       200,
+       15,
+       15,
+       15
+      ]
+     }
+    ]
+   },
+   "apiName": "DA_18_Kobuko",
+   "characterName": "DA_18_Kobuko",
+   "cost": 1,
+   "icon": "{7ae9d8870aed1489}",
+   "name": "コブコ",
+   "role": "APTank",
+   "squareIcon": "assets/characters/tft18_kobuko/skins/base/images/tft18_kobuko_splash_tile_2.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.6499999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 55,
+    "hp": 700,
+    "initialMana": 30,
+    "magicResist": 40,
+    "mana": 90,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_kobuko/tft18_kobuko_square.tex",
+   "traits": [
+    "スプライキン",
+    "ブローラー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "最も近くにいる@NumEnemiesHit@体の敵に、@MagicDamageCalc1@ %i:scaleAP%の魔法ダメージを与えるキノコの塊を2つ投げつける。その後、巨大なキノコを投げつけ、対象に@MagicDamageCalc2@%i:scaleAP%の魔法ダメージを与える。\r\\n\r\\nスキルを使用するたびに@PercentChanceOfForage@の確率で追加のキノコを採集でき、拾うとボーナス効果を獲得する。\r\\n\r\\n<bright>赤:</bright> リロール@RedRerolls@回<Rules>(赤キノコ: </Rules>@Stack@<Rules>個)</Rules>\r\\n<bright>緑:</bright> タクティシャンの体力@GreenHealth@<Rules>(緑キノコ:</Rules> @GenericCalc1@<Rules>個)</Rules>\r\\n<bright>黄:</bright> @YellowXP@XP<Rules>(黄キノコ:</Rules> @GenericCalc2@<Rules>個)</Rules>",
+    "icon": "None",
+    "name": "ファンガス アマング アス",
+    "variables": []
+   },
+   "apiName": "DA_18_Teemo",
+   "characterName": "DA_18_Teemo",
+   "cost": 2,
+   "icon": "{9d832f70c923aaf6}",
+   "name": "ティーモ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_teemo/skins/base/images/tft18_teemo_splash_tile_0.tex",
+   "stats": {
+    "armor": 30,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 35,
+    "hp": 550,
+    "initialMana": 0,
+    "magicResist": 30,
+    "mana": 50,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_teemo/tft18_teemo_square.tex",
+   "traits": [
+    "スプライキン",
+    "インヴォーカー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "敵を挑発して、このチャンピオンを攻撃させる。@Duration@秒間、@ShieldCalc1@%i:scaleAP%のシールドと@ArmorMR@の物理防御および魔法防御を獲得する。\r\\n\r\\nシールドが破壊されると、@DamageHexRange@マス以内の敵に@PhysicalDamageCalc1@%i:scaleArmor%%i:scaleMR%の物理ダメージを与える。",
+    "icon": "None",
+    "name": "かたくなる",
+    "variables": []
+   },
+   "apiName": "DA_18_Rammus",
+   "characterName": "DA_18_Rammus",
+   "cost": 3,
+   "icon": "assets/characters/tft18_rammus/skins/base/images/tft18_rammus_splash_centered_26.tex",
+   "name": "ラムス",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_rammus/skins/base/images/tft18_rammus_splash_tile_26.tex",
+   "stats": {
+    "armor": 50,
+    "attackSpeed": 0.6000000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 1100,
+    "initialMana": 30,
+    "magicResist": 50,
+    "mana": 80,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_rammus/tft18_rammus_square.tex",
+   "traits": [
+    "スプライキン",
+    "ディフェンダー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果:</Bright>毎秒@RagePerSecond@の「怒り」を獲得し、通常攻撃ごとに@RagePerAttack@の「怒り」を獲得する。\r\\n\r\\n<Bright>発動効果:</Bright>メガナーに変身し、@TransformSearchRadius@マス以内の敵の最も大きな集団に向かってリープする。その後、@TransformHexRadius@マス以内の敵に@PhysicalDamageCalc3@%i:scaleAD%の物理ダメージを与えて、対象の物理防御と魔法防御を@GenericCalc1@%i:scaleAP%低下させ、@StunDuration@秒間スタンさせる。メガナーの体力が@HealthCalc1@増加し、スキルが「掴んでぽいっ」に変化する。\r\\n\r\\n<Bright>掴んでぽいっ: </Bright>対象を最も遠くにいる敵に投げつけ、@PhysicalDamageCalc1@%i:scaleAD%の物理ダメージを与える。通り道にいた敵には@PhysicalDamageCalc2@%i:scaleAD%の物理ダメージを与える。敵が残り1体の場合は、代わりにその敵をフィールド外に投げ飛ばす。",
+    "icon": "None",
+    "name": "ぷんすこ",
+    "variables": []
+   },
+   "apiName": "DA_18_GnarSmall",
+   "characterName": "DA_18_GnarSmall",
+   "cost": 5,
+   "icon": "assets/characters/tft18_gnar/skins/base/images/tft18_gnar_splash_centered_0.tex",
+   "name": "ナー",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_gnar/skins/base/images/tft18_gnar_splash_tile_0.tex",
+   "stats": {
+    "armor": 55,
+    "attackSpeed": 0.8999999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 100,
+    "hp": 900,
+    "initialMana": 0,
+    "magicResist": 55,
+    "mana": 70,
+    "range": 2
+   },
+   "tileIcon": "assets/characters/tft18_gnar/tft18_gnar_square.tex",
+   "traits": [
+    "エルダーウッド",
+    "スプライキン",
+    "ブローラー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "対象に@Duration@秒間持続する「ヨードルグレネード」を貼り付ける。発動中は射程が無限になり、攻撃速度が@AttackSpeedCalc1@ %i:scaleAP%増加する。効果時間が終了するとグレネードが爆発し、2マス以内のすべての敵にダメージを分散して与え、@PhysicalDamageCalc1@ %i:scaleAD%の物理ダメージ + 詠唱中の通常攻撃1回ごとに@PhysicalDamageCalc2@ %i:scaleAD%のダメージを与える。\r\\n\r\\n<Rules>「ヨードルグレネード」が付与された敵が倒されると、トリスターナの新たな対象に付着する。</Rules>",
+    "icon": "assets/characters/tft18_tristana/hud/icons2d/tft18_tristana_e.tex",
+    "name": "ヨードルグレネード",
+    "variables": []
+   },
+   "apiName": "DA_18_Tristana",
+   "characterName": "DA_18_Tristana",
+   "cost": 3,
+   "icon": "assets/characters/tft18_tristana/skins/base/images/tft18_tristana_splash_centered_61.tex",
+   "name": "トリスターナ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_tristana/skins/base/images/tft18_tristana_splash_tile_61.tex",
+   "stats": {
+    "armor": 35,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 55,
+    "hp": 650,
+    "initialMana": 0,
+    "magicResist": 35,
+    "mana": 60,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_tristana/tft18_tristana_square.tex",
+   "traits": [
+    "フェイ",
+    "スプライキン",
+    "ハンター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "現在の対象に@PhysicalDamageCalc1@ %i:scaleAD%%i:scaleAP%の物理ダメージを与える巨大なクロスブレードを投げる。クロスブレードは周囲の敵の間を@NumBounces@回跳ね返り、跳ね返るたびに@PhysicalDamageCalc2@ %i:scaleAD%%i:scaleAP%の物理ダメージを与える。これで敵をキルすると、追加で@BonusKillBounces@回跳ね返る。",
+    "icon": "None",
+    "name": "ブーメランブレード",
+    "variables": []
+   },
+   "apiName": "DA_18_Sivir",
+   "characterName": "DA_18_Sivir",
+   "cost": 4,
+   "icon": "assets/characters/tft18_sivir/skins/base/images/tft18_sivir_splash_centered_61.tex",
+   "name": "シヴィア",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_sivir/skins/base/images/tft18_sivir_splash_tile_61.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 850,
+    "initialMana": 0,
+    "magicResist": 40,
+    "mana": 40,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_sivir/tft18_sivir_square.tex",
+   "traits": [
+    "プライマル",
+    "ハンター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果:</bright> 通常攻撃時に体力を@HealthCalc1@ %i:scaleHealth%回復する。\r\\n\r\\n<bright>発動効果:</bright> 野生の雄叫びをあげ、体力を@HealthCalc3@ %i:scaleAP%回復する。その後@SpellDuration@秒間、攻撃速度が@SpellAS@、耐久力が@SpellDurability@増加し、アンストッパブル状態になる。",
+    "icon": "None",
+    "name": "激情の拳",
+    "variables": []
+   },
+   "apiName": "DA_Vi18",
+   "characterName": "DA_Vi18",
+   "cost": 3,
+   "icon": "assets/characters/tft18_vi/skins/base/images/tft18_vi_splash_centered_39.tex",
+   "name": "ヴァイ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_vi/skins/base/images/tft18_vi_splash_tile_39.tex",
+   "stats": {
+    "armor": 50,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 45,
+    "hp": 1100,
+    "initialMana": 0,
+    "magicResist": 50,
+    "mana": 60,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_vi/tft18_vi_square.tex",
+   "traits": [
+    "プライマル",
+    "ジャガーノート"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>アダプター</Bright>%i:scaleAD%<Bright>: </Bright>対象に大量のクナイを飛ばし、@PhysicalDamageCalc1@%i:scaleAD%%i:scaleAP%の物理ダメージを与える。対象が<keyword>炎上</keyword>状態の場合、追加で@PhysicalDamageCalc2@%i:scaleAD%のダメージを与える。\r\\n\r\\n<dim>アダプター</dim>%i:scaleAP%<dim>: このスキルでキルすると、再発動する。</dim>",
+    "icon": "None",
+    "name": "苦無撃",
+    "variables": []
+   },
+   "apiName": "DA_18_Akali_AD",
+   "characterName": "DA_18_Akali_AD",
+   "cost": 1,
+   "icon": "assets/characters/tft18_akali/skins/base/images/tft18_akali_splash_centered_2.tex",
+   "name": "アカリ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_akali/skins/base/images/tft18_akali_splash_tile_2.tex",
+   "stats": {
+    "armor": 35,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 650,
+    "initialMana": 0,
+    "magicResist": 35,
+    "mana": 25,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_akali/tft18_akali_square.tex",
+   "traits": [
+    "インフェルノ",
+    "アダプター",
+    "ラヴィジャー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "力を溜めた後、対象と直線上の最も敵の数が多い方向に矢を放つ。命中した敵に@PhysicalDamageCalc1@ %i:scaleAD%%i:scaleAP%の物理ダメージを与える。このダメージは敵に触れるたびに@DamageReductionPerHit@減少する(最小@MinDamagePercent@)。",
+    "icon": "None",
+    "name": "乾坤一擲",
+    "variables": []
+   },
+   "apiName": "DA_18_Varus",
+   "characterName": "DA_18_Varus",
+   "cost": 1,
+   "icon": "assets/characters/tft18_varus/skins/base/images/tft18_varus_splash_centered_9.tex",
+   "name": "ヴァルス",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_varus/skins/base/images/tft18_varus_splash_tile_9.tex",
+   "stats": {
+    "armor": 25,
+    "attackSpeed": 0.699999988079071,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 500,
+    "initialMana": 30,
+    "magicResist": 25,
+    "mana": 120,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_varus/tft18_varus_square.tex",
+   "traits": [
+    "インフェルノ",
+    "ラピッドファイア"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果: </Bright>毎秒、体力を@HealthCalc1@%i:scaleAP%%i:scaleHealth%回復し、@PassiveHexRadius@マス以内の敵に@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。\r\\n\r\\n<Bright>発動効果: </Bright>@BigHexRadius@マス以内の敵に@MagicDamageCalc3@%i:scaleAP%の魔法ダメージを与え、@StunDuration@秒間スタンさせる。対象が<Keyword>炎上</Keyword>状態の場合、効果時間が@GenericCalc1@秒に増加する。\r\\n\r\\n<Rules>炎上: 対象の最大体力に応じた割合の確定ダメージを毎秒与える。</Rules>",
+    "icon": "None",
+    "name": "だだっこ",
+    "variables": []
+   },
+   "apiName": "DA_Amumu18",
+   "characterName": "DA_Amumu18",
+   "cost": 4,
+   "icon": "assets/characters/tft18_amumu/skins/base/images/tft18_amumu_splash_centered_17.tex",
+   "name": "アムム",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_amumu/skins/base/images/tft18_amumu_splash_tile_17.tex",
+   "stats": {
+    "armor": 60,
+    "attackSpeed": 0.699999988079071,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 70,
+    "hp": 1300,
+    "initialMana": 30,
+    "magicResist": 60,
+    "mana": 125,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_amumu/tft18_amumu_square.tex",
+   "traits": [
+    "インフェルノ",
+    "ジャガーノート"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "チャージを行い、<Keyword>燃焼</Keyword>状態の敵1体ごとに@APPerBurningEnemy@の魔力を獲得する。その後、@ShieldDuration@秒間、耐久値@ShieldCalc1@%i:scaleAP%のシールドを獲得し、近くにいる敵集団の間を走り抜けて、それぞれの敵に@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。\r\\n\r\\n走り抜けた後、@FirestormHexRadius@マスの火炎嵐を発生させ、@FirestormDuration@秒かけて、命中したすべての敵に合計@MagicDamageCalc2@%i:scaleAP%の魔法ダメージを分散して与える。",
+    "icon": "None",
+    "name": "ファイアストーム",
+    "variables": []
+   },
+   "apiName": "DA_18_Kennen",
+   "characterName": "DA_18_Kennen",
+   "cost": 5,
+   "icon": "assets/characters/tft18_kennen/skins/base/images/tft18_kennen_splash_centered_8.tex",
+   "name": "ケネン",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_kennen/skins/base/images/tft18_kennen_splash_tile_8.tex",
+   "stats": {
+    "armor": 60,
+    "attackSpeed": 0.8500000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 1200,
+    "initialMana": 0,
+    "magicResist": 60,
+    "mana": 40,
+    "range": 2
+   },
+   "tileIcon": "assets/characters/tft18_kennen/tft18_kennen_square.tex",
+   "traits": [
+    "インフェルノ",
+    "エクセキューショナー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "セヴェラムを装備し、@Duration@秒かけて対象を@GenericCalc1@%i:scaleAS%回斬りつける。各攻撃は@PhysicalDamageCalc1@%i:scaleAD%の物理ダメージを与える。\r\\n\r\\n猛攻撃の終了後、爆風を放ち、半径2マス以内のすべての敵に@PhysicalDamageCalc2@%i:scaleAD%%i:scaleAP%の物理ダメージを分散して与える。",
+    "icon": "None",
+    "name": "月光の猛攻撃",
+    "variables": []
+   },
+   "apiName": "DA_18_Aphelios",
+   "characterName": "DA_18_Aphelios",
+   "cost": 4,
+   "icon": "assets/characters/tft18_aphelios/skins/base/images/tft18_aphelios_splash_centered_0.tex",
+   "name": "アフェリオス",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_aphelios/skins/base/images/tft18_aphelios_splash_tile_0.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 60,
+    "hp": 850,
+    "initialMana": 20,
+    "magicResist": 40,
+    "mana": 70,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_aphelios/tft18_aphelios_square.tex",
+   "traits": [
+    "ルナー",
+    "ラピッドファイア"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@ShieldDuration@秒間、耐久値@ShieldCalc1@のシールドを獲得し、2マス以内の敵に@NumOrbs@個の月光のオーブを分散して送り出す。オーブはそれぞれ@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。 ",
+    "icon": "None",
+    "name": "蒼白のバリア",
+    "variables": []
+   },
+   "apiName": "DA_18_Diana",
+   "characterName": "DA_18_Diana",
+   "cost": 3,
+   "icon": "assets/characters/tft18_diana/skins/base/images/tft18_diana_splash_centered_0.tex",
+   "name": "ダイアナ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_diana/skins/base/images/tft18_diana_splash_tile_0.tex",
+   "stats": {
+    "armor": 50,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 30,
+    "hp": 850,
+    "initialMana": 0,
+    "magicResist": 50,
+    "mana": 30,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_diana/tft18_diana_square.tex",
+   "traits": [
+    "ルナー",
+    "ラヴィジャー",
+    "ヴァンガード"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@NumEnemies@最も近い敵に@NumMoonshards@個の月の破片を降らせ、それぞれに@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。\r\\n\r\\n満月の場合、代わりに月を盤上に落とし、すべての敵に分割して@MagicDamageCalc2@%i:scaleAP%の魔法ダメージを与える。",
+    "icon": "None",
+    "name": "崩月",
+    "variables": [
+     {
+      "name": "MagicDamage",
+      "value": [
+       0,
+       380,
+       570,
+       900,
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "name": "ShredDuration",
+      "value": [
+       6,
+       6,
+       6,
+       6,
+       6,
+       6,
+       6
+      ]
+     },
+     {
+      "name": "ShredPercent",
+      "value": [
+       20,
+       20,
+       20,
+       20,
+       20,
+       20,
+       20
+      ]
+     },
+     {
+      "name": "PrimaryMagicDamage",
+      "value": [
+       0,
+       160,
+       240,
+       380,
+       0,
+       0,
+       0
+      ]
+     },
+     {
+      "name": "AttackSpeed",
+      "value": [
+       0.4000000059604645,
+       0.20000000298023224,
+       0.25,
+       0.30000001192092896,
+       0.4000000059604645,
+       0.4000000059604645,
+       0.4000000059604645
+      ]
+     },
+     {
+      "name": "AttackSpeedDuration",
+      "value": [
+       5,
+       5,
+       5,
+       5,
+       5,
+       5,
+       5
+      ]
+     }
+    ]
+   },
+   "apiName": "DA_18_Alune",
+   "characterName": "DA_18_Alune",
+   "cost": 5,
+   "icon": "{8dc562676f27747d}",
+   "name": "アルーン",
+   "role": "APCaster",
+   "squareIcon": "assets/characters/tft18_alune/skins/base/images/tft18_alune_splash_tile_15.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 0,
+    "magicResist": 45,
+    "mana": 35,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_alune/hud/tft18_alune_square.tex",
+   "traits": [
+    "同調",
+    "ルナー",
+    "スペルウィーバー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果: </Bright>戦闘開始時に@GenericCalc1@%i:scaleAP%の追加物理防御と魔法防御を獲得する。この効果は@DecayDuration@秒かけて減衰する。\r\\n\r\\n<Bright>発動効果: </Bright>現在の対象をバッシュして@MagicDamageCalc1@%i:scaleArmor%の魔法ダメージを与え、@StunDuration@秒間スタンさせる。",
+    "icon": "None",
+    "name": "シールドバッシュ",
+    "variables": []
+   },
+   "apiName": "DA_18_Leona",
+   "characterName": "DA_18_Leona",
+   "cost": 1,
+   "icon": "assets/characters/tft18_leona/skins/base/images/tft18_leona_splash_centered_10.tex",
+   "name": "レオナ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_leona/skins/base/images/tft18_leona_splash_tile_10.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.6499999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 750,
+    "initialMana": 30,
+    "magicResist": 40,
+    "mana": 90,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_leona/tft18_leona_square.tex",
+   "traits": [
+    "ソーラー",
+    "ディフェンダー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果: </Bright>ケイルが自身のスターレベルに応じて「超越」し、スタックするボーナスを獲得する。\r\\n\r\\n<Bright>1回目の超越: </Bright>通常攻撃が@MagicDamageCalc1@%i:scaleAP%の追加魔法ダメージを与える。\r\\n<Bright>2回目の超越: </Bright>通常攻撃が命中した敵に@ShredDuration@秒間、@ShredLevel@%の<Keyword>細断</Keyword>を付与する。\r\\n<Bright>3回目の超越: </Bright>通常攻撃が波動を放ち、命中した他の全ユニットに@MagicDamageCalc2@%i:scaleAP%の魔法ダメージを与える。\r\\n<Bright>4回目の超越: </Bright>射程が無限になる。@NumAttacksForBigWave4Star@回おきに波動が大幅に広がる。\r\\n\r\\n<Rules>細断: 魔法防御を低下させる</Rules>",
+    "icon": "None",
+    "name": "太陽の審判",
+    "variables": []
+   },
+   "apiName": "DA_18_Kayle",
+   "characterName": "DA_18_Kayle",
+   "cost": 2,
+   "icon": "assets/characters/tft18_kayle/skins/base/images/tft18_kayle_splash_centered_42.tex",
+   "name": "ケイル",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_kayle/skins/base/images/tft18_kayle_splash_tile_42.tex",
+   "stats": {
+    "armor": 30,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": null,
+    "hp": 550,
+    "initialMana": 0,
+    "magicResist": 30,
+    "mana": 0,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_kayle/tft18_kayle_square.tex",
+   "traits": [
+    "ソーラー",
+    "ラピッドファイア"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@ShieldDuration@秒間、耐久値@ShieldCalc1@ %i:scaleHealth%%i:scaleAP%のシールドを獲得する。その後、扇形範囲を斬りつけて@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与え、さらに直線上を攻撃して命中した敵に@MagicDamageCalc2@%i:scaleAP%の魔法ダメージを与える。",
+    "icon": "None",
+    "name": "太陽の怒り",
+    "variables": []
+   },
+   "apiName": "DA_18_Sejuani",
+   "characterName": "DA_18_Sejuani",
+   "cost": 2,
+   "icon": "assets/characters/tft18_sejuani/skins/base/images/tft18_sejuani_splash_centered_26.tex",
+   "name": "セジュアニ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_sejuani/skins/base/images/tft18_sejuani_splash_tile_26.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.6000000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 900,
+    "initialMana": 40,
+    "magicResist": 45,
+    "mana": 100,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_sejuani/tft18_sejuani_square.tex",
+   "traits": [
+    "ソーラー",
+    "ジャガーノート"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@LeapRangeHexes@マス以内で最も遠い敵に飛びかかり、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。隣接する味方がいない場合、代わりに@MagicDamageCalc2@%i:scaleAP%の魔法ダメージを与え、マナを@IsolateManaGrant@獲得する。{Augment.Variant.RivalsAugment.AbilityTooltip}",
+    "icon": "None",
+    "name": "甘美なる恐怖",
+    "variables": []
+   },
+   "apiName": "DA_18_KhaZix",
+   "characterName": "DA_18_KhaZix",
+   "cost": 3,
+   "icon": "assets/characters/tft18_khazix/skins/base/images/tft18_khazix_splash_centered_0.tex",
+   "name": "カ＝ジックス",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_khazix/skins/base/images/tft18_khazix_splash_tile_0.tex",
+   "stats": {
+    "armor": 55,
+    "attackSpeed": 0.8500000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 950,
+    "initialMana": 0,
+    "magicResist": 55,
+    "mana": 25,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_khazix/tft18_khazix_square.tex",
+   "traits": [
+    "ライバル"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@JumpHexRange@マス以内で体力の割合が最も低い敵に跳びかかって突き刺し、@PhysicalDamageCalc1@%i:scaleAD%の物理ダメージを与える。その後、体力を@HealthCalc1@%i:scaleAP%回復する。この効果は対象の減少体力に応じて最大@HealthCalc2@%i:scaleAP%まで増加する。{Augment.Variant.RivalsAugment.AbilityTooltip}",
+    "icon": "None",
+    "name": "逆上",
+    "variables": []
+   },
+   "apiName": "DA_18_Rengar",
+   "characterName": "DA_18_Rengar",
+   "cost": 3,
+   "icon": "assets/characters/tft18_rengar/skins/base/images/tft18_rengar_splash_centered_0.tex",
+   "name": "レンガー",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_rengar/skins/base/images/tft18_rengar_splash_tile_0.tex",
+   "stats": {
+    "armor": 55,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 60,
+    "hp": 900,
+    "initialMana": 10,
+    "magicResist": 55,
+    "mana": 50,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_rengar/tft18_rengar_square.tex",
+   "traits": [
+    "ライバル"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>アダプター</Bright> %i:scaleAD%<Bright>:</Bright> 対象とその最も近くにいる他の敵に酸を発射し、@PhysicalDamageCalc1@%i:scaleAD%%i:scaleAP%の物理ダメージを与える。最大体力が@ADBonusDamageThreshold@未満の敵には、代わりに@PhysicalDamageCalc2@%i:scaleAD%%i:scaleAP%の物理ダメージを与える。\r\\n\r\\n<dim>アダプター</dim>%i:scaleAP%<dim>: 敵に継続ダメージを与える。</dim>",
+    "icon": "None",
+    "name": "雨の空撃砲",
+    "variables": []
+   },
+   "apiName": "DA_KogMaw18_AD",
+   "characterName": "DA_KogMaw18_AD",
+   "cost": 3,
+   "icon": "assets/characters/tft18_kogmaw/skins/base/images/tft18_kogmaw_splash_centered_3.tex",
+   "name": "コグ＝マウ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_kogmaw/skins/base/images/tft18_kogmaw_splash_tile_3.tex",
+   "stats": {
+    "armor": 35,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 650,
+    "initialMana": 15,
+    "magicResist": 35,
+    "mana": 55,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_kogmaw/tft18_kogmaw_square.tex",
+   "traits": [
+    "腐敗",
+    "アダプター",
+    "インヴォーカー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "フィールドに@NumPlantsToSpawn@本の植物を出現させ、最も近くにいる敵を@ThornSpitterNumAttacks@回攻撃させる。各攻撃は@MagicDamageCalc1@ %i:scaleAP%の魔法ダメージを与える。 ",
+    "icon": "None",
+    "name": "狂い咲き",
+    "variables": []
+   },
+   "apiName": "DA_18_Zyra",
+   "characterName": "DA_18_Zyra",
+   "cost": 4,
+   "icon": "assets/characters/tft18_zyra/skins/base/images/tft18_zyra_splash_centered_0.tex",
+   "name": "ザイラ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_zyra/skins/base/images/tft18_zyra_splash_tile_0.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 850,
+    "initialMana": 0,
+    "magicResist": 40,
+    "mana": 45,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_zyra/tft18_zyra_square.tex",
+   "traits": [
+    "ソーンメイデン",
+    "サモナー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "最も近くにいる敵@NumTargets@体の魔法防御を@MRReduction@低下させる。その後、@CastDuration@秒かけて対象の生命力を吸収し、自身は@HealthCalc1@%i:scaleAP%の体力を回復して、それぞれの対象に@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。",
+    "icon": "None",
+    "name": "収穫",
+    "variables": []
+   },
+   "apiName": "DA_Fiddlesticks18",
+   "characterName": "DA_Fiddlesticks18",
+   "cost": 3,
+   "icon": "assets/characters/tft18_fiddlesticks/skins/base/images/tft18_fiddlesticks_splash_centered_46.tex",
+   "name": "フィドルスティックス",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_fiddlesticks/skins/base/images/tft18_fiddlesticks_splash_tile_46.tex",
+   "stats": {
+    "armor": 55,
+    "attackSpeed": 0.6499999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 1000,
+    "initialMana": 30,
+    "magicResist": 55,
+    "mana": 90,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_fiddlesticks/tft18_fiddlesticks_square.tex",
+   "traits": [
+    "フローラ・ファターリス",
+    "ディフェンダー",
+    "スペルウィーバー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "現在の対象に星を降らせ、@MagicDamageCalc1@ %i:scaleAP%の魔法ダメージを与える。その対象にすでに星が降っていた場合は追加で星を@NumAdditionalStars@個降らせ、それぞれ@MagicDamageCalc2@ %i:scaleAP%の魔法ダメージを与える。",
+    "icon": "None",
+    "name": "星のささやき",
+    "variables": []
+   },
+   "apiName": "DA_18_Soraka",
+   "characterName": "DA_18_Soraka",
+   "cost": 4,
+   "icon": "assets/characters/tft18_soraka/skins/base/images/tft18_soraka_splash_centered_53.tex",
+   "name": "ソラカ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_soraka/skins/base/images/tft18_soraka_splash_tile_53.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 30,
+    "hp": 850,
+    "initialMana": 0,
+    "magicResist": 40,
+    "mana": 30,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_soraka/tft18_soraka_square.tex",
+   "traits": [
+    "フローラ・ファターリス",
+    "エクセキューショナー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果:</Bright> タリックか、そのペアになった味方の体力が初めて@PassivePercentHealthThreshold@を下回ると、両者からエメラルドの気が放たれ、@PassiveHexRadius@マス以内の味方に@PassiveShieldDuration@秒間、耐久値@ShieldCalc1@ %i:scaleHealth%のシールドを付与する。\r\\n\r\\n<Bright>発動効果:</Bright> 体力を@HealthCalc1@ %i:scaleAP%回復する。タリックおよびそのペアになった味方は、次の通常攻撃@NumAttacks@回の間、@MagicDamageCalc1@ %i:scaleAP%の追加魔法ダメージを獲得する。",
+    "icon": "None",
+    "name": "エメラルド レディアンス",
+    "variables": []
+   },
+   "apiName": "DA_Taric18",
+   "characterName": "DA_Taric18",
+   "cost": 5,
+   "icon": "assets/characters/tft18_taric/skins/base/images/tft18_taric_splash_centered_1.tex",
+   "name": "タリック",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_taric/skins/base/images/tft18_taric_splash_tile_1.tex",
+   "stats": {
+    "armor": 65,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 55,
+    "hp": 1300,
+    "initialMana": 0,
+    "magicResist": 65,
+    "mana": 65,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_taric/tft18_taric_square.tex",
+   "traits": [
+    "エメラルドの神髄",
+    "ヴァンガード"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果:</bright> このスキルによるシールドは、<Keyword>「正確無比」</Keyword>でクリティカルが発生する。\r\\n\r\\n<bright>発動効果: </bright>@NumAlliesToShield@体の味方に@ShieldDuration@秒間、耐久値@ShieldCalc1@%i:scaleAP%%i:scaleDA%のシールドと@DamageAmpAmount@のダメージ増加を付与する。その後、その味方に隣接する敵に@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。@CastThreshold@回発動するごとに、対象にスタックする攻撃速度を@AttackSpeed@付与する。 ",
+    "icon": "None",
+    "name": "タネバクダン",
+    "variables": []
+   },
+   "apiName": "DA_18_Ivern",
+   "characterName": "DA_18_Ivern",
+   "cost": 5,
+   "icon": "assets/characters/tft18_ivern/skins/base/images/tft18_ivern_splash_centered_0.tex",
+   "name": "アイバーン",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_ivern/skins/base/images/tft18_ivern_splash_tile_0.tex",
+   "stats": {
+    "armor": 55,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 60,
+    "hp": 1000,
+    "initialMana": 50,
+    "magicResist": 55,
+    "mana": 80,
+    "range": 3
+   },
+   "tileIcon": "assets/characters/tft18_ivern/hud/tft18_ivern_square.tex",
+   "traits": [
+    "翠の父"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果: </bright>スキル使用時、ラックスと特性を共有するすべての味方がマナを@ManaCalc1@%i:scaleAP%獲得する。\r\\n\r\\n<bright>発動効果: </bright>最も敵が多い集団に向かってレーザーを発射し、@MagicDamageCalc1@%i:scaleAP%魔法ダメージを与える。命中した敵1体につき、このダメージは@DamageReductionPerUnit@ずつ減少する。",
+    "icon": "None",
+    "name": "ファイナルスパーク",
+    "variables": []
+   },
+   "apiName": "DA_Lux18_Base",
+   "characterName": "DA_Lux18_Base",
+   "cost": 5,
+   "icon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_centered_7.tex",
+   "name": "ラックス",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_tile_7.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 40,
+    "mana": 70,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_lux/tft18_lux_square.tex",
+   "traits": [
+    "アバター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "咆哮をあげて体力を@HealthCalc1@%i:scaleHealth%%i:scaleAP%回復し、行動妨害効果を取り除き、最も残り体力の割合が低い味方2体を@HealthCalc2@ %i:scaleAP%回復させる。その後現在の対象を強打して@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与え、@StunDuration@秒間スタンさせる。",
+    "icon": "None",
+    "name": "戦士の咆哮",
+    "variables": []
+   },
+   "apiName": "DA_18_Alistar",
+   "characterName": "DA_18_Alistar",
+   "cost": 2,
+   "icon": "assets/characters/tft18_alistar/skins/base/images/tft18_alistar_splash_centered_40.tex",
+   "name": "アリスター",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_alistar/skins/base/images/tft18_alistar_splash_tile_40.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.6000000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 950,
+    "initialMana": 30,
+    "magicResist": 45,
+    "mana": 90,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_alistar/tft18_alistar_square.tex",
+   "traits": [
+    "エルダーウッド",
+    "ブローラー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果: </bright>通常攻撃が範囲内のランダムな敵を標的にして「出血」を付与し、@BleedDuration@秒かけて@PhysicalDamageCalc1@%i:scaleAD%の物理ダメージを与える。通常攻撃のたびに@GenericCalc1@%i:scaleAP%の確率で@SpinningAxeDamageRatio@の追加物理ダメージを与え、@SpinningAxeBleedStacks@の「出血」を付与するようになる。\r\\n\r\\n<bright>発動効果:</bright>最も「出血」スタックが多い敵に向かって、巨大な斧を2本投げつける。命中した敵に@PhysicalDamageCalc3@%i:scaleAD%の物理ダメージを与え、「出血」を消費して残りのダメージを即座に与える。その後、両斧は命中した敵に@GenericCalc2@%i:scaleAD%の物理ダメージを与えながら自身の手元に戻る。 ",
+    "icon": "None",
+    "name": "死の車輪",
+    "variables": []
+   },
+   "apiName": "DA_Draven18",
+   "characterName": "DA_Draven18",
+   "cost": 5,
+   "icon": "assets/characters/tft18_draven/skins/base/images/tft18_draven_splash_centered_5.tex",
+   "name": "ドレイヴン",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_draven/skins/base/images/tft18_draven_splash_tile_5.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.8500000238418579,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 48,
+    "hp": 900,
+    "initialMana": 0,
+    "magicResist": 45,
+    "mana": 110,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_draven/tft18_draven_square.tex",
+   "traits": [
+    "バウンティーシーカー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果:</Bright> 通常攻撃が、対象に隣接する敵にも@AttackAoERatio@のダメージを与える。\r\\n\r\\n<Bright>発動効果:</Bright> 無敵となって空中へ飛び上がる。戻ってきた時、すべての敵を@StunDuration@秒間スタンさせ、@Omnivamp@のオムニヴァンプを獲得し、@IgniteDuration@秒間発火状態にする。発火状態の敵は毎秒最大体力の@IgniteMaxHealthDamage@にあたる物理ダメージを受ける。このスキルが「フレイムブレス」に置き換えられ、即座に発動する。\r\\n\r\\n<Bright>フレイムブレス:</Bright> 対象を通る一直線上にいる最も多くの敵に炎を吐き、@PhysicalDamageCalc2@%i:scaleAD%%i:scaleAP%の物理ダメージを与える。炎は敵に命中するたびにダメージが@DamageReductionPerHit@減少する(最小@MinimumDamageThreshold@)。敵を@IgniteDuration@秒間発火状態にさせる。\r\\n\r\\nエルダードラゴンのバフ: 体力が@TraitExecuteThreshold@未満の敵にダメージを与えると、その敵をキルする。",
+    "icon": "None",
+    "name": "比類なき熱",
+    "variables": []
+   },
+   "apiName": "DA_18_ElderDragon",
+   "characterName": "DA_18_ElderDragon",
+   "cost": 5,
+   "icon": "{1ae0a111a91a05ab}",
+   "name": "エルダードラゴン",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_elderdragon/skins/base/images/t_18_elderdragon_teamplannersplash.tex",
+   "stats": {
+    "armor": 75,
+    "attackSpeed": 0.5,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 125,
+    "hp": 1800,
+    "initialMana": 20,
+    "magicResist": 75,
+    "mana": 60,
+    "range": 2
+   },
+   "tileIcon": "assets/characters/tft18_elderdragon/hud/tft18_elderdragon_square.tex",
+   "traits": [
+    "捕食者の頂点",
+    "リフトビースト"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "現在の対象と繋がり、@TetherDuration@秒かけて@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。その後、その対象の周囲に爆発的な力を解き放ち、@AoEHexRange@マス以内のすべての敵に@MagicDamageCalc2@%i:scaleAP%の魔法ダメージを与え、@SlowDuration@秒間@SlowPercent@%の<keyword>スロウ効果</keyword>を付与する。\r\\n\r\\n<Rules>スロウ効果: 攻撃速度が低下する</Rules>",
+    "icon": "None",
+    "name": "カルマの絆",
+    "variables": []
+   },
+   "apiName": "DA_Karma18",
+   "characterName": "DA_Karma18",
+   "cost": 1,
+   "icon": "assets/characters/tft18_karma/skins/base/images/tft18_karma_splash_centered_70.tex",
+   "name": "カルマ",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_karma/skins/base/images/tft18_karma_splash_tile_70.tex",
+   "stats": {
+    "armor": 25,
+    "attackSpeed": 0.699999988079071,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 25,
+    "hp": 500,
+    "initialMana": 0,
+    "magicResist": 25,
+    "mana": 40,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_karma/tft18_karma_square.tex",
+   "traits": [
+    "ブロッサム",
+    "スペルウィーバー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果: </bright>プレイヤーとの戦闘後、最も強いルブランが@PercentChanceToPrint@の確率で盤面にいる味方1体のコピーを作り出す。この確率はテイクダウンごとに@PercentChanceToPrintKillBonus@増加する。\r\\n\r\\n<bright>発動効果: </bright>現在の対象に鏡像を放ち、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与え、隣接する敵には@MagicDamageCalc2@%i:scaleAP%を与える。",
+    "icon": "None",
+    "name": "鏡像",
+    "variables": []
+   },
+   "apiName": "DA_18_LeBlanc",
+   "characterName": "DA_18_LeBlanc",
+   "cost": 2,
+   "icon": "assets/characters/tft18_leblanc/skins/base/images/tft18_leblanc_splash_centered_5.tex",
+   "name": "ルブラン",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_leblanc/skins/base/images/tft18_leblanc_splash_tile_5.tex",
+   "stats": {
+    "armor": 30,
+    "attackSpeed": 0.699999988079071,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 30,
+    "hp": 550,
+    "initialMana": 0,
+    "magicResist": 30,
+    "mana": 40,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_leblanc/tft18_leblanc_square.tex",
+   "traits": [
+    "エルダーウッド",
+    "スペルウィーバー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<Bright>自動効果:</Bright> 通常攻撃が3回ごとに「ダブルストライク」になる。キルまたはアシストを獲得すると、移動速度が大幅に増加する。\r\\n\r\\n<Bright>アダプター</Bright>%i:scaleAD%: 「ダブルストライク」を行うたびに、攻撃速度が@AttackSpeedCalc1@%i:scaleAP%増加するスタックを獲得する。\r\\n\r\\n<dim>アダプター</dim>%i:scaleAP%<dim>: 「ダブルストライク」が追加ダメージを与え、自身の体力を回復する。</dim>",
+    "icon": "None",
+    "name": "ウージュースタイル",
+    "variables": []
+   },
+   "apiName": "DA_18_MasterYi_AD",
+   "characterName": "DA_18_MasterYi_AD",
+   "cost": 3,
+   "icon": "assets/characters/tft18_masteryi/skins/base/images/tft18_masteryi_splash_centered_52.tex",
+   "name": "マスター・イー",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_masteryi/skins/base/images/tft18_masteryi_splash_tile_52.tex",
+   "stats": {
+    "armor": 55,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 62,
+    "hp": 850,
+    "initialMana": 0,
+    "magicResist": 55,
+    "mana": 3,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_masteryi/tft18_masteryi_square.tex",
+   "traits": [
+    "ブロッサム",
+    "アダプター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "@MagicShieldDuration@秒間、シェンに耐久値@ShieldCalc1@ %i:scaleAP%のシールドを、周囲のダメージを負った味方1体に耐久値@ShieldCalc2@ %i:scaleAP%のシールドを付与する。両者は次の@NumAttacksBuff@回の通常攻撃における攻撃速度が@AttackSpeedBuff@増加し、@MagicDamageCalc1@ %i:scaleAP%の追加魔法ダメージを与える。",
+    "icon": "None",
+    "name": "内気功",
+    "variables": []
+   },
+   "apiName": "DA_18_Shen",
+   "characterName": "DA_18_Shen",
+   "cost": 2,
+   "icon": "assets/characters/tft18_shen/skins/base/images/tft18_shen_splash_centered_16.tex",
+   "name": "シェン",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_shen/skins/base/images/tft18_shen_splash_tile_16.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.6499999761581421,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 50,
+    "hp": 900,
+    "initialMana": 30,
+    "magicResist": 45,
+    "mana": 90,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_shen/tft18_shen_square.tex",
+   "traits": [
+    "インフェルノ",
+    "ディフェンダー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "現在の対象に噛みつき、@PhysicalDamageCalc1@ %i:scaleAD%の物理ダメージを与え、与えたダメージの@GenericCalc1@ %i:scaleAP%にあたる体力を回復する。戦闘終了まで攻撃速度が@AttackSpeedBuff@増加する。",
+    "icon": "None",
+    "name": "野獣の牙",
+    "variables": []
+   },
+   "apiName": "DA_18_Warwick",
+   "characterName": "DA_18_Warwick",
+   "cost": 2,
+   "icon": "assets/characters/tft18_warwick/skins/base/images/tft18_warwick_splash_centered_35.tex",
+   "name": "ワーウィック",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_warwick/skins/base/images/tft18_warwick_splash_tile_35.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 45,
+    "hp": 750,
+    "initialMana": 0,
+    "magicResist": 45,
+    "mana": 40,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_warwick/tft18_warwick_square.tex",
+   "traits": [
+    "ブラックソーン",
+    "ラヴィジャー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "対象を切り裂いて@PhysicalDamageCalc1@%i:scaleAD%%i:scaleAP%の物理ダメージを与え、@ShieldDuration@秒間、耐久値@AbilityShield@のシールドを獲得する。",
+    "icon": "None",
+    "name": "ディフェンシブスイープ",
+    "variables": []
+   },
+   "apiName": "DA_18_Camille",
+   "characterName": "DA_18_Camille",
+   "cost": 1,
+   "icon": "assets/characters/tft18_camille/skins/base/images/tft18_camille_splash_centered_2.tex",
+   "name": "カミール",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_camille/skins/base/images/tft18_camille_splash_tile_2.tex",
+   "stats": {
+    "armor": 40,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 700,
+    "initialMana": 0,
+    "magicResist": 40,
+    "mana": 25,
+    "range": 1
+   },
+   "tileIcon": "assets/characters/tft18_camille/tft18_camille_square.tex",
+   "traits": [
+    "魔女",
+    "ラヴィジャー"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果:</bright> スキル使用時、ラックスと特性を共有するすべての味方がマナを@ManaCalc1@%i:scaleAP%獲得する。\r\\n\r\\n<bright>発動効果:</bright> 最も敵が多い直線上にレーザーを発射し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。命中した敵1体につき、このダメージは@DamageReductionPerUnit@ずつ減少する(最小@MinimumFalloffDamageRatio@)。\r\\n\r\\n<bright>ブラックソーンボーナス:</bright> 命中した対象を@BlackthornStunDuration@秒間スタンさせる。",
+    "icon": "None",
+    "name": "ファイナルスパーク",
+    "variables": []
+   },
+   "apiName": "DA_Lux18_Blackthorn",
+   "characterName": "DA_Lux18_Blackthorn",
+   "cost": 5,
+   "icon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_centered_7.tex",
+   "name": "ラックス (ブラックソーン)",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lux/hud/splashes/t_18_lux_blackthorn_teamplanner.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 70,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_lux/tft18_lux_blackthorn_square.tex",
+   "traits": [
+    "ブラックソーン",
+    "アバター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果: </bright>スキル使用時、ラックスと特性を共有するすべての味方がマナを@ManaCalc1@%i:scaleAP%獲得する。\r\\n\r\\n<bright>発動効果:</bright> 最も敵の数が多い直線上にレーザーを発射し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。命中した敵1体につき、このダメージは@DamageReductionPerUnit@ずつ減少する(最小@MinimumFalloffDamageRatio@)。\r\\n\r\\n<bright>ブロッサムボーナス:</bright> 最初に命中した対象に@BlossomBonusDamageRatio@の追加ダメージを与える。",
+    "icon": "None",
+    "name": "ファイナルスパーク",
+    "variables": []
+   },
+   "apiName": "DA_Lux18_Blossom",
+   "characterName": "DA_Lux18_Blossom",
+   "cost": 5,
+   "icon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_centered_7.tex",
+   "name": "ラックス (ブロッサム)",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lux/hud/splashes/t_18_lux_blossom_teamplanner.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 70,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_lux/tft18_lux_blossom_square.tex",
+   "traits": [
+    "ブロッサム",
+    "アバター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果:</bright> スキル使用時、ラックスと特性を共有するすべての味方がマナを@ManaCalc1@%i:scaleAP%獲得する。\r\\n\r\\n<bright>発動効果:</bright> 最も敵が多い直線上にレーザーを発射し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。命中した敵1体につき、このダメージは@DamageReductionPerUnit@ずつ減少する(最低@MinimumFalloffDamageRatio@まで)。\r\\n\r\\n<bright>魔女ボーナス: </bright>戦闘終了まで、命中した対象の物理防御と魔法防御を@CovenResistReduction@低下させる。",
+    "icon": "None",
+    "name": "ファイナルスパーク",
+    "variables": []
+   },
+   "apiName": "DA_18_Lux_Coven",
+   "characterName": "DA_18_Lux_Coven",
+   "cost": 5,
+   "icon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_centered_7.tex",
+   "name": "ラックス (魔女)",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lux/hud/splashes/t_18_lux_coven_teamplanner.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 70,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_lux/tft18_lux_coven_square.tex",
+   "traits": [
+    "魔女",
+    "アバター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果:</bright> スキル使用時、ラックスと特性を共有するすべての味方がマナを@ManaCalc1@%i:scaleAP%獲得する。\r\\n\r\\n<bright>発動効果:</bright> 最も敵が多い直線上にレーザーを発射し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。命中した敵1体につき、このダメージは@DamageReductionPerUnit@ずつ減少する (最低で@MinimumFalloffDamageRatio@)。\r\\n\r\\n<bright>エルダーウッドのボーナス:</bright> スキル発動時、戦闘終了まですべての味方の最大体力が@ElderwoodHealthIncrease@増える。",
+    "icon": "None",
+    "name": "ファイナルスパーク",
+    "variables": []
+   },
+   "apiName": "DA_18_Lux_Elderwood",
+   "characterName": "DA_18_Lux_Elderwood",
+   "cost": 5,
+   "icon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_centered_7.tex",
+   "name": "ラックス (エルダーウッド)",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lux/hud/splashes/t_18_lux_elderwood_teamplanner.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 70,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_lux/tft18_lux_elderwood_square.tex",
+   "traits": [
+    "エルダーウッド",
+    "アバター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果:</bright> スキル使用時、ラックスと特性を共有するすべての味方がマナを@ManaCalc1@%i:scaleAP%獲得する。\r\\n\r\\n<bright>発動効果:</bright> 最も敵が多い直線上にレーザーを発射し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。命中した敵1体につき、このダメージは@DamageReductionPerUnit@ずつ減少する(最小@MinimumFalloffDamageRatio@)。\r\\n\r\\n<bright>妖精ボーナス:</bright> 最も体力割合が低い味方の体力を、スキルで与えたダメージの@FaeHealRatio@と同じだけ回復する。",
+    "icon": "None",
+    "name": "ファイナルスパーク",
+    "variables": []
+   },
+   "apiName": "DA_18_Lux_Fae",
+   "characterName": "DA_18_Lux_Fae",
+   "cost": 5,
+   "icon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_centered_7.tex",
+   "name": "ラックス (フェイ)",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lux/hud/splashes/t_18_lux_fae_teamplanner.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 70,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_lux/tft18_lux_fae_square.tex",
+   "traits": [
+    "フェイ",
+    "アバター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果:</bright> スキル使用時、ラックスと特性を共有するすべての味方がマナを@ManaCalc1@%i:scaleAP%獲得する。\r\\n\r\\n<bright>発動効果:</bright> 最も敵が多い直線上にレーザーを発射し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。命中した敵1体につき、このダメージは@DamageReductionPerUnit@ずつ減少する(最低@MinimumFalloffDamageRatio@)。\r\\n\r\\n<bright>インフェルノボーナス: </bright>テイクダウンごとにマナを@InfernoManaRestore@回復する。",
+    "icon": "None",
+    "name": "ファイナルスパーク",
+    "variables": []
+   },
+   "apiName": "DA_18_Lux_Inferno",
+   "characterName": "DA_18_Lux_Inferno",
+   "cost": 5,
+   "icon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_centered_7.tex",
+   "name": "ラックス (インフェルノ)",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lux/hud/splashes/t_18_lux_inferno_teamplanner.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 70,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_lux/tft18_lux_inferno_square.tex",
+   "traits": [
+    "インフェルノ",
+    "アバター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果:</bright> スキル使用時、ラックスと特性を共有するすべての味方がマナを@ManaCalc1@%i:scaleAP%獲得する。\r\\n\r\\n<bright>発動効果:</bright> 最も敵が多い直線上にレーザーを発射し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。命中した敵1体につき、このダメージは@DamageReductionPerUnit@ずつ減少する(最低@MinimumFalloffDamageRatio@まで)。\r\\n\r\\n<bright>ルナーボーナス: </bright>命中した敵に@LunarVulnerableDuration@秒間、@LunarVulnerablePercent@%の<Keyword>弱点</Keyword>を付与する。\r\\n\r\\n<Rules>弱点: 受けるダメージが増加する</Rules>",
+    "icon": "None",
+    "name": "ファイナルスパーク",
+    "variables": []
+   },
+   "apiName": "DA_18_Lux_Moonbeam",
+   "characterName": "DA_18_Lux_Moonbeam",
+   "cost": 5,
+   "icon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_centered_7.tex",
+   "name": "ラックス (ルナー)",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lux/hud/splashes/t_18_lux_moonbeam_teamplanner.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 70,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_lux/tft18_lux_moonbeam_square.tex",
+   "traits": [
+    "ルナー",
+    "アバター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果:</bright> スキル使用時、ラックスと特性を共有するすべての味方がマナを@ManaCalc1@%i:scaleAP%獲得する。\r\\n\r\\n<bright>発動効果:</bright> 最も敵が多い直線上にレーザーを発射し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。命中した敵1体につき、このダメージは@DamageReductionPerUnit@ずつ減少する(最低@MinimumFalloffDamageRatio@まで)。\r\\n\r\\n<bright>プライマルボーナス: </bright>発動後@PrimalASDuration@秒間、攻撃速度が@PrimalAttackSpeed@増加する。",
+    "icon": "None",
+    "name": "ファイナルスパーク",
+    "variables": []
+   },
+   "apiName": "DA_18_Lux_Primal",
+   "characterName": "DA_18_Lux_Primal",
+   "cost": 5,
+   "icon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_centered_7.tex",
+   "name": "ラックス (プライマル)",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lux/hud/splashes/t_18_lux_primal_teamplanner.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 70,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_lux/tft18_lux_primal_square.tex",
+   "traits": [
+    "プライマル",
+    "アバター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "<bright>自動効果:</bright> スキル使用時、ラックスと特性を共有するすべての味方がマナを@ManaCalc1@%i:scaleAP%獲得する。\r\\n\r\\n<bright>発動効果:</bright> 最も敵が多い直線上にレーザーを発射し、@MagicDamageCalc1@%i:scaleAP%の魔法ダメージを与える。命中した敵1体につき、このダメージは@DamageReductionPerUnit@ずつ減少する(最小@MinimumFalloffDamageRatio@)。\r\\n\r\\n<bright>ソーラーボーナス:</bright> 配置した種類の異なる★3チャンピオン1体につき、@SolarBonusDamagePer3StarRadio@の追加ダメージを与える。",
+    "icon": "None",
+    "name": "ファイナルスパーク",
+    "variables": []
+   },
+   "apiName": "DA_18_Lux_Sunbeam",
+   "characterName": "DA_18_Lux_Sunbeam",
+   "cost": 5,
+   "icon": "assets/characters/tft18_lux/skins/base/images/tft18_lux_splash_centered_7.tex",
+   "name": "ラックス (ソーラー)",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_lux/hud/splashes/t_18_lux_sunbeam_teamplanner.tex",
+   "stats": {
+    "armor": 45,
+    "attackSpeed": 0.800000011920929,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 40,
+    "hp": 900,
+    "initialMana": 20,
+    "magicResist": 45,
+    "mana": 70,
+    "range": 6
+   },
+   "tileIcon": "assets/characters/tft18_lux/tft18_lux_sunbeam_square.tex",
+   "traits": [
+    "ソーラー",
+    "アバター"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "周辺に@GenericCalc1@%i:scaleAP%秒間、対象指定不可のミニヒナ鳥を4体召喚する。ママ鳥が攻撃するたびにミニヒナ鳥も同じ敵を攻撃し、@PhysicalDamageCalc1@%i:scaleAD%の物理ダメージを与える。\r\\n\r\\nオレンジバフ: 物理ダメージを与えると、敵の物理防御を@ArmorReduc@低下させる。",
+    "icon": "None",
+    "name": "フロックファミリー",
+    "variables": []
+   },
+   "apiName": "DA_CrimsonRaptor18",
+   "characterName": "DA_CrimsonRaptor18",
+   "cost": 3,
+   "icon": "{e81b0dca177b4dbf}",
+   "name": "ママ鳥",
+   "role": null,
+   "squareIcon": "assets/characters/tft18_raptor/skins/base/images/t_18_crimsonraptor_teamplannersplash.tex",
+   "stats": {
+    "armor": 35,
+    "attackSpeed": 0.75,
+    "critChance": 0.25,
+    "critMultiplier": 1.399999976158142,
+    "damage": 55,
+    "hp": 650,
+    "initialMana": 20,
+    "magicResist": 35,
+    "mana": 60,
+    "range": 4
+   },
+   "tileIcon": "assets/characters/tft18_raptor/tft18_crimsonraptor_teamplanner_splash.tex",
+   "traits": [
+    "リフトビースト",
+    "サモナー",
+    "ラピッドファイア"
+   ]
+  },
+  {
+   "ability": {
+    "desc": "この書物をショップまでドラッグして、紋章アイテムでいっぱいのアーマリーを開きましょう！30秒以内に選択する必要があります。",
+    "icon": "assets/characters/tft8_teamupprop/hud/icons2d/tft5_emblemarmorykey_square.tex",
+    "name": "特性の書",
+    "variables": [
+     {
+      "name": "RoundsToHatch",
+      "value": [
+       2,
+       2,
+       2,
+       2,
+       2,
+       2,
+       2
+      ]
+     }
+    ]
+   },
+   "apiName": "TFT5_EmblemArmoryKey",
+   "characterName": "TFT5_EmblemArmoryKey",
+   "cost": 8,
+   "icon": "assets/ux/tft/championsplashes/tft5_emblemarmorykey.tex",
+   "name": "特性の書",
+   "role": null,
+   "squareIcon": "assets/ux/tft/championsplashes/tft5_draconicegg_mobile.tex",
+   "stats": {
+    "armor": 10,
+    "attackSpeed": 1,
+    "critChance": null,
+    "critMultiplier": 0,
+    "damage": null,
+    "hp": 10,
+    "initialMana": 0,
+    "magicResist": 10,
+    "mana": 100,
+    "range": 0
+   },
+   "tileIcon": "assets/characters/tft8_teamupprop/hud/icons2d/tft5_emblemarmorykey_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "これをショップまでドラッグして、完成アイテムでいっぱいのアーマリーを開きましょう！30秒以内に選択する必要があります。",
+    "icon": "assets/characters/tft_armorykeycompleted/hud/icons2d/tft_armorykeycompleted_square.tex",
+    "name": "完成アイテムの金床",
+    "variables": [
+     {
+      "name": "RoundsToHatch",
+      "value": [
+       2,
+       2,
+       2,
+       2,
+       2,
+       2,
+       2
+      ]
+     }
+    ]
+   },
+   "apiName": "TFT_ArmoryKeyCompleted",
+   "characterName": "TFT_ArmoryKeyCompleted",
+   "cost": 8,
+   "icon": "None",
+   "name": "完成アイテムの金床",
+   "role": null,
+   "squareIcon": "None",
+   "stats": {
+    "armor": 10,
+    "attackSpeed": 1,
+    "critChance": null,
+    "critMultiplier": 0,
+    "damage": 70,
+    "hp": 10,
+    "initialMana": 0,
+    "magicResist": 10,
+    "mana": 100,
+    "range": 0
+   },
+   "tileIcon": "assets/characters/tft_armorykeycompleted/hud/icons2d/tft_armorykeycompleted_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "これをショップまでドラッグして、素材アイテムでいっぱいのアーマリーを開きましょう！30秒以内に選択する必要があります。",
+    "icon": "assets/characters/tft_armorykeycomponent/hud/icons2d/tft_armorykeycomponent_square.tex",
+    "name": "素材アイテムの金床",
+    "variables": [
+     {
+      "name": "RoundsToHatch",
+      "value": [
+       2,
+       2,
+       2,
+       2,
+       2,
+       2,
+       2
+      ]
+     }
+    ]
+   },
+   "apiName": "TFT_ArmoryKeyComponent",
+   "characterName": "TFT_ArmoryKeyComponent",
+   "cost": 8,
+   "icon": "None",
+   "name": "素材アイテムの金床",
+   "role": null,
+   "squareIcon": "None",
+   "stats": {
+    "armor": 10,
+    "attackSpeed": 1,
+    "critChance": null,
+    "critMultiplier": 0,
+    "damage": 70,
+    "hp": 10,
+    "initialMana": 0,
+    "magicResist": 10,
+    "mana": 100,
+    "range": 0
+   },
+   "tileIcon": "assets/characters/tft_armorykeycomponent/hud/icons2d/tft_armorykeycomponent_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "これをショップまでドラッグして、アーティファクトアイテムでいっぱいのアーマリーを開きましょう！30秒以内に選択する必要があります。",
+    "icon": "assets/characters/tft_armorykeyornn/hud/icons2d/tft_armorykeyornn_square.tex",
+    "name": "アーティファクトアイテムの金床",
+    "variables": [
+     {
+      "name": "RoundsToHatch",
+      "value": [
+       2,
+       2,
+       2,
+       2,
+       2,
+       2,
+       2
+      ]
+     }
+    ]
+   },
+   "apiName": "TFT_ArmoryKeyOrnn",
+   "characterName": "TFT_ArmoryKeyOrnn",
+   "cost": 8,
+   "icon": "None",
+   "name": "アーティファクトアイテムの金床",
+   "role": null,
+   "squareIcon": "None",
+   "stats": {
+    "armor": 10,
+    "attackSpeed": 1,
+    "critChance": null,
+    "critMultiplier": 0,
+    "damage": 70,
+    "hp": 10,
+    "initialMana": 0,
+    "magicResist": 10,
+    "mana": 100,
+    "range": 0
+   },
+   "tileIcon": "assets/characters/tft_armorykeyornn/hud/icons2d/tft_armorykeyornn_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "これをショップまでドラッグして、サポートアイテムでいっぱいのアーマリーを開きましょう！30秒以内に選択する必要があります。",
+    "icon": "assets/characters/tft_armorykeysupport/hud/tft_armorykeysupport_square.tex",
+    "name": "サポートアイテムの金床",
+    "variables": [
+     {
+      "name": "RoundsToHatch",
+      "value": [
+       2,
+       2,
+       2,
+       2,
+       2,
+       2,
+       2
+      ]
+     }
+    ]
+   },
+   "apiName": "TFT_ArmoryKeySupport",
+   "characterName": "TFT_ArmoryKeySupport",
+   "cost": 8,
+   "icon": "None",
+   "name": "サポートアイテムの金床",
+   "role": null,
+   "squareIcon": "None",
+   "stats": {
+    "armor": 10,
+    "attackSpeed": 1,
+    "critChance": null,
+    "critMultiplier": 0,
+    "damage": 70,
+    "hp": 10,
+    "initialMana": 0,
+    "magicResist": 10,
+    "mana": 100,
+    "range": 0
+   },
+   "tileIcon": "assets/characters/tft_armorykeysupport/hud/tft_armorykeysupport_square.tex",
+   "traits": []
+  },
+  {
+   "ability": {
+    "desc": "この宝箱には、これまでに獲得した累積の戦利品がすべて入っています。プレイヤーとの戦闘に勝利して開けましょう！",
+    "icon": "assets/characters/tft6_mercenarychest/hud/icons2d/tft6_mercenarychest_eyeofthestorm.tex",
+    "name": "マーセナリーの宝箱",
+    "variables": [
+     {
+      "name": "RoundsToHatch",
+      "value": [
+       2,
+       2,
+       2,
+       2,
+       2,
+       2,
+       2
+      ]
+     }
+    ]
+   },
+   "apiName": "TFT6_MercenaryChest",
+   "characterName": "TFT6_MercenaryChest",
+   "cost": 11,
+   "icon": "assets/ux/tft/championsplashes/tft6_mercenarychest.tex",
+   "name": "マーセナリーの宝箱",
+   "role": null,
+   "squareIcon": "assets/ux/tft/championsplashes/tft6_mercenarychest_mobile.tex",
+   "stats": {
+    "armor": 0,
+    "attackSpeed": null,
+    "critChance": 0.25,
+    "critMultiplier": 1.2999999523162842,
+    "damage": 0,
+    "hp": 1,
+    "initialMana": 0,
+    "magicResist": null,
+    "mana": 12,
+    "range": 0
+   },
+   "tileIcon": "assets/characters/tft_itemunknown/skins/skin0/tft_item_unknown.tex",
+   "traits": []
+  }
+ ],
+ "traits": [
+  {
+   "apiName": "DA_18_Elderwood",
+   "desc": "配置可能な「エルダーウッド」の植物を獲得する。<br><row>(@MinUnits@) 「ストーンバークの木」と「ライフブロッサム」をそれぞれ1本</row><br><row>(@MinUnits@) 2本目の「ストーンバークの木」を獲得し、「ストーンバークの木」の体力が@StonebarkTreeBonusHealth@増加する</row><br><row>(@MinUnits@) さらに、「ディープウッド プロテクター」を獲得する</row><br><row>(@MinUnits@) 植物が★2になる</row><br><row>(@MinUnits@) 植物が★3になり、森が息づき始める</row>",
+   "effects": [
+    {
+     "maxUnits": 4,
+     "minUnits": 3,
+     "style": 1,
+     "variables": {
+      "{0f90e7a4}": 0.25,
+      "{4013f48e}": 0.10000000149011612
+     }
+    },
+    {
+     "maxUnits": 6,
+     "minUnits": 5,
+     "style": 3,
+     "variables": {
+      "{0f90e7a4}": 0.25,
+      "{4013f48e}": 0.10000000149011612,
+      "{b027c2f9}": 200
+     }
+    },
+    {
+     "maxUnits": 8,
+     "minUnits": 7,
+     "style": 5,
+     "variables": {
+      "{0f90e7a4}": 0.25,
+      "{4013f48e}": 0.10000000149011612
+     }
+    },
+    {
+     "maxUnits": 10,
+     "minUnits": 9,
+     "style": 5,
+     "variables": {
+      "{0f90e7a4}": 0.25,
+      "{4013f48e}": 0.10000000149011612
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 11,
+     "style": 6,
+     "variables": {
+      "{0f90e7a4}": 0.25,
+      "{4013f48e}": 0.10000000149011612
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_elderwood.tex",
+   "name": "エルダーウッド"
+  },
+  {
+   "apiName": "DA_18_LuxUniqueTrait",
+   "desc": "ベンチまたはボード上に「アバター」がいると、自分のショップの他のすべての「アバター」がその「アバター」の特性に変化する。<br><br>選んだ「アバター」の特性は特性ボーナスにおいて2体分としてカウントされる。",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 4,
+     "variables": {}
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_avatar.tex",
+   "name": "アバター"
+  },
+  {
+   "apiName": "DA_18_Slayer",
+   "desc": "「ラヴィジャー」は@Omnivamp*100@%のオムニヴァンプを獲得する。さらに、「ラヴィジャー」は追加ダメージを与える。体力が@EnemyHealthThreshold*100@%未満のユニットに対しては、この効果が2倍になる。<br><row>(@MinUnits@) @BonusDamagePercentBase*100@%の追加ダメージ</row><br><row>(@MinUnits@) @BonusDamagePercentBase*100@%の追加ダメージ</row><br><row>(@MinUnits@) @BonusDamagePercentBase*100@%の追加ダメージ</row>",
+   "effects": [
+    {
+     "maxUnits": 3,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "Omnivamp": 0.10000000149011612,
+      "{a9a813e7}": 0.11999999731779099,
+      "{bef0ca90}": 0.5
+     }
+    },
+    {
+     "maxUnits": 5,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "Omnivamp": 0.10000000149011612,
+      "{a9a813e7}": 0.25,
+      "{bef0ca90}": 0.5
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 6,
+     "style": 5,
+     "variables": {
+      "Omnivamp": 0.10000000149011612,
+      "{a9a813e7}": 0.4000000059604645,
+      "{bef0ca90}": 0.5
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_ravager.tex",
+   "name": "ラヴィジャー"
+  },
+  {
+   "apiName": "DA_DravenUniqueTrait18",
+   "desc": "バウンティーを選択。最も強いドレイヴンがバウンティーを進め、その報酬を獲得できる。バウンティーを達成したら、次のバウンティーを選択。",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 4,
+     "variables": {}
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_bountyseeker.tex",
+   "name": "バウンティーシーカー"
+  },
+  {
+   "apiName": "DA_18_Solar",
+   "desc": "<row>(@MinUnits@) 味方チャンピオンが最大体力の@ShieldRatio*100@%にあたるシールドを獲得し、@BonusMagicDamage*100@%の追加魔法ダメージを与える。異なる★3チャンピオン1体ごとに追加ボーナスを獲得する:<br><br>1: ★3ユニット1体ごとにシールドと魔法ダメージが@PercentIncreasePer3Star*100@%増加する。<br>@NumThreeStarThreshold1@: @Threshold1AttackSpeed*100@% %i:scaleAS%および@Threshold1ArmorMagicResist@ %i:scaleArmor%%i:scaleMR%<br>@NumThreeStarThreshold2@: 追加魔法ダメージの@Threshold2TrueDamageConversion*100@%を確定ダメージに変換する。<br>@NumThreeStarThreshold3@: 戦闘中、@Threshold3StarUpPeriod@秒ごとに★3チャンピオン1体が★4にレベルアップする。</row>",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 3,
+     "style": 5,
+     "variables": {
+      "BonusMagicDamage": 0.07999999821186066,
+      "ShieldRatio": 0.05000000074505806,
+      "{092e2b2b}": 3,
+      "{0a2e2cbe}": 5,
+      "{0b2e2e51}": 8,
+      "{5cfe766f}": 0.4000000059604645,
+      "{617a160e}": 0.1499999761581421,
+      "{7e77da03}": 15,
+      "{a51b2ace}": 0.009999999776482582,
+      "{d91f7c21}": 4
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_solar.tex",
+   "name": "ソーラー"
+  },
+  {
+   "apiName": "DA_18_Sprykin",
+   "desc": "「大きなモフモフのお友達」を獲得する。「大きなモフモフのお友達」に「スプライキン」をドロップしてライダーを選ぶ。<br><row>(@MinUnits@) ライダーは@HealthIncrease*100@% %i:scaleHealth%と@AttackSpeedIncrease*100@% %i:scaleAS%を獲得する</row><br><row>(@MinUnits@) @HealthIncrease*100@% %i:scaleHealth% @AttackSpeedIncrease*100@% %i:scaleAS%を獲得し、「大きなモフモフのお友達」のスキルの@TeamwideRatio*100@%が「スプライキン」チャンピオンに適用される</row><br><row>(@MinUnits@) @HealthIncrease*100@% %i:scaleHealth% @AttackSpeedIncrease*100@% %i:scaleAS%を獲得し、「大きなモフモフのお友達」のスキルの@TeamwideRatio*100@%が「スプライキン」チャンピオンに適用される</row>",
+   "effects": [
+    {
+     "maxUnits": 4,
+     "minUnits": 3,
+     "style": 1,
+     "variables": {
+      "AttackSpeedIncrease": 0.1499999761581421,
+      "HealthIncrease": 0.1499999761581421
+     }
+    },
+    {
+     "maxUnits": 6,
+     "minUnits": 5,
+     "style": 3,
+     "variables": {
+      "AttackSpeedIncrease": 0.3500000238418579,
+      "HealthIncrease": 0.3999999761581421,
+      "{aa3fad66}": 0.5
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 7,
+     "style": 5,
+     "variables": {
+      "AttackSpeedIncrease": 0.4500000476837158,
+      "HealthIncrease": 0.4500000476837158,
+      "{aa3fad66}": 1
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_sprykin.tex",
+   "name": "スプライキン"
+  },
+  {
+   "apiName": "DA_18_Adaptor",
+   "desc": "インネイト: 「アダプター」のスキルは、攻撃力と魔力のどちらが高いかによって変化する。<br><br>「アダプター」は、高い方のステータスに応じて魔力か攻撃力を獲得する。<br><row>(@MinUnits@) @ADAPGain*100@%/</row><br><row>(@MinUnits@) @ADAPGain*100@%/</row><br><row>(@MinUnits@) @ADAPGain*100@%/</row>",
+   "effects": [
+    {
+     "maxUnits": 2,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "{0412779a}": 0.25
+     }
+    },
+    {
+     "maxUnits": 3,
+     "minUnits": 3,
+     "style": 3,
+     "variables": {
+      "{0412779a}": 0.3499999940395355
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 4,
+     "style": 5,
+     "variables": {
+      "{0412779a}": 0.5
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_adaptor.tex",
+   "name": "アダプター"
+  },
+  {
+   "apiName": "DA_18_Coven",
+   "desc": "チャンピオンをキルすると「エッセンス」を獲得する。対人戦に敗北するとより多くのエッセンスを獲得する。<br><br>最初は@EssenceForRitualTooltip@エッセンスから始まり、エッセンスを報酬に変換するか、さらに集め続けるかを選択できる。各報酬の獲得に必要なエッセンス量は、段階的に増加する。<br><row>(@MinUnits@) キルごとに@EssencePerDeath@エッセンス、敗北ごとに@EssencePerLoss@エッセンス</row><br><row>(@MinUnits@) キルごとに@EssencePerDeath@、敗北ごとに@EssencePerLoss@</row><br><row>(@MinUnits@) キルごとに@EssencePerDeath@、敗北ごとに@EssencePerLoss@</row><br><row>(@MinUnits@) キルごとに@EssencePerDeath@、敗北ごとに@EssencePerLoss@</row>",
+   "effects": [
+    {
+     "maxUnits": 3,
+     "minUnits": 3,
+     "style": 1,
+     "variables": {
+      "{7a9d7f0e}": 2,
+      "{d62ae6ae}": 40,
+      "{de46577b}": 18
+     }
+    },
+    {
+     "maxUnits": 4,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "{7a9d7f0e}": 2,
+      "{d62ae6ae}": 40,
+      "{de46577b}": 25
+     }
+    },
+    {
+     "maxUnits": 6,
+     "minUnits": 5,
+     "style": 3,
+     "variables": {
+      "{7a9d7f0e}": 3,
+      "{d62ae6ae}": 40,
+      "{de46577b}": 32
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 7,
+     "style": 5,
+     "variables": {
+      "{7a9d7f0e}": 10,
+      "{d62ae6ae}": 40,
+      "{de46577b}": 60
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_coven.tex",
+   "name": "魔女"
+  },
+  {
+   "apiName": "DA_18_Eclipse",
+   "desc": "戦闘開始から@DelaySeconds@秒後、「エクリプス」が最も体力の低い敵をキルする。この効果は@EclipseBeamPeriod@秒ごとに繰り返される。",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": null,
+     "style": 1,
+     "variables": {
+      "DelaySeconds": 10,
+      "{53db05e8}": 3.5
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_eclipse.tex",
+   "name": "エクリプス"
+  },
+  {
+   "apiName": "DA_18_Hunter",
+   "desc": "「ハンター」の攻撃力が増加する。「ハンター」が対象を@HunterDuration@秒間切り替えなかったとき、@DamageAmp*100@%のダメージ増加効果を獲得する。<br><row>(@MinUnits@) @HunterAD*100@% %i:scaleAD%</row><br><row>(@MinUnits@) @HunterAD*100@% %i:scaleAD%</row><br><row>(@MinUnits@) @HunterAD*100@% %i:scaleAD%</row><br><row>(@MinUnits@) @HunterAD*100@% %i:scaleAD%</row>",
+   "effects": [
+    {
+     "maxUnits": 2,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "DamageAmp": 0.10000000149011612,
+      "{641254b6}": 0.20000000298023224,
+      "{83011ee7}": 3
+     }
+    },
+    {
+     "maxUnits": 3,
+     "minUnits": 3,
+     "style": 3,
+     "variables": {
+      "DamageAmp": 0.10000000149011612,
+      "{641254b6}": 0.30000001192092896,
+      "{83011ee7}": 3
+     }
+    },
+    {
+     "maxUnits": 4,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "DamageAmp": 0.10000000149011612,
+      "{641254b6}": 0.44999998807907104,
+      "{83011ee7}": 3
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 5,
+     "style": 5,
+     "variables": {
+      "DamageAmp": 0.10000000149011612,
+      "{641254b6}": 0.6499999761581421,
+      "{83011ee7}": 3
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_hunter.tex",
+   "name": "ハンター"
+  },
+  {
+   "apiName": "DA_18_Maokai_UniqueTrait",
+   "desc": "@UniqueTraitHexRange@マス以内の敵がキルされると、最も強い「原生林」のチャンピオンの最大体力が恒久的に@UniqueTraitHealthPerStack@増加する。<br><br>現在の増加量: 0",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 4,
+     "variables": {
+      "{36e69059}": 30,
+      "{56607148}": 3
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_oldgrowth.tex",
+   "name": "原生林"
+  },
+  {
+   "apiName": "DA_18_Battlemage",
+   "desc": "「モノリス」を攻撃対象としている敵1体ごとに、物理防御と魔法防御が@Resists@増加する。",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 4,
+     "variables": {
+      "Resists": 10
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_monolith.tex",
+   "name": "モノリス"
+  },
+  {
+   "apiName": "DA_Primal18",
+   "desc": "4つの「プライマルの祝福」から1つを選択。<br><row>(@MinUnits@)</row><br><row>(@MinUnits@)</row>",
+   "effects": [
+    {
+     "maxUnits": 3,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {}
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 4,
+     "style": 5,
+     "variables": {}
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_primal.tex",
+   "name": "プライマル"
+  },
+  {
+   "apiName": "DA_18_Greenfather",
+   "desc": "最も強いアイバーンがスキルを使用すると@SeedsPerCast@個の種を獲得し、さらに戦闘ごとに@CombatStartSeeds@個獲得する。アイバーンは@SeedsToGrowHex@個の種を使ってボード上にマスを生み出して、マス上のユニットにボーナスを付与する。<br><br>種: 0 / @SeedsToGrowHex@<br><br>現在のバイオーム: ",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 4,
+     "variables": {
+      "{5f537bd3}": 1,
+      "{5fea9917}": 3,
+      "{b133da98}": 5
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_greenfather.tex",
+   "name": "翠の父"
+  },
+  {
+   "apiName": "DA_18_Invoker",
+   "desc": "味方チームがマナ自動回復を獲得する。「インヴォーカー」は回復量が増加する。<br><row>(@MinUnits@) @TeamManaRegen@ %i:scaleManaRegen% | @InvokerManaBonus@ %i:scaleManaRegen%</row><br><row>(@MinUnits@) @TeamManaRegen@ %i:scaleManaRegen% | @InvokerManaBonus@ %i:scaleManaRegen%</row><br><row>(@MinUnits@) @TeamManaRegen@ %i:scaleManaRegen% | @InvokerManaBonus@ %i:scaleManaRegen%</row><br><row>(@MinUnits@) @TeamManaRegen@ %i:scaleManaRegen% | @InvokerManaBonus@ %i:scaleManaRegen%</row>",
+   "effects": [
+    {
+     "maxUnits": 2,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "TeamManaRegen": 1,
+      "{de27cb95}": 2
+     }
+    },
+    {
+     "maxUnits": 3,
+     "minUnits": 3,
+     "style": 3,
+     "variables": {
+      "TeamManaRegen": 1,
+      "{de27cb95}": 3
+     }
+    },
+    {
+     "maxUnits": 4,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "TeamManaRegen": 2,
+      "{de27cb95}": 5
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 5,
+     "style": 5,
+     "variables": {
+      "TeamManaRegen": 2,
+      "{de27cb95}": 8
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_invoker.tex",
+   "name": "インヴォーカー"
+  },
+  {
+   "apiName": "DA_18_Rapidfire",
+   "desc": "味方チームの攻撃速度が@TeamAS*100@%増加する。「ラピッドファイア」チャンピオンは、通常攻撃を行うたびにさらに増加する(最大@MaxStacks@スタック)。<br><row>(@MinUnits@) 通常攻撃ごとに+@ASPerAttack*100@% %i:scaleAS%</row><br><row>(@MinUnits@) 通常攻撃ごとに+@ASPerAttack*100@% %i:scaleAS%</row><br><row>(@MinUnits@) 通常攻撃ごとに+@ASPerAttack*100@% %i:scaleAS%</row><br><row>(@MinUnits@) 通常攻撃ごとに+@ASPerAttack*100@% %i:scaleAS%</row>",
+   "effects": [
+    {
+     "maxUnits": 2,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "ASperAttack": 0.029999971389770508,
+      "MaxStacks": 10,
+      "{1d98dcec}": 0.10000002384185791
+     }
+    },
+    {
+     "maxUnits": 3,
+     "minUnits": 3,
+     "style": 3,
+     "variables": {
+      "ASperAttack": 0.04999995231628418,
+      "MaxStacks": 10,
+      "{1d98dcec}": 0.10000002384185791
+     }
+    },
+    {
+     "maxUnits": 4,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "ASperAttack": 0.09000003337860107,
+      "MaxStacks": 10,
+      "{1d98dcec}": 0.10000002384185791
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 5,
+     "style": 5,
+     "variables": {
+      "ASperAttack": 0.1499999761581421,
+      "MaxStacks": 10,
+      "{1d98dcec}": 0.10000002384185791
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_rapidfire.tex",
+   "name": "ラピッドファイア"
+  },
+  {
+   "apiName": "DA_Juggernaut18",
+   "desc": "味方チームの耐久力が増加する。「ジャガーノート」はより多く増加する。<br><row>(@MinUnits@) @TeamDurability*100@% %i:scaleDR%または@JuggernautDurability*100@% %i:scaleDR%</row><br><row>(@MinUnits@) @TeamDurability*100@% %i:scaleDR%または@JuggernautDurability*100@% %i:scaleDR%</row><br><row>(@MinUnits@) @TeamDurability*100@% %i:scaleDR%または@JuggernautDurability*100@% %i:scaleDR%</row>",
+   "effects": [
+    {
+     "maxUnits": 3,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "{6eab9c5e}": 0.19999998807907104,
+      "{f8c73243}": 0.04000002145767212
+     }
+    },
+    {
+     "maxUnits": 5,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "{6eab9c5e}": 0.32999998331069946,
+      "{f8c73243}": 0.06000000238418579
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 6,
+     "style": 5,
+     "variables": {
+      "{6eab9c5e}": 0.44999998807907104,
+      "{f8c73243}": 0.07999998331069946
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_juggernaut.tex",
+   "name": "ジャガーノート"
+  },
+  {
+   "apiName": "DA_18_Inferno",
+   "desc": "「インフェルノ」のダメージは@Duration@秒間、敵に<TFTKeyword>燃焼</TFTKeyword>と<TFTKeyword>負傷</TFTKeyword>を付与する。「インフェルノ」による燃焼はその他の燃焼効果とスタックする。<br><row>(@MinUnits@) @HPBurnPerSecond@%の燃焼、@WoundPercent@%の負傷</row><br><row>(@MinUnits@) 戦闘後、「インフェルノ」チャンピオンがいないショップのスロット@LuckySlotCount@つに火がつき、1ティア高いチャンピオンが出現する</row><br><row>(@MinUnits@) ショップのスロット@LuckySlotCount@つに火がつく、@HPBurnPerSecond@%の燃焼</row><br><row>(@MinUnits@) ショップのスロット@LuckySlotCount@つに火がつく、@HPBurnPerSecond@%の燃焼</row>",
+   "effects": [
+    {
+     "maxUnits": 2,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "Duration": 3,
+      "WoundPercent": 33,
+      "{2c202877}": 1
+     }
+    },
+    {
+     "maxUnits": 4,
+     "minUnits": 3,
+     "style": 3,
+     "variables": {
+      "Duration": 3,
+      "{c4c70a4e}": 1
+     }
+    },
+    {
+     "maxUnits": 6,
+     "minUnits": 5,
+     "style": 5,
+     "variables": {
+      "Duration": 3,
+      "{2c202877}": 3.5,
+      "{c4c70a4e}": 2
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 7,
+     "style": 5,
+     "variables": {
+      "Duration": 3,
+      "{2c202877}": 4.5,
+      "{c4c70a4e}": 4
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_inferno.tex",
+   "name": "インフェルノ"
+  },
+  {
+   "apiName": "DA_AluneUniqueTrait18",
+   "desc": "発動するたび、最も強力なアルーンが月の満ち欠けにおける次の段階へと移行する。月が半月以下の間は、味方チームの耐久力が@Durability*100@%増加する。半月より大きい場合、味方チームが@DamageAmp*100@%のダメージ増加効果を獲得する。",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 4,
+     "variables": {
+      "DamageAmp": 0.07000000029802322,
+      "Durability": 0.06999999284744263
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_attuned.tex",
+   "name": "同調"
+  },
+  {
+   "apiName": "DA_18_Rival",
+   "desc": "<row>(@MinUnits@) 「ライバル」を1体配置した場合のみ発動する。<br><br>「ライバル」はキルまたはアシストを獲得するとスタックを得る。他の「ライバル」からキルまたはアシストを獲得した場合は3スタック獲得する。</row><br><row>(@MinUnits@) 「ライバル」はキルまたはアシストを獲得するとスタックを得る。他の「ライバル」からキルまたはアシストを獲得した場合は3スタック獲得する。<br><br>キルまたはアシストを獲得するとカ＝ジックスが進化し、「エクセキューショナー」、「ラピッドファイア」、「ラヴィジャー」、「スペルウィーバー」の中から任意の特性を1つ恒久的に獲得する。<br><br>キルまたはアシストを@RengarStackReq@回獲得するたびに、@RengarGold@/@RengarGold_2@/@RengarGold_3@ゴールドを獲得する。@RengarADStackReq@回キルまたはアシストを達成すると、それ以降は達成するたびに味方チームの攻撃力が@RengarThresholdAD*100@%+@RengarADPerStack*100@%%i:scaleAD%増加する。<br><br>カ＝ジックスのキルまたはアシスト: 0 / 0<br>レンガーのキルまたはアシスト: 0<br>獲得ゴールド: 0</row><br><row>(@MinUnits@) 「ライバル」は一緒にボード上に配置可能。スキルが互いにボーナスを付与する。</row>",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 5,
+     "variables": {}
+    },
+    {
+     "maxUnits": 1,
+     "minUnits": 1,
+     "style": 1,
+     "variables": {
+      "{1b5b0a96}": 2,
+      "{3bcd79f5}": 30,
+      "{740d1888}": 5,
+      "{750d1a1b}": 3,
+      "{a1ab72d6}": 0.05000000074505806,
+      "{a6d81c50}": 8,
+      "{f1f3dbfc}": 0.0020000000949949026
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 2,
+     "style": 5,
+     "variables": {}
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_rival.tex",
+   "name": "ライバル"
+  },
+  {
+   "apiName": "DA_18_Vanguard",
+   "desc": "戦闘開始時、および体力が@HealthThreshold*100@%未満になると、「ヴァンガード」は@ShieldDuration@秒間、自身の最大体力に応じたシールドを獲得する。<br><row>(@MinUnits@) 最大体力の@MaxHealthShield*100@%</row><br><row>(@MinUnits@) 最大体力の@MaxHealthShield*100@%</row><br><row>(@MinUnits@) 最大体力の@MaxHealthShield*100@%シールド獲得中は耐久力が@DurabilityIncrease*100@%増加する。</row>",
+   "effects": [
+    {
+     "maxUnits": 3,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "HealthThreshold": 0.5,
+      "MaxHealthShield": 0.18000000715255737,
+      "ShieldDuration": 10
+     }
+    },
+    {
+     "maxUnits": 5,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "HealthThreshold": 0.5,
+      "MaxHealthShield": 0.30000001192092896,
+      "ShieldDuration": 10
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 6,
+     "style": 5,
+     "variables": {
+      "HealthThreshold": 0.5,
+      "MaxHealthShield": 0.4000000059604645,
+      "ShieldDuration": 10,
+      "{b58e0b6e}": 0.050000011920928955
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_vanguard.tex",
+   "name": "ヴァンガード"
+  },
+  {
+   "apiName": "DA_18_Brawler",
+   "desc": "味方チームの最大体力が@BrawlerTeamHealth@増加する。「ブローラー」はより多く増加する。<br><row>(@MinUnits@) @BrawlerHealthPercent*100@% %i:scaleHealth%</row><br><row>(@MinUnits@) @BrawlerHealthPercent*100@% %i:scaleHealth%</row><br><row>(@MinUnits@) @BrawlerHealthPercent*100@% %i:scaleHealth%</row>",
+   "effects": [
+    {
+     "maxUnits": 3,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "{da2472a7}": 120,
+      "{f1ed73eb}": 0.25
+     }
+    },
+    {
+     "maxUnits": 5,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "{da2472a7}": 120,
+      "{f1ed73eb}": 0.4000000059604645
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 6,
+     "style": 5,
+     "variables": {
+      "{da2472a7}": 120,
+      "{f1ed73eb}": 0.6499999761581421
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_brawler.tex",
+   "name": "ブローラー"
+  },
+  {
+   "apiName": "DA_18_Blackthorn",
+   "desc": "「ブラックソーン」のマス上の味方が戦闘開始前に生贄となり、味方チャンピオンに体力を付与する。<br><br>「ブラックソーン」のチャンピオンは、生贄の役割、スターレベル、コストに応じて追加ステータスを得る。<br><row>(@MinUnits@) @Health@ %i:scaleHealth%</row><br><row>(@MinUnits@) @Health@ %i:scaleHealth%、ボーナスが@StatMultiplier*100@%増加</row><br><row>(@MinUnits@) @Health@ %i:scaleHealth%、ボーナスが@StatMultiplier*100@%増加</row>",
+   "effects": [
+    {
+     "maxUnits": 3,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "Health": 175
+     }
+    },
+    {
+     "maxUnits": 5,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "Health": 350,
+      "StatMultiplier": 0.2999999523162842
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 6,
+     "style": 5,
+     "variables": {
+      "Health": 600,
+      "StatMultiplier": 0.6000000238418579
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_oldgod.tex",
+   "name": "ブラックソーン"
+  },
+  {
+   "apiName": "DA_18_Executioner",
+   "desc": "<row>(@MinUnits@) 「エクセキューショナー」は<TFTKeyword>正確無比</TFTKeyword>と@CritChance*100@%のクリティカル率を獲得する。</row><br><row>(@MinUnits@) さらに、敵は@BleedDuration@秒かけて@BonusBleedPercent*100@%の追加確定ダメージを受ける出血状態になる。</row><br><row>(@MinUnits@) 出血ダメージが@BonusBleedPercent*100@%に増加する。</row>",
+   "effects": [
+    {
+     "maxUnits": 2,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "CritChance": 0.15000000596046448
+     }
+    },
+    {
+     "maxUnits": 3,
+     "minUnits": 3,
+     "style": 3,
+     "variables": {
+      "BleedDuration": 3,
+      "{2c61751d}": 0.30000001192092896
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 4,
+     "style": 5,
+     "variables": {
+      "{2c61751d}": 0.4000000059604645
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_executioner.tex",
+   "name": "エクセキューショナー"
+  },
+  {
+   "apiName": "DA_18_ApexPredator",
+   "desc": "エルダードラゴンはチームスロットを2つ使用し、「リフトビースト」の特性カウントが+2になる。",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 4,
+     "variables": {}
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_apexpredator.tex",
+   "name": "捕食者の頂点"
+  },
+  {
+   "apiName": "DA_Riftbeast18",
+   "desc": "<row>(@MinUnits@) 「アルファマーク」を使ってリフトビーストに固有のバフを付与する</row><br><row>(@MinUnits@) @OverrunCombats@戦ごとに、次のショップがリフトビーストで溢れかえる。</row><br><row>(@MinUnits@) 戦闘開始時と5秒ごとに、リフトビーストが成長して次を獲得: <br>@CapstoneAD*100@% %i:scaleAD% @CapstoneAP*100@% %i:scaleAP% @CapstoneAspd*100@% %i:scaleAS%<br>+@CapstoneArmor@ %i:scaleArmor% +@CapstoneMR@ %i:scaleMR% +@CapstoneHealth@ %i:scaleHealth% +@CapstoneManaRegen@ %i:scaleManaRegen%</row><br><row>(@MinUnits@) チームサイズ+@TeamSize@</row>",
+   "effects": [
+    {
+     "maxUnits": 4,
+     "minUnits": 3,
+     "style": 1,
+     "variables": {}
+    },
+    {
+     "maxUnits": 6,
+     "minUnits": 5,
+     "style": 3,
+     "variables": {
+      "{e8d16db1}": 3
+     }
+    },
+    {
+     "maxUnits": 9,
+     "minUnits": 7,
+     "style": 5,
+     "variables": {
+      "{0776b071}": 0.05000000074505806,
+      "{08cfb22e}": 50,
+      "{0d6c2c87}": 5,
+      "{1b76cfed}": 0.05000000074505806,
+      "{3230276c}": 1,
+      "{4e1998f4}": 0.04999995231628418,
+      "{a8c6eeaf}": 5
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 10,
+     "style": 5,
+     "variables": {
+      "TeamSize": 2
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_riftbeast.tex",
+   "name": "リフトビースト"
+  },
+  {
+   "apiName": "DA_18_Caustic",
+   "desc": "「腐敗」がダメージを与えると、@ShredDuration@秒間、敵に@ShredPercent@%の「細断」と「分解」を付与する。<br><br><rules>細断: 魔法防御を低下させる。</rules><br><rules>分解: 物理防御を低下させる。</rules>",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 4,
+     "variables": {
+      "ShredDuration": 4,
+      "ShredPercent": 30
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_caustic.tex",
+   "name": "腐敗"
+  },
+  {
+   "apiName": "DA_18_Fae",
+   "desc": "味方チームのダメージ、回復、シールドは妖精をおびき寄せる。<br><br>各妖精は「フェイ」のチャンピオンの攻撃力と魔力を増加させ、体力が@HealThreshold*100@%未満になると、妖精1匹ごとに体力が回復する。<br><row>(@MinUnits@) @ADAP@% および@Heal@%の回復。</row><br><row>(@MinUnits@) @ADAP@% および@Heal@%の回復。妖精を7匹おびき寄せると、ゴールドを付与する黄金の妖精をおびき寄せられるようになる。</row>",
+   "effects": [
+    {
+     "maxUnits": 3,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "ADAP": 5,
+      "Heal": 2.5,
+      "HealThreshold": 0.5
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 4,
+     "style": 5,
+     "variables": {
+      "ADAP": 8,
+      "Heal": 4,
+      "HealThreshold": 0.5
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_fae.tex",
+   "name": "フェイ"
+  },
+  {
+   "apiName": "DA_18_Lunar",
+   "desc": "「ルナー」チャンピオンとそれに隣接する味方の攻撃速度と魔力が増加する。「ルナー」チャンピオンは@LunarMultiplier*100@%多く増加する。<br><row>(@MinUnits@) @AttackSpeed*100@% %i:scaleAS%、@AbilityPower*100@% %i:scaleAP%</row><br><row>(@MinUnits@) @AttackSpeed*100@% %i:scaleAS%、@AbilityPower*100@% %i:scaleAP%</row><br><row>(@MinUnits@) @AttackSpeed*100@% %i:scaleAS%、@AbilityPower*100@% %i:scaleAP%</row><br><row>(@MinUnits@) @AttackSpeed*100@% %i:scaleAS%、@AbilityPower*100@% %i:scaleAP%</row>",
+   "effects": [
+    {
+     "maxUnits": 2,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "AbilityPower": 0.07000000029802322,
+      "AttackSpeed": 0.0700000524520874,
+      "{6d27fbd4}": 1
+     }
+    },
+    {
+     "maxUnits": 3,
+     "minUnits": 3,
+     "style": 3,
+     "variables": {
+      "AbilityPower": 0.10000000149011612,
+      "AttackSpeed": 0.10000002384185791,
+      "{6d27fbd4}": 1
+     }
+    },
+    {
+     "maxUnits": 4,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "AbilityPower": 0.14000000059604645,
+      "AttackSpeed": 0.13999998569488525,
+      "{6d27fbd4}": 1
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 5,
+     "style": 5,
+     "variables": {
+      "AbilityPower": 0.18000000715255737,
+      "AttackSpeed": 0.1799999475479126,
+      "{6d27fbd4}": 1
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_lunar.tex",
+   "name": "ルナー"
+  },
+  {
+   "apiName": "DA_18_Defender",
+   "desc": "味方チームの物理防御と魔法防御が@NonDefenderDefenseGain@増加する。「ディフェンダー」はより多く増加する。<br><row>(@MinUnits@) @DefenderDefenseGain@</row><br><row> (@MinUnits@)  @DefenderDefenseGain@</row><br><row>(@MinUnits@)  @DefenderDefenseGain@</row>",
+   "effects": [
+    {
+     "maxUnits": 3,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "{0eb6405e}": 12,
+      "{8c16b281}": 25
+     }
+    },
+    {
+     "maxUnits": 5,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "{0eb6405e}": 12,
+      "{8c16b281}": 60
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 6,
+     "style": 5,
+     "variables": {
+      "{0eb6405e}": 12,
+      "{8c16b281}": 120
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_defender.tex",
+   "name": "ディフェンダー"
+  },
+  {
+   "apiName": "DA_18_Spellweaver",
+   "desc": "味方チームの魔力が@TeamwideAP*100@%増加する。「スペルウィーバー」はさらに増加する。さらに、「スペルウィーバー」がスキルを使用するたびに、魔力が追加で増加する。<br><row>(@MinUnits@) @SpellweaverAP*100@% %i:scaleAP%、+スキル使用ごとに@APPerCast*100@% %i:scaleAP%</row><br><row>(@MinUnits@) @SpellweaverAP*100@% %i:scaleAP%、+スキル使用ごとに@APPerCast*100@% %i:scaleAP%</row><br><row>(@MinUnits@) @SpellweaverAP*100@% %i:scaleAP%、+スキル使用ごとに@APPerCast*100@% %i:scaleAP%</row>",
+   "effects": [
+    {
+     "maxUnits": 3,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "APPerCast": 0.009999999776482582,
+      "TeamwideAP": 0.10000000149011612,
+      "{b012bed0}": 0.10000000149011612
+     }
+    },
+    {
+     "maxUnits": 5,
+     "minUnits": 4,
+     "style": 3,
+     "variables": {
+      "APPerCast": 0.009999999776482582,
+      "TeamwideAP": 0.10000000149011612,
+      "{b012bed0}": 0.30000001192092896
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 6,
+     "style": 5,
+     "variables": {
+      "APPerCast": 0.019999999552965164,
+      "TeamwideAP": 0.10000000149011612,
+      "{b012bed0}": 0.550000011920929
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_spellweaver.tex",
+   "name": "スペルウィーバー"
+  },
+  {
+   "apiName": "DA_18_ZyraUniqueTrait",
+   "desc": "味方チームの耐久力が@BaseDurability*100@%増加する。ザイラの植物が@PlantNumThreshold@体以上生存している場合は@IncreasedDurability*100@%まで増加する。",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 4,
+     "variables": {
+      "BaseDurability": 0.050000011920928955,
+      "{7c65d9f5}": 6,
+      "{8e1b920c}": 0.10000002384185791
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_zyraorigin.tex",
+   "name": "ソーンメイデン"
+  },
+  {
+   "apiName": "DA_FloraFatalis18",
+   "desc": "「フローラ・ファターリス」のチャンピオンは敵をキルすると、以下を獲得する: <br><row>(@MinUnits@) @Mana@マナ</row><br><row>(@MinUnits@) さらに、最も体力が低い味方を最大体力の@PercentHeal*100@%分回復させる。</row>",
+   "effects": [
+    {
+     "maxUnits": 1,
+     "minUnits": 1,
+     "style": 1,
+     "variables": {
+      "Mana": 10
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 2,
+     "style": 5,
+     "variables": {
+      "PercentHeal": 0.07999999821186066
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_florafatalis.tex",
+   "name": "フローラ・ファターリス"
+  },
+  {
+   "apiName": "DA_18_Summoner",
+   "desc": "自身の召喚ユニットを強化する方法はそれぞれ異なる。<br><br>ヨリック: 体力+@HealthMult*100@%<br>アジール: ダメージ+@AzirDamageMult*100@%<br>ママ鳥: ダメージ+@DamageMult*100@%<br>ザイラ: 植物の通常攻撃+@NumExtraAttacks@<br><row>(@MinUnits@) 召喚ユニットを強化</row><br><row>(@MinUnits@) 各効果が50%増加</row>",
+   "effects": [
+    {
+     "maxUnits": 2,
+     "minUnits": 2,
+     "style": 1,
+     "variables": {
+      "DamageMult": 0.4500000476837158,
+      "{1cb64e3c}": 4,
+      "{5311f791}": 0.2999999523162842,
+      "{6bba9a92}": 0.20000004768371582
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 3,
+     "style": 5,
+     "variables": {
+      "DamageMult": 0.4500000476837158,
+      "{1cb64e3c}": 4,
+      "{5311f791}": 0.2999999523162842,
+      "{6bba9a92}": 0.20000004768371582
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_summoner.tex",
+   "name": "サモナー"
+  },
+  {
+   "apiName": "DA_18_Blossom",
+   "desc": "戦闘後、ウィスプが強化される。<br><br>「ブロッサム」のチャンピオンは攻撃力、魔力、最大体力の@BonusHealth*100@%を獲得する。<br><row>(@MinUnits@) ウィスプがアップグレード、@ADAP*100@% %i:scaleAD%%i:scaleAP%</row><br><row>(@MinUnits@) ウィスプが全ショップで入手可能、@ADAP*100@% %i:scaleAD%%i:scaleAP%</row><br><row>(@MinUnits@) ウィスプ購入後に@GoldPerCharmPurchased@ゴールドを獲得、@ADAP*100@% %i:scaleAD%%i:scaleAP%</row><br><row>(@MinUnits@) 各ラウンドでウィスプを2体まで購入可能、@ADAP*100@% %i:scaleAD%%i:scaleAP%</row><br><row>(@MinUnits@) ウィスプに力が満ち溢れる、 @ADAP*100@% %i:scaleAD%%i:scaleAP%</row>",
+   "effects": [
+    {
+     "maxUnits": 4,
+     "minUnits": 3,
+     "style": 1,
+     "variables": {
+      "ADAP": 0.11999999731779099,
+      "BonusHealth": 0.10000002384185791
+     }
+    },
+    {
+     "maxUnits": 6,
+     "minUnits": 5,
+     "style": 3,
+     "variables": {
+      "ADAP": 0.30000001192092896,
+      "BonusHealth": 0.10000002384185791
+     }
+    },
+    {
+     "maxUnits": 8,
+     "minUnits": 7,
+     "style": 5,
+     "variables": {
+      "ADAP": 0.44999998807907104,
+      "BonusHealth": 0.10000002384185791,
+      "{91925b8e}": 4
+     }
+    },
+    {
+     "maxUnits": 10,
+     "minUnits": 9,
+     "style": 5,
+     "variables": {
+      "ADAP": 0.5,
+      "BonusHealth": 0.10000002384185791
+     }
+    },
+    {
+     "maxUnits": 25000,
+     "minUnits": 11,
+     "style": 6,
+     "variables": {
+      "ADAP": 1,
+      "BonusHealth": 0.10000002384185791
+     }
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_blossom.tex",
+   "name": "ブロッサム"
+  },
+  {
+   "apiName": "DA_Emerald18",
+   "desc": "味方を最も強いタリックの上にドラッグしてペアにすると、その味方はタリックのスキルから強力なボーナスを得る。",
+   "effects": [
+    {
+     "maxUnits": 25000,
+     "minUnits": 1,
+     "style": 4,
+     "variables": {}
+    }
+   ],
+   "icon": "assets/ux/traiticons/trait_icon_18_emeraldaspect.tex",
+   "name": "エメラルドの神髄"
+  }
+ ]
+}
