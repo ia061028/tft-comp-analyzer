@@ -18,7 +18,7 @@ import {
 } from './state.ts'
 import { sealAndPrune } from './shards.ts'
 import { logSealAndPrune } from './seal-log.ts'
-import { retentionFloor } from './patches.ts'
+import { entryEarliestSinceMs, retentionFloor } from './patches.ts'
 import { appendFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import type { ParticipantRecord } from '../shared/types.ts'
@@ -224,7 +224,7 @@ async function buildPuuidPool(
 /**
  * マッチ ID 取得の下限時刻（epoch 秒）。
  * セット開始（config.collectSinceEpoch）と、配信済みの直近 config.collectPatchesBack パッチの
- * 先頭（既定 1 = 最新パッチ）の配信開始の遅い方。前パッチの試合を新たに取りに行かず、
+ * 先頭（既定 1 = 最新パッチ）の最も早い配信開始（プラットフォーム別の上書きを含む）の遅い方。前パッチの試合を新たに取りに行かず、
  * リクエスト予算を最新パッチに使う。スケジュールが無ければセット開始。
  */
 export function collectStartTime(nowMs: number = Date.now()): number {
@@ -234,7 +234,7 @@ export function collectStartTime(nowMs: number = Date.now()): number {
   const set = sets.length ? Math.max(...sets) : null
   const floor = set === null ? null : retentionFloor(config.patchSchedule, set, config.collectPatchesBack, nowMs)
   const entry = floor === null ? undefined : config.patchSchedule.find((e) => e.patch === floor)
-  const floorSince = entry ? Math.floor(Date.parse(entry.since) / 1000) : -Infinity
+  const floorSince = entry ? Math.floor(entryEarliestSinceMs(entry) / 1000) : -Infinity
   return Math.max(config.collectSinceEpoch, Number.isFinite(floorSince) ? floorSince : -Infinity)
 }
 

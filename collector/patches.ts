@@ -70,8 +70,44 @@ export function pickTargetPatch(
 export interface PatchScheduleEntry {
   /** TFT パッチ表記（例 "18.2"）。そのまま表示ラベルになる。 */
   patch: string
-  /** このパッチの配信開始（ISO 8601, UTC）。 */
+  /** このパッチの配信開始（ISO 8601, UTC）。sinceByPlatform に無いプラットフォームの境界。 */
   since: string
+  /**
+   * プラットフォーム別の配信開始（キーは小文字のプラットフォーム ID、例 "kr" / "na1"）。
+   * 通常パッチはリージョンごとに丸1日近くずれて配信される（18.4 は JP 20時台 → NA 翌日）ので、
+   * 1つの since では未配信リージョンの旧パッチの試合が新パッチに混ざる。
+   * null は「このプラットフォームはまだ配信されていない」: 前のパッチ扱いのまま。
+   */
+  sinceByPlatform?: Record<string, string | null>
+}
+
+/** マッチ ID（"KR_8408686667"）からプラットフォーム ID（"kr"）を取る。取れなければ undefined。 */
+export function platformOf(matchId: string): string | undefined {
+  const i = matchId.indexOf('_')
+  return i > 0 ? matchId.slice(0, i).toLowerCase() : undefined
+}
+
+/**
+ * エントリの配信開始（epoch ms）。platform 別の上書きがあればそれ、null なら未配信（Infinity）。
+ * platform を渡さないときはエントリ全体の since。
+ */
+export function entrySinceMs(entry: PatchScheduleEntry, platform?: string): number {
+  if (platform !== undefined && entry.sinceByPlatform && platform in entry.sinceByPlatform) {
+    const v = entry.sinceByPlatform[platform]
+    return v === null ? Infinity : Date.parse(v)
+  }
+  return Date.parse(entry.since)
+}
+
+/** エントリの最も早い配信開始（epoch ms）。収集の下限など「どこかで配信済み」を知りたいとき用。 */
+export function entryEarliestSinceMs(entry: PatchScheduleEntry): number {
+  let min = Date.parse(entry.since)
+  for (const v of Object.values(entry.sinceByPlatform ?? {})) {
+    if (v === null) continue
+    const t = Date.parse(v)
+    if (!Number.isNaN(t) && (Number.isNaN(min) || t < min)) min = t
+  }
+  return min
 }
 
 /**
@@ -88,10 +124,12 @@ export function isSynthesizedPatch(v: string): boolean {
  * - v が合成キー（"18.0"）なら、同じメジャー（=セット番号）のスケジュールから
  *   `since <= ts` を満たす最新エントリの patch を返す。該当なし（スケジュール未登録、
  *   または最初の配信より前の ts）なら v をそのまま返す。
+ * - platform を渡すと、エントリの sinceByPlatform をそのプラットフォームの境界に使う。
  *
  * @param ts game_datetime（epoch 秒）
+ * @param platform 小文字のプラットフォーム ID（platformOf）
  */
-export function resolvePatch(v: string, ts: number, schedule: PatchScheduleEntry[]): string {
+export function resolvePatch(v: string, ts: number, schedule: PatchScheduleEntry[], platform?: string): string {
   if (!isSynthesizedPatch(v)) return v
   const major = v.slice(0, v.indexOf('.'))
   const tsMs = ts * 1000
@@ -99,7 +137,7 @@ export function resolvePatch(v: string, ts: number, schedule: PatchScheduleEntry
   let resolvedSince = -Infinity
   for (const entry of schedule) {
     if (!entry.patch.startsWith(`${major}.`)) continue
-    const since = Date.parse(entry.since)
+    const since = entrySinceMs(entry, platform)
     if (Number.isNaN(since) || since > tsMs) continue
     if (since >= resolvedSince) {
       resolved = entry.patch

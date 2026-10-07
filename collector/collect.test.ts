@@ -7,6 +7,7 @@ import type { EmblemContext } from './cdragon.ts'
 process.env.RIOT_API_KEY ??= 'RGAPI-test-key-not-used'
 const { buildRecords, decidePoolMode, samplePool, collectStartTime } = await import('./collect.ts')
 const { config } = await import('./config.ts')
+const { entryEarliestSinceMs } = await import('./patches.ts')
 
 /** セット18 相当の紋章コンテキスト（getEmblemContext の出力を手で組んだもの）。 */
 function makeEmblemCtx(): EmblemContext {
@@ -183,7 +184,7 @@ test('samplePool: 上限以下はそのまま（順序保持）、超えたら�
 })
 
 test('collectStartTime: 配信済みの直近 collectPatchesBack パッチの配信開始（既定は最新パッチのみ）', () => {
-  const since = (i: number) => Math.floor(Date.parse(config.patchSchedule[i].since) / 1000)
+  const since = (i: number) => Math.floor(entryEarliestSinceMs(config.patchSchedule[i]) / 1000)
   // 1パッチ目の途中: 最新の配信済みは1つ目 → セット開始と同じ。
   const early = Date.parse(config.patchSchedule[0].since) + 86400_000
   assert.equal(collectStartTime(early), Math.max(config.collectSinceEpoch, since(0)))
