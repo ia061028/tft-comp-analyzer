@@ -1,0 +1,516 @@
+{
+ "Characters/DA_18_Maokai/Spells/TFT18_MaokaiCritAttack": {
+  "ObjectName": "TFT18_MaokaiCritAttack",
+  "objectPath": "Characters/DA_18_Maokai/Spells/TFT18_MaokaiCritAttack",
+  "mScriptName": "TFT18_MaokaiCritAttack",
+  "mSpell": {
+   "mAffectsTypeFlags": 7375,
+   "mAnimationName": "Crit",
+   "spellCastTime": 0.4166499972343445,
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "bHaveHitEffect": true,
+   "castRange": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "castRangeValues": {
+    "values": [
+     200,
+     200,
+     200,
+     200,
+     200,
+     200,
+     200
+    ],
+    "{0a3e0478}": 200,
+    "__type": "{0a0eddc9}"
+   },
+   "castRadius": [
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100
+   ],
+   "castConeDistance": 100,
+   "castFrame": 14,
+   "missileSpeed": 0,
+   "mHitEffectOrientType": 2,
+   "mHitEffectKey": "TFT_Global_BA_Crit",
+   "bHaveHitBone": true,
+   "mHitBoneName": "C_BUFFBONE_GLB_CHEST_LOC",
+   "mClientData": {
+    "mTargeterDefinitions": [
+     {
+      "__type": "TargeterDefinitionRange"
+     }
+    ],
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ },
+ "Characters/DA_18_Maokai/Spells/TFT18_MaokaiBasicAttack": {
+  "ObjectName": "TFT18_MaokaiBasicAttack",
+  "objectPath": "Characters/DA_18_Maokai/Spells/TFT18_MaokaiBasicAttack",
+  "mScriptName": "TFT18_MaokaiBasicAttack",
+  "mSpell": {
+   "mAffectsTypeFlags": 7375,
+   "mAlternateName": "MaokaiBasicAttack",
+   "spellCastTime": 0.4166499972343445,
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "bHaveHitEffect": true,
+   "castRange": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "castRangeValues": {
+    "values": [
+     200,
+     200,
+     200,
+     200,
+     200,
+     200,
+     200
+    ],
+    "{0a3e0478}": 200,
+    "__type": "{0a0eddc9}"
+   },
+   "castRadius": [
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100
+   ],
+   "castConeDistance": 100,
+   "castFrame": 14,
+   "missileSpeed": 0,
+   "mHitEffectOrientType": 2,
+   "mHitEffectKey": "TFT_Global_BA_Hit",
+   "bHaveHitBone": true,
+   "mHitBoneName": "C_BUFFBONE_GLB_CHEST_LOC",
+   "mClientData": {
+    "mTargeterDefinitions": [
+     {
+      "useCasterBoundingBox": false,
+      "__type": "TargeterDefinitionRange"
+     }
+    ],
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ },
+ "Characters/DA_18_Maokai/Spells/TFT18_MaokaiSpell": {
+  "ObjectName": "TFT18_MaokaiSpell",
+  "objectPath": "Characters/DA_18_Maokai/Spells/TFT18_MaokaiSpell",
+  "mScriptName": "TFT18_MaokaiSpell",
+  "mSpell": {
+   "mAffectsTypeFlags": 7183,
+   "mAffectsStatusFlags": 32,
+   "DataValues": [
+    {
+     "name": "DataValue",
+     "values": [
+      0,
+      1,
+      2,
+      10,
+      160,
+      200,
+      240
+     ],
+     "__type": "SpellDataValue"
+    },
+    {
+     "name": "OtherValue",
+     "values": [
+      0,
+      100,
+      200,
+      1000,
+      0,
+      0,
+      0
+     ],
+     "__type": "SpellDataValue"
+    }
+   ],
+   "mSpellCalculations": {
+    "{d678dbfb}": {
+     "mFormulaParts": [
+      {
+       "mSubpart": {
+        "mDataValue": "OtherValue",
+        "__type": "NamedDataValueCalculationPart"
+       },
+       "mRatio": 0.009999999776482582,
+       "mStyleTag": "noScale",
+       "mStyleTagIfScaled": "scaleAP",
+       "__type": "SubPartScaledProportionalToStat"
+      }
+     ],
+     "__type": "GameCalculation"
+    }
+   },
+   "mAnimationName": "",
+   "mCastTime": 0.25,
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "canCastOrQueueWhileCasting": true,
+   "mCantCancelWhileWindingUp": true,
+   "castRange": [
+    25000,
+    25000,
+    25000,
+    25000,
+    25000,
+    25000,
+    25000
+   ],
+   "castRangeValues": {
+    "values": [
+     25000,
+     25000,
+     25000,
+     25000,
+     25000,
+     25000,
+     25000
+    ],
+    "{0a3e0478}": 25000,
+    "__type": "{0a0eddc9}"
+   },
+   "castRadius": [
+    20,
+    20,
+    20,
+    20,
+    20,
+    20,
+    20
+   ],
+   "castConeDistance": 100,
+   "mFloatVarsDecimals": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "selectionPriority": 1,
+   "mSpellCooldownOrSealedQueueThreshold": 0.5,
+   "mClientData": {
+    "mTooltipData": {
+     "mObjectName": "TFT18_MaokaiSpell",
+     "mFormat": "{fffee0e7}",
+     "mLocKeys": {
+      "keyName": "Spell_TFT18_MaokaiSpell_Name",
+      "keyTooltip": "Spell_TFT18_MaokaiSpell_Tooltip"
+     },
+     "mLists": {
+      "LevelUp": {
+       "levelCount": 3,
+       "Elements": [
+        {
+         "type": "DataValue",
+         "typeIndex": 2,
+         "nameOverride": "TFT18_Spell_ListType_TemplateValue1",
+         "__type": "TooltipInstanceListElement"
+        },
+        {
+         "type": "OtherValue",
+         "nameOverride": "TFT18_Spell_ListType_TemplateValue2",
+         "__type": "TooltipInstanceListElement"
+        }
+       ],
+       "__type": "TooltipInstanceList"
+      }
+     },
+     "__type": "TooltipInstanceSpell"
+    },
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ },
+ "Characters/DA_18_Maokai/Spells/TFT18_MaokaiBasicAttack2": {
+  "ObjectName": "TFT18_MaokaiBasicAttack2",
+  "objectPath": "Characters/DA_18_Maokai/Spells/TFT18_MaokaiBasicAttack2",
+  "mScriptName": "TFT18_MaokaiBasicAttack2",
+  "mSpell": {
+   "mAffectsTypeFlags": 7375,
+   "mAlternateName": "MaokaiBasicAttack",
+   "mAnimationName": "Attack2",
+   "spellCastTime": 0.4166499972343445,
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "bHaveHitEffect": true,
+   "castRange": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "castRangeValues": {
+    "values": [
+     200,
+     200,
+     200,
+     200,
+     200,
+     200,
+     200
+    ],
+    "{0a3e0478}": 200,
+    "__type": "{0a0eddc9}"
+   },
+   "castRadius": [
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100
+   ],
+   "castConeDistance": 100,
+   "castFrame": 14,
+   "missileSpeed": 0,
+   "mHitEffectOrientType": 2,
+   "mHitEffectKey": "TFT_Global_BA_Hit",
+   "bHaveHitBone": true,
+   "mHitBoneName": "C_BUFFBONE_GLB_CHEST_LOC",
+   "mClientData": {
+    "mTargeterDefinitions": [
+     {
+      "useCasterBoundingBox": false,
+      "__type": "TargeterDefinitionRange"
+     }
+    ],
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ },
+ "Characters/DA_18_Maokai/CharacterRecords/Root": {
+  "mCharacterName": "DA_18_Maokai",
+  "baseHPModifiable": {
+   "baseValue": 1150,
+   "__type": "ModifiableFloat"
+  },
+  "baseStaticHPRegenModifiable": {
+   "baseValue": 0,
+   "__type": "ModifiableFloat"
+  },
+  "healthBarHeight": 200,
+  "healthBarFullParallax": true,
+  "primaryAbilityResource": {
+   "arType": 0,
+   "{c4ab3550}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "arAllowMaxValueToBeOverridden": true,
+   "__type": "AbilityResourceSlotInfo"
+  },
+  "secondaryAbilityResource": {
+   "{726ee5cd}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "{c4ab3550}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "__type": "AbilityResourceSlotInfo"
+  },
+  "baseDamageModifiable": {
+   "baseValue": 80,
+   "__type": "ModifiableFloat"
+  },
+  "baseArmorModifiable": {
+   "baseValue": 60,
+   "__type": "ModifiableFloat"
+  },
+  "baseMR": {
+   "baseValue": 60,
+   "__type": "ModifiableFloat"
+  },
+  "baseCritChance": 0.25,
+  "critDamageMultiplier": 1.399999976158142,
+  "baseMoveSpeedModifiable": {
+   "baseValue": 500,
+   "__type": "ModifiableFloat"
+  },
+  "attackRangeModifiable": {
+   "baseValue": 180,
+   "__type": "ModifiableFloat"
+  },
+  "attackSpeedModifiable": {
+   "baseValue": 0.6499999761581421,
+   "__type": "ModifiableFloat"
+  },
+  "attackSpeedRatioModifiable": {
+   "baseValue": 0.800000011920929,
+   "__type": "ModifiableFloat"
+  },
+  "basicAttack": {
+   "mAttackName": "TFT18_MaokaiBasicAttack",
+   "__type": "AttackSlotData"
+  },
+  "extraAttacks": [
+   {
+    "mAttackName": "TFT18_MaokaiBasicAttack2",
+    "__type": "AttackSlotData"
+   }
+  ],
+  "critAttacks": [
+   {
+    "mAttackName": "TFT18_MaokaiCritAttack",
+    "__type": "AttackSlotData"
+   }
+  ],
+  "expGivenOnDeath": 0,
+  "goldGivenOnDeath": 0,
+  "selectionRadius": 150,
+  "unitTagsString": "Champion",
+  "flags": 9446656,
+  "tier": 5,
+  "mLinkedTraits": [
+   {
+    "TraitData": "Maps/Shipping/Map22/Sets/TFTSet18/Traits/DA_18_Maokai_UniqueTrait",
+    "__type": "TFTTraitContributionData"
+   },
+   {
+    "TraitData": "Maps/Shipping/Map22/Sets/TFTSet18/Traits/DA_Juggernaut18",
+    "__type": "TFTTraitContributionData"
+   }
+  ],
+  "mMoveInterval": -0.10000000149011612,
+  "mMoveProximity": 180,
+  "mMoveRange": 250,
+  "mMoveHeight": 0,
+  "mInitialMana": 30,
+  "mShopData": "Maps/Shipping/Map22/Sets/TFTSet18/Shop/DA_18_Maokai",
+  "mManaPerAttack": 0,
+  "__type": "TFTCharacterRecord"
+ }
+}

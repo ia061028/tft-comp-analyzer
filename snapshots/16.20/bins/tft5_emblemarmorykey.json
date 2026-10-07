@@ -1,0 +1,142 @@
+{
+ "Characters/TFT5_EmblemArmoryKey/CharacterRecords/Root": {
+  "mCharacterName": "TFT5_EmblemArmoryKey",
+  "baseHPModifiable": {
+   "baseValue": 10,
+   "__type": "ModifiableFloat"
+  },
+  "baseStaticHPRegenModifiable": {
+   "baseValue": 0,
+   "__type": "ModifiableFloat"
+  },
+  "healthBarHeight": 50,
+  "primaryAbilityResource": {
+   "arType": 0,
+   "{c4ab3550}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "arAllowMaxValueToBeOverridden": true,
+   "__type": "AbilityResourceSlotInfo"
+  },
+  "secondaryAbilityResource": {
+   "{726ee5cd}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "__type": "AbilityResourceSlotInfo"
+  },
+  "baseArmorModifiable": {
+   "baseValue": 10,
+   "__type": "ModifiableFloat"
+  },
+  "baseMR": {
+   "baseValue": 10,
+   "__type": "ModifiableFloat"
+  },
+  "critDamageMultiplier": 0,
+  "baseMoveSpeedModifiable": {
+   "baseValue": 1,
+   "__type": "ModifiableFloat"
+  },
+  "attackSpeedModifiable": {
+   "baseValue": 1,
+   "__type": "ModifiableFloat"
+  },
+  "expGivenOnDeath": 0,
+  "goldGivenOnDeath": 0,
+  "spellNames": [
+   "TFT5_EmblemArmoryKey",
+   "",
+   "",
+   ""
+  ],
+  "spells": [
+   "Characters/TFT5_EmblemArmoryKey/Spells/TFT5_EmblemArmoryKey",
+   "{00000000}",
+   "{00000000}",
+   "{00000000}"
+  ],
+  "selectionRadius": 120,
+  "unitTagsString": "Champion",
+  "mMoveInterval": -0.10000000149011612,
+  "mMoveProximity": 180,
+  "mMoveRange": 0,
+  "mMoveHeight": 0,
+  "mShopData": "{7b90de57}",
+  "mUnitInfoCardAttachToBone": "Root",
+  "UnitInfoCardDisplayType": 2,
+  "mUsesAbilityPower": false,
+  "mManaPerAttack": 0,
+  "__type": "TFTCharacterRecord"
+ },
+ "Characters/TFT5_EmblemArmoryKey/Spells/TFT5_EmblemArmoryKey": {
+  "ObjectName": "TFT5_EmblemArmoryKey",
+  "objectPath": "Characters/TFT5_EmblemArmoryKey/Spells/TFT5_EmblemArmoryKey",
+  "mScriptName": "TFT5_EmblemArmoryKey",
+  "mSpell": {
+   "DataValues": [
+    {
+     "name": "RoundsToHatch",
+     "values": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2
+     ],
+     "__type": "SpellDataValue"
+    }
+   ],
+   "mAnimationName": "",
+   "mCastTime": 0.5,
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "mCantCancelWhileWindingUp": true,
+   "mTargetingTypeData": {
+    "__type": "Self"
+   },
+   "mClientData": {
+    "mTooltipData": {
+     "mObjectName": "TFT5_EmblemArmoryKey",
+     "mFormat": "{fffee0e7}",
+     "mLocKeys": {
+      "keyName": "Spell_TFT5_EmblemArmoryKey_Name",
+      "keyTooltip": "Spell_TFT5_EmblemArmoryKey_Tooltip"
+     },
+     "mLists": {
+      "LevelUp": {
+       "__type": "TooltipInstanceList"
+      }
+     },
+     "__type": "TooltipInstanceSpell"
+    },
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ }
+}

@@ -1,0 +1,292 @@
+{
+ "Characters/TFT_ElderDragon/CharacterRecords/Root": {
+  "mCharacterName": "TFT_ElderDragon",
+  "baseHPModifiable": {
+   "baseValue": 10000,
+   "__type": "ModifiableFloat"
+  },
+  "baseStaticHPRegenModifiable": {
+   "baseValue": 0,
+   "__type": "ModifiableFloat"
+  },
+  "primaryAbilityResource": {
+   "arType": 0,
+   "{726ee5cd}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "{c4ab3550}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "arAllowMaxValueToBeOverridden": true,
+   "__type": "AbilityResourceSlotInfo"
+  },
+  "secondaryAbilityResource": {
+   "{726ee5cd}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "__type": "AbilityResourceSlotInfo"
+  },
+  "baseDamageModifiable": {
+   "baseValue": 900,
+   "__type": "ModifiableFloat"
+  },
+  "baseArmorModifiable": {
+   "baseValue": 50,
+   "__type": "ModifiableFloat"
+  },
+  "baseMR": {
+   "baseValue": 50,
+   "__type": "ModifiableFloat"
+  },
+  "baseCritChance": 0.25,
+  "critDamageMultiplier": 1.399999976158142,
+  "baseMoveSpeedModifiable": {
+   "baseValue": 550,
+   "__type": "ModifiableFloat"
+  },
+  "attackRangeModifiable": {
+   "baseValue": 420,
+   "__type": "ModifiableFloat"
+  },
+  "attackSpeedModifiable": {
+   "baseValue": 0.800000011920929,
+   "__type": "ModifiableFloat"
+  },
+  "attackSpeedRatioModifiable": {
+   "baseValue": 0.800000011920929,
+   "__type": "ModifiableFloat"
+  },
+  "basicAttack": {
+   "mAttackTotalTime": 2,
+   "mAttackCastTime": 0.800000011920929,
+   "mAttackName": "TFT_ElderDragonBasicAttack",
+   "__type": "AttackSlotData"
+  },
+  "extraAttacks": [
+   {
+    "mAttackName": "TFT_ElderDragonBasicAttack",
+    "__type": "AttackSlotData"
+   }
+  ],
+  "critAttacks": [
+   {
+    "mAttackName": "TFT_ElderDragonBasicAttack",
+    "__type": "AttackSlotData"
+   }
+  ],
+  "expGivenOnDeath": 0,
+  "goldGivenOnDeath": 0,
+  "spellNames": [
+   "TFT_ElderDragonSpell",
+   "TFT_ElderDragonBasicAttack",
+   "TFT_ElderDragonBasicAttack",
+   "TFT_ElderDragonBasicAttack"
+  ],
+  "spells": [
+   "Characters/TFT_ElderDragon/Spells/TFT_ElderDragonSpell",
+   "Characters/TFT_ElderDragon/Spells/TFT_ElderDragonBasicAttack",
+   "Characters/TFT_ElderDragon/Spells/TFT_ElderDragonBasicAttack",
+   "Characters/TFT_ElderDragon/Spells/TFT_ElderDragonBasicAttack"
+  ],
+  "selectionHeight": 200,
+  "selectionRadius": 200,
+  "unitTagsString": "Champion | Monster",
+  "CharacterRole": "{d5823aeb}",
+  "mMoveInterval": 0.10000000149011612,
+  "mMoveProximity": 180,
+  "mMoveRange": 500,
+  "mMoveHeight": 0,
+  "mShopData": "{5e544e6c}",
+  "__type": "TFTCharacterRecord"
+ },
+ "Characters/TFT_ElderDragon/Spells/TFT_ElderDragonSpell": {
+  "ObjectName": "TFT_ElderDragonSpell",
+  "objectPath": "Characters/TFT_ElderDragon/Spells/TFT_ElderDragonSpell",
+  "mScriptName": "TFT_ElderDragonSpell",
+  "mSpell": {
+   "mAffectsTypeFlags": 6154,
+   "mAnimationName": "",
+   "spellCastTime": 2.5,
+   "spellTotalTime": 3.5,
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "castRange": [
+    2000,
+    2000,
+    2000,
+    2000,
+    2000,
+    2000,
+    2000
+   ],
+   "castRangeValues": {
+    "values": [
+     2000,
+     2000,
+     2000,
+     2000,
+     2000,
+     2000,
+     2000
+    ],
+    "{0a3e0478}": 2000,
+    "__type": "{0a0eddc9}"
+   },
+   "mClientData": {
+    "mTooltipData": {
+     "mObjectName": "TFT_ElderDragonSpell",
+     "mFormat": "{fffee0e7}",
+     "mLocKeys": {
+      "keyName": "Spell_TFT_ElderDragonSpell_Name",
+      "keyTooltip": "Spell_TFT_ElderDragonSpell_Tooltip"
+     },
+     "mLists": {
+      "LevelUp": {
+       "levelCount": 3,
+       "__type": "TooltipInstanceList"
+      }
+     },
+     "__type": "TooltipInstanceSpell"
+    },
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ },
+ "Characters/TFT_ElderDragon/Spells/TFT_ElderDragonBasicAttack": {
+  "ObjectName": "TFT_ElderDragonBasicAttack",
+  "objectPath": "Characters/TFT_ElderDragon/Spells/TFT_ElderDragonBasicAttack",
+  "mScriptName": "TFT_ElderDragonBasicAttack",
+  "mSpell": {
+   "mAffectsTypeFlags": 24527,
+   "mAffectsStatusFlags": 8,
+   "mAnimationName": "Spell1",
+   "spellCastTime": 0.25599998235702515,
+   "spellTotalTime": 0.8300000429153442,
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "mCantCancelWhileWindingUp": true,
+   "bHaveHitEffect": true,
+   "mUpdateRotationWhenCasting": true,
+   "castRange": [
+    622.7000122070312,
+    622.7000122070312,
+    622.7000122070312,
+    622.7000122070312,
+    622.7000122070312,
+    622.7000122070312,
+    622.7000122070312
+   ],
+   "castRangeValues": {
+    "values": [
+     622.7000122070312,
+     622.7000122070312,
+     622.7000122070312,
+     622.7000122070312,
+     622.7000122070312,
+     622.7000122070312,
+     622.7000122070312
+    ],
+    "{0a3e0478}": 622.7000122070312,
+    "__type": "{0a0eddc9}"
+   },
+   "castRadius": [
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100
+   ],
+   "castConeDistance": 100,
+   "mMissileSpec": {
+    "mMissileWidth": 20,
+    "movementComponent": {
+     "mTargetHeightAugment": 100,
+     "mOffsetInitialTargetHeight": 100,
+     "mStartBoneName": "Jaw",
+     "mSpeed": 1000,
+     "__type": "FixedSpeedMovement"
+    },
+    "verticalFacing": {
+     "__type": "VeritcalFacingMatchVelocity"
+    },
+    "behaviors": [
+     {
+      "__type": "CastOnMovementComplete"
+     },
+     {
+      "__type": "DestroyOnMovementComplete"
+     }
+    ],
+    "__type": "MissileSpecification"
+   },
+   "mCastType": 1,
+   "castFrame": 25,
+   "missileSpeed": 700,
+   "mMissileEffectKey": "TFT_ElderDragon_BA_Mis",
+   "mLineWidth": 20,
+   "mHitEffectOrientType": 2,
+   "mHitEffectKey": "TFT_Global_BA_Hit",
+   "bHaveHitBone": true,
+   "mHitBoneName": "spine",
+   "selectionPriority": 1,
+   "mClientData": {
+    "mTargeterDefinitions": [
+     {
+      "useCasterBoundingBox": false,
+      "__type": "TargeterDefinitionRange"
+     }
+    ],
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ }
+}

@@ -1,0 +1,147 @@
+{
+ "Characters/TFT_ArmoryKeySupport/Spells/TFT_ArmoryKeySupport": {
+  "ObjectName": "TFT_ArmoryKeySupport",
+  "objectPath": "Characters/TFT_ArmoryKeySupport/Spells/TFT_ArmoryKeySupport",
+  "mScriptName": "TFT_ArmoryKeySupport",
+  "mSpell": {
+   "DataValues": [
+    {
+     "name": "RoundsToHatch",
+     "values": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2
+     ],
+     "__type": "SpellDataValue"
+    }
+   ],
+   "mAnimationName": "",
+   "mCastTime": 0.5,
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "mCantCancelWhileWindingUp": true,
+   "mTargetingTypeData": {
+    "__type": "Self"
+   },
+   "mClientData": {
+    "mTooltipData": {
+     "mObjectName": "TFT_ArmoryKeySupport",
+     "mFormat": "{fffee0e7}",
+     "mLocKeys": {
+      "keyName": "tft_armorykey_SupportItem_Name",
+      "keyTooltip": "tft_armorykey_SupportItem_Tooltip"
+     },
+     "mLists": {
+      "LevelUp": {
+       "__type": "TooltipInstanceList"
+      }
+     },
+     "__type": "TooltipInstanceSpell"
+    },
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ },
+ "Characters/TFT_ArmoryKeySupport/CharacterRecords/Root": {
+  "mCharacterName": "TFT_ArmoryKeySupport",
+  "baseHPModifiable": {
+   "baseValue": 10,
+   "__type": "ModifiableFloat"
+  },
+  "baseStaticHPRegenModifiable": {
+   "baseValue": 0,
+   "__type": "ModifiableFloat"
+  },
+  "healthBarHeight": 50,
+  "primaryAbilityResource": {
+   "arType": 0,
+   "{c4ab3550}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "arAllowMaxValueToBeOverridden": true,
+   "__type": "AbilityResourceSlotInfo"
+  },
+  "secondaryAbilityResource": {
+   "{726ee5cd}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "__type": "AbilityResourceSlotInfo"
+  },
+  "baseDamageModifiable": {
+   "baseValue": 70,
+   "__type": "ModifiableFloat"
+  },
+  "baseArmorModifiable": {
+   "baseValue": 10,
+   "__type": "ModifiableFloat"
+  },
+  "baseMR": {
+   "baseValue": 10,
+   "__type": "ModifiableFloat"
+  },
+  "critDamageMultiplier": 0,
+  "baseMoveSpeedModifiable": {
+   "baseValue": 500,
+   "__type": "ModifiableFloat"
+  },
+  "attackSpeedModifiable": {
+   "baseValue": 1,
+   "__type": "ModifiableFloat"
+  },
+  "expGivenOnDeath": 0,
+  "goldGivenOnDeath": 0,
+  "spellNames": [
+   "TFT_ArmoryKeySupport",
+   "",
+   "",
+   ""
+  ],
+  "spells": [
+   "Characters/TFT_ArmoryKeySupport/Spells/TFT_ArmoryKeySupport",
+   "{00000000}",
+   "{00000000}",
+   "{00000000}"
+  ],
+  "selectionRadius": 120,
+  "unitTagsString": "Champion",
+  "NumToCombine": 99,
+  "mMoveInterval": -0.10000000149011612,
+  "mMoveProximity": 180,
+  "mMoveRange": 0,
+  "mMoveHeight": 0,
+  "mShopData": "{fae72f61}",
+  "mUnitInfoCardAttachToBone": "Root",
+  "UnitInfoCardDisplayType": 2,
+  "mUsesAbilityPower": false,
+  "mManaPerAttack": 0,
+  "__type": "TFTCharacterRecord"
+ }
+}

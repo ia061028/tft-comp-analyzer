@@ -1,0 +1,331 @@
+{
+ "Characters/TFT_MurkWolf/Spells/TFT_MurkWolfBasicAttack2": {
+  "ObjectName": "TFT_MurkWolfBasicAttack2",
+  "objectPath": "Characters/TFT_MurkWolf/Spells/TFT_MurkWolfBasicAttack2",
+  "mScriptName": "TFT_MurkWolfBasicAttack2",
+  "mSpell": {
+   "mAffectsTypeFlags": 5327,
+   "mAnimationName": "Attack2_base",
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "bHaveHitEffect": true,
+   "castRange": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "castRangeValues": {
+    "values": [
+     200,
+     200,
+     200,
+     200,
+     200,
+     200,
+     200
+    ],
+    "{0a3e0478}": 200,
+    "__type": "{0a0eddc9}"
+   },
+   "castRadius": [
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100
+   ],
+   "castConeDistance": 100,
+   "castFrame": 15,
+   "missileSpeed": 0,
+   "mHitEffectOrientType": 2,
+   "mHitEffectKey": "TFT_Global_BA_Hit",
+   "bHaveHitBone": true,
+   "mHitBoneName": "C_BUFFBONE_GLB_CHEST_LOC",
+   "mClientData": {
+    "mTargeterDefinitions": [
+     {
+      "__type": "TargeterDefinitionRange"
+     }
+    ],
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ },
+ "Characters/TFT_MurkWolf/Spells/TFT_MurkWolfBasicAttack": {
+  "ObjectName": "TFT_MurkWolfBasicAttack",
+  "objectPath": "Characters/TFT_MurkWolf/Spells/TFT_MurkWolfBasicAttack",
+  "mScriptName": "TFT_MurkWolfBasicAttack",
+  "mSpell": {
+   "mAffectsTypeFlags": 5327,
+   "mAnimationName": "Attack1_base",
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "bHaveHitEffect": true,
+   "castRange": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "castRangeValues": {
+    "values": [
+     200,
+     200,
+     200,
+     200,
+     200,
+     200,
+     200
+    ],
+    "{0a3e0478}": 200,
+    "__type": "{0a0eddc9}"
+   },
+   "castRadius": [
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100
+   ],
+   "castConeDistance": 100,
+   "castFrame": 15,
+   "missileSpeed": 0,
+   "mHitEffectOrientType": 2,
+   "mHitEffectKey": "TFT_Global_BA_Hit",
+   "bHaveHitBone": true,
+   "mHitBoneName": "C_BUFFBONE_GLB_CHEST_LOC",
+   "mClientData": {
+    "mTargeterDefinitions": [
+     {
+      "__type": "TargeterDefinitionRange"
+     }
+    ],
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ },
+ "Characters/TFT_MurkWolf/Spells/TFT_MurkWolfSpell": {
+  "ObjectName": "TFT_MurkWolfSpell",
+  "objectPath": "Characters/TFT_MurkWolf/Spells/TFT_MurkWolfSpell",
+  "mScriptName": "TFT_MurkWolfSpell",
+  "mSpell": {
+   "mAffectsTypeFlags": 6154,
+   "mAnimationName": "",
+   "spellCastTime": 2.5,
+   "spellTotalTime": 3.5,
+   "cooldownTime": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "Cooldown": {
+    "values": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "{0a3e0478}": 0,
+    "__type": "{0a0eddc9}"
+   },
+   "castRange": [
+    2000,
+    2000,
+    2000,
+    2000,
+    2000,
+    2000,
+    2000
+   ],
+   "castRangeValues": {
+    "values": [
+     2000,
+     2000,
+     2000,
+     2000,
+     2000,
+     2000,
+     2000
+    ],
+    "{0a3e0478}": 2000,
+    "__type": "{0a0eddc9}"
+   },
+   "mClientData": {
+    "mTooltipData": {
+     "mObjectName": "TFT_MurkWolfSpell",
+     "mFormat": "{fffee0e7}",
+     "mLocKeys": {
+      "keyName": "Spell_TFT_MurkwolfSpell_Name",
+      "keyTooltip": "Spell_TFT_MurkwolfSpell_Tooltip"
+     },
+     "mLists": {
+      "LevelUp": {
+       "levelCount": 3,
+       "__type": "TooltipInstanceList"
+      }
+     },
+     "__type": "TooltipInstanceSpell"
+    },
+    "__type": "SpellDataResourceClient"
+   },
+   "__type": "SpellDataResource"
+  },
+  "__type": "SpellObject"
+ },
+ "Characters/TFT_MurkWolf/CharacterRecords/Root": {
+  "mCharacterName": "TFT_MurkWolf",
+  "baseHPModifiable": {
+   "baseValue": 1300,
+   "__type": "ModifiableFloat"
+  },
+  "baseStaticHPRegenModifiable": {
+   "baseValue": 0,
+   "__type": "ModifiableFloat"
+  },
+  "healthBarHeight": 40,
+  "primaryAbilityResource": {
+   "arType": 0,
+   "{726ee5cd}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "{c4ab3550}": {
+    "baseValue": 0,
+    "__type": "ModifiableFloat"
+   },
+   "arAllowMaxValueToBeOverridden": true,
+   "__type": "AbilityResourceSlotInfo"
+  },
+  "baseDamageModifiable": {
+   "baseValue": 230,
+   "__type": "ModifiableFloat"
+  },
+  "baseArmorModifiable": {
+   "baseValue": 15,
+   "__type": "ModifiableFloat"
+  },
+  "baseMR": {
+   "baseValue": 15,
+   "__type": "ModifiableFloat"
+  },
+  "baseCritChance": 0.25,
+  "critDamageMultiplier": 1.399999976158142,
+  "baseMoveSpeedModifiable": {
+   "baseValue": 550,
+   "__type": "ModifiableFloat"
+  },
+  "attackRangeModifiable": {
+   "baseValue": 180,
+   "__type": "ModifiableFloat"
+  },
+  "attackSpeedModifiable": {
+   "baseValue": 1,
+   "__type": "ModifiableFloat"
+  },
+  "basicAttack": {
+   "mAttackTotalTime": 1.600000023841858,
+   "mAttackCastTime": 0.5,
+   "mAttackProbability": 0.5,
+   "mAttackName": "TFT_MurkWolfBasicAttack",
+   "__type": "AttackSlotData"
+  },
+  "extraAttacks": [
+   {
+    "mAttackProbability": 0.5,
+    "mAttackName": "TFT_MurkWolfBasicAttack",
+    "__type": "AttackSlotData"
+   }
+  ],
+  "critAttacks": [
+   {
+    "mAttackName": "TFT_MurkWolfBasicAttack",
+    "__type": "AttackSlotData"
+   }
+  ],
+  "expGivenOnDeath": 0,
+  "goldGivenOnDeath": 0,
+  "spellNames": [
+   "TFT_MurkWolfSpell",
+   "",
+   "",
+   ""
+  ],
+  "spells": [
+   "Characters/TFT_MurkWolf/Spells/TFT_MurkWolfSpell",
+   "{00000000}",
+   "{00000000}",
+   "{00000000}"
+  ],
+  "unitTagsString": "Champion | Monster",
+  "CharacterRole": "{d5823aeb}",
+  "mMoveInterval": 0.10000000149011612,
+  "mMoveProximity": 180,
+  "mMoveRange": 250,
+  "mMoveHeight": 0,
+  "mShopData": "{aa78dba0}",
+  "mIsDiscoverable": false,
+  "__type": "TFTCharacterRecord"
+ }
+}
