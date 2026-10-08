@@ -5,6 +5,8 @@ import {
   pickTargetPatch,
   isSynthesizedPatch,
   resolvePatch,
+  platformOf,
+  entryEarliestSinceMs,
   planPatchViews,
   planRecentViews,
   ALL_PATCHES_KEY,
@@ -121,6 +123,37 @@ test('resolvePatch: スケジュールの並び順に依存しない', () => {
   const reversed = [...SCHEDULE].reverse()
   assert.equal(resolvePatch('18.0', T('2026-09-12T00:00:00Z'), reversed), '18.2')
   assert.equal(resolvePatch('18.0', T('2026-09-01T00:00:00Z'), reversed), '18.1')
+})
+
+test('resolvePatch: platform 別の since で境界をずらす（未登録の platform は since）', () => {
+  const sched = [
+    { patch: '18.3b', since: '2026-09-24T17:00:00Z' },
+    {
+      patch: '18.4',
+      since: '2026-10-07T00:00:00Z',
+      sinceByPlatform: { kr: '2026-10-06T22:00:00Z', euw1: '2026-10-07T04:00:00Z', na1: null },
+    },
+  ]
+  // KR は配信済み（23時）、EUW は未配信（02時）、NA は null なのでいつでも前パッチ。
+  assert.equal(resolvePatch('18.0', T('2026-10-06T23:00:00Z'), sched, 'kr'), '18.4')
+  assert.equal(resolvePatch('18.0', T('2026-10-07T02:00:00Z'), sched, 'euw1'), '18.3b')
+  assert.equal(resolvePatch('18.0', T('2026-10-07T05:00:00Z'), sched, 'euw1'), '18.4')
+  assert.equal(resolvePatch('18.0', T('2026-10-08T00:00:00Z'), sched, 'na1'), '18.3b')
+  // 上書きの無い platform と platform 未指定は since。
+  assert.equal(resolvePatch('18.0', T('2026-10-06T23:00:00Z'), sched, 'br1'), '18.3b')
+  assert.equal(resolvePatch('18.0', T('2026-10-07T01:00:00Z'), sched), '18.4')
+})
+
+test('platformOf: マッチ ID の接頭辞を小文字で', () => {
+  assert.equal(platformOf('KR_8408686667'), 'kr')
+  assert.equal(platformOf('NA1_123'), 'na1')
+  assert.equal(platformOf('noprefix'), undefined)
+})
+
+test('entryEarliestSinceMs: 上書き（null 以外）と since の最も早い時刻', () => {
+  const e = { patch: '18.4', since: '2026-10-07T00:00:00Z', sinceByPlatform: { oc1: '2026-10-06T18:00:00Z', na1: null } }
+  assert.equal(entryEarliestSinceMs(e), Date.parse('2026-10-06T18:00:00Z'))
+  assert.equal(entryEarliestSinceMs({ patch: '18.1', since: '2026-08-26T00:00:00Z' }), Date.parse('2026-08-26T00:00:00Z'))
 })
 
 // ---- planPatchViews ----

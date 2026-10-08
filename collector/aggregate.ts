@@ -24,7 +24,7 @@ import { dirname, join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { fileURLToPath } from 'node:url'
 import { config, KNOWN_ROUTES } from './config.ts'
-import { compareVersions, resolvePatch, planPatchViews, planRecentViews, retentionFloor } from './patches.ts'
+import { compareVersions, resolvePatch, planPatchViews, planRecentViews, platformOf, retentionFloor } from './patches.ts'
 import { getStaticData, type StaticData } from './cdragon.ts'
 import type { ParticipantRecord, WireDrillFile, WireStatsFile, WireSummaryFile, PatchIndexEntry } from '../shared/types.ts'
 import {
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
   const scan = await forEachRecord(routes.values(), (rec) => {
     const setKey = typeof rec.s === 'number' ? String(rec.s) : '-'
     if (typeof rec.s === 'number') setCounts.set(rec.s, (setCounts.get(rec.s) ?? 0) + 1)
-    const patch = resolvePatch(rec.v, rec.ts, schedule)
+    const patch = resolvePatch(rec.v, rec.ts, schedule, platformOf(rec.m))
     const key = `${setKey}|${patch}`
     let ms = matchSets.get(key)
     if (!ms) {
@@ -250,7 +250,7 @@ async function main(): Promise<void> {
   const granterCounter = createGranterCounter()
   let inScopeRecords = 0
   await forEachRecord(routes.values(), (rec) => {
-    const patch = resolvePatch(rec.v, rec.ts, schedule)
+    const patch = resolvePatch(rec.v, rec.ts, schedule, platformOf(rec.m))
     if (!inScope(rec, patch)) return
     inScopeRecords++
     const cls = classifyRecord(rec, staticData)
@@ -318,7 +318,7 @@ async function main(): Promise<void> {
   // 8. パス C（集計）: 対象レコードを、それを含む全ビューの builder へ。
   t0 = Date.now()
   await forEachRecord(routes.values(), (rec, route) => {
-    const patch = resolvePatch(rec.v, rec.ts, schedule)
+    const patch = resolvePatch(rec.v, rec.ts, schedule, platformOf(rec.m))
     if (!inScope(rec, patch)) return
     for (const vi of viewIdxsOf(patch, rec.ts)) {
       summaryBuilders[vi].builder.add(rec)
