@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512">
+  <!-- apple-touch-icon.png / icon-192.png / icon-512.png の元絵。マークは public/favicon.svg と同じ。余白は maskable の安全域（中心から半径40%）に収める -->
+  <rect width="64" height="64" fill="#131417"/>
+  <g transform="translate(32 32) scale(0.72) translate(-32 -32)">
+    <path fill="#e8b75c" d="M32 2 58 17v30L32 62 6 47V17Z"/>
+    <path fill="#131417" d="M18 19h28v8H36v20h-8V27H18Z"/>
+  </g>
+</svg>
