@@ -369,13 +369,25 @@ export interface WireDrillType {
   b: number[]
   /** その盤面の [人数, 順位合計]（数え始めてからの下限値）。 */
   bs: [number, number]
-  /**
-   * プレイヤーレベルの区分ごとの最頻の盤面 [区分, 盤面, 人数, 順位合計]。人の居ない区分は出さない。
-   * 画面でレベルを選んだときは、b ではなくこちらを出す（Lv8 で 9体の盤面が出ないように）。
-   * 無い古いファイルは b を出す。まとめ行は空。
-   */
+  /** 旧形式のレベル区分ごとの最頻盤面 [区分, 盤面, 人数, 順位合計]。今は l に置き換わり、書き出さない。 */
   bl?: [LevelKey, number[], number, number][]
+  /**
+   * プレイヤーレベルの区分ごとの内訳。画面でレベルを選んだときは型の数字・駒・最多の盤面を全部こちらから出す
+   * （盤面だけレベル別だと、駒の採用率に別レベルの人が混ざって盤面と食い違う）。
+   * ファイルには書かず、drill-<ビュー>-lv.json（WireDrillLevelsFile）から読み込み時に付ける。
+   * 無いときは bl と型の平均Lvで代用する。
+   */
+  l?: WireDrillLevel[]
   /** 採用率の高い順。まとめ行は空。 */
+  u: WireDrillUnit[]
+}
+
+/** 型のプレイヤーレベル区分ごとの内訳。人の居ない区分は出さない。まとめ行は s だけ（b, u は空）。 */
+export interface WireDrillLevel {
+  k: LevelKey
+  s: WireRecordStat
+  b: number[]
+  bs: [number, number]
   u: WireDrillUnit[]
 }
 
@@ -385,6 +397,17 @@ export interface WireDrillRow {
   m: number
   /** [全体, 紋章あり, 紋章なし]。人数の多い順。 */
   sp: [WireDrillType[], WireDrillType[], WireDrillType[]]
+}
+
+/**
+ * drill-<ビュー>-lv.json。型ごとのレベル区分の内訳を、drill-<ビュー>.json と同じ並び（rows / sp / 型の順）で持つ。
+ * 駒の idx は drill-<ビュー>.json の units。レベルを選んだときだけ読む（全Lv の表示を重くしない）。
+ */
+export interface WireDrillLevelsFile {
+  schemaVersion: 1
+  generatedAt: string
+  key: string
+  rows: { t: number; m: number; sp: [WireDrillLevel[][], WireDrillLevel[][], WireDrillLevel[][]] }[]
 }
 
 export interface WireDrillUnitInfo {

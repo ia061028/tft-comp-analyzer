@@ -2,6 +2,8 @@
 //
 // 特性の段（summary.json の特性行）ごとに、同じ盤面で一番深く発動している別の特性（相方）で
 // 「構成の型」に分け、型ごとの成績・最頻の盤面・駒ごとの星3率を数える。
+// 型の中はプレイヤーレベルの区分ごとにも同じものを数える（画面でレベルを選んだときに、
+// 型の数字・駒・盤面がそろって同じプレイヤーの分になるように）。
 // 例: ブラックソーン4 ＋ラヴィジャー / ＋スペルウィーバー / ＋エクセキューショナー。
 
 import type { StaticData } from './cdragon.ts'
@@ -9,6 +11,8 @@ import type {
   LevelKey,
   ParticipantRecord,
   WireDrillFile,
+  WireDrillLevel,
+  WireDrillLevelsFile,
   WireDrillRow,
   WireDrillType,
   WireDrillUnit,
@@ -33,17 +37,23 @@ interface BoardSlot {
   place: number
 }
 
-interface TypeAcc {
+/** 型（またはその中の1つのレベル区分）の集計。 */
+interface SliceAcc {
   s: WireRecordStat
   /** unitIdx → [採用人数, 星3人数, 星3の順位合計, 星3以外の順位合計] */
   units: Map<number, [number, number, number, number]>
   boards: Map<string, BoardSlot>
-  /** プレイヤーレベルの区分ごとの最頻盤面の候補 */
-  boardsByLv: Map<LevelKey, Map<string, BoardSlot>>
 }
 
+interface TypeAcc extends SliceAcc {
+  /** プレイヤーレベルの区分ごとの内訳（画面でレベルを選んだときは、型の数字も駒も盤面もこちら） */
+  byLv: Map<LevelKey, SliceAcc>
+}
+
+const newSlice = (): SliceAcc => ({ s: emptyStat(), units: new Map(), boards: new Map() })
+
 function newType(): TypeAcc {
-  return { s: emptyStat(), units: new Map(), boards: new Map(), boardsByLv: new Map() }
+  return { ...newSlice(), byLv: new Map() }
 }
 
 const LEVEL_KEYS: readonly LevelKey[] = ['7', '8', '9', '10']
@@ -118,6 +128,28 @@ export function partnerOf(
   return best
 }
 
+function addSlice(
+  acc: SliceAcc,
+  rec: ParticipantRecord,
+  units: number[],
+  stars: (number | undefined)[],
+  boardKey: string,
+): void {
+  addStat(acc.s, rec)
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i]
+    let a = acc.units.get(u)
+    if (!a) acc.units.set(u, (a = [0, 0, 0, 0]))
+    a[0]++
+    // 星の記録が無い旧レコードは星3以外に数える（星3率は下振れするが、平均は人数と合う）。
+    if (stars[i] === 3) {
+      a[1]++
+      a[2] += rec.p
+    } else a[3] += rec.p
+  }
+  if (boardKey) addBoard(acc.boards, boardKey, rec.p)
+}
+
 export interface DrillBuilder {
   add(rec: ParticipantRecord): void
   finish(key: string, generatedAt: string): WireDrillFile
@@ -141,25 +173,11 @@ export function createDrillBuilder(staticData: StaticData): DrillBuilder {
   ): void {
     let acc = types.get(partner)
     if (!acc) types.set(partner, (acc = newType()))
-    addStat(acc.s, rec)
-    for (let i = 0; i < units.length; i++) {
-      const u = units[i]
-      let a = acc.units.get(u)
-      if (!a) acc.units.set(u, (a = [0, 0, 0, 0]))
-      a[0]++
-      // 星の記録が無い旧レコードは星3以外に数える（星3率は下振れするが、平均は人数と合う）。
-      if (stars[i] === 3) {
-        a[1]++
-        a[2] += rec.p
-      } else a[3] += rec.p
-    }
-    if (boardKey) {
-      addBoard(acc.boards, boardKey, rec.p)
-      const lv = levelKeyOf(rec.lv)
-      let byLv = acc.boardsByLv.get(lv)
-      if (!byLv) acc.boardsByLv.set(lv, (byLv = new Map()))
-      addBoard(byLv, boardKey, rec.p)
-    }
+    const lv = levelKeyOf(rec.lv)
+    let byLv = acc.byLv.get(lv)
+    if (!byLv) acc.byLv.set(lv, (byLv = newSlice()))
+    addSlice(acc, rec, units, stars, boardKey)
+    addSlice(byLv, rec, units, stars, boardKey)
   }
 
   return {
@@ -206,9 +224,10 @@ export function createDrillBuilder(staticData: StaticData): DrillBuilder {
       for (const row of outRows) {
         for (const types of row.sp) {
           for (const ty of types) {
-            ty.b = ty.b.map((u) => remap.get(u)!)
-            for (const l of ty.bl ?? []) l[1] = l[1].map((u) => remap.get(u)!)
-            for (const u of ty.u) u[0] = remap.get(u[0])!
+            for (const sl of [ty, ...(ty.l ?? [])]) {
+              sl.b = sl.b.map((u) => remap.get(u)!)
+              for (const u of sl.u) u[0] = remap.get(u[0])!
+            }
           }
         }
       }
@@ -223,7 +242,7 @@ export function createDrillBuilder(staticData: StaticData): DrillBuilder {
             const byCost = (a: number, b: number) =>
               units[a].cost - units[b].cost || (units[a].name < units[b].name ? -1 : 1)
             ty.b.sort(byCost)
-            for (const l of ty.bl ?? []) l[1].sort(byCost)
+            for (const l of ty.l ?? []) l.b.sort(byCost)
           }
         }
       }
@@ -232,34 +251,76 @@ export function createDrillBuilder(staticData: StaticData): DrillBuilder {
   }
 }
 
+function finishSlice(acc: SliceAcc, used: Set<number>): Pick<WireDrillType, 's' | 'b' | 'bs' | 'u'> {
+  const n = acc.s[0]
+  const units: WireDrillUnit[] = [...acc.units.entries()]
+    .filter(([, a]) => a[0] >= n * DRILL_UNIT_SHARE)
+    .sort((a, b) => b[1][0] - a[1][0] || a[0] - b[0])
+    .slice(0, DRILL_UNIT_LIMIT)
+    .map(([u, a]) => [u, a[0], a[1], a[2], a[3]])
+  const best = bestBoard(acc.boards)
+  const board = best ? boardUnits(best[0]) : []
+  for (const u of units) used.add(u[0])
+  for (const u of board) used.add(u)
+  return { s: acc.s, b: board, bs: best ? [best[1].n, best[1].place] : [0, 0], u: units }
+}
+
 function finishTypes(types: Map<number, TypeAcc>, used: Set<number>): WireDrillType[] {
   const sorted = [...types.entries()].sort((a, b) => b[1].s[0] - a[1].s[0] || a[0] - b[0])
   const out: WireDrillType[] = []
   const rest = emptyStat()
+  const restLv = new Map<LevelKey, WireRecordStat>()
   sorted.forEach(([p, acc], i) => {
     if (i >= DRILL_TYPE_LIMIT) {
       for (let k = 0; k < 5; k++) rest[k] += acc.s[k]
+      for (const [lv, sl] of acc.byLv) {
+        let r = restLv.get(lv)
+        if (!r) restLv.set(lv, (r = emptyStat()))
+        for (let k = 0; k < 5; k++) r[k] += sl.s[k]
+      }
       return
     }
-    const n = acc.s[0]
-    const units: WireDrillUnit[] = [...acc.units.entries()]
-      .filter(([, a]) => a[0] >= n * DRILL_UNIT_SHARE)
-      .sort((a, b) => b[1][0] - a[1][0] || a[0] - b[0])
-      .slice(0, DRILL_UNIT_LIMIT)
-      .map(([u, a]) => [u, a[0], a[1], a[2], a[3]])
-    const best = bestBoard(acc.boards)
-    const board = best ? boardUnits(best[0]) : []
-    const byLv: NonNullable<WireDrillType['bl']> = []
-    for (const lv of LEVEL_KEYS) {
-      const b = acc.boardsByLv.get(lv)
-      const top = b && bestBoard(b)
-      if (top) byLv.push([lv, boardUnits(top[0]), top[1].n, top[1].place])
+    const l: WireDrillLevel[] = []
+    for (const k of LEVEL_KEYS) {
+      const sl = acc.byLv.get(k)
+      if (sl) l.push({ k, ...finishSlice(sl, used) })
     }
-    for (const u of units) used.add(u[0])
-    for (const u of board) used.add(u)
-    for (const l of byLv) for (const u of l[1]) used.add(u)
-    out.push({ p, s: acc.s, b: board, bs: best ? [best[1].n, best[1].place] : [0, 0], bl: byLv, u: units })
+    out.push({ p, ...finishSlice(acc, used), l })
   })
-  if (rest[0] > 0) out.push({ p: -2, s: rest, b: [], bs: [0, 0], u: [] })
+  if (rest[0] > 0) {
+    const l: WireDrillLevel[] = LEVEL_KEYS.filter((k) => restLv.has(k)).map((k) => ({
+      k,
+      s: restLv.get(k)!,
+      b: [],
+      bs: [0, 0],
+      u: [],
+    }))
+    out.push({ p: -2, s: rest, b: [], bs: [0, 0], u: [], l })
+  }
   return out
+}
+
+/**
+ * 書き出し用に、型のレベル区分の内訳（l）を drill-<ビュー>-lv.json へ分ける。
+ * 内訳は本体の約2倍の大きさで、レベルを選んだときしか使わないため。
+ */
+export function splitDrillLevels(file: WireDrillFile): { main: WireDrillFile; levels: WireDrillLevelsFile } {
+  const levels: WireDrillLevelsFile = {
+    schemaVersion: 1,
+    generatedAt: file.generatedAt,
+    key: file.key,
+    rows: file.rows.map((r) => ({
+      t: r.t,
+      m: r.m,
+      sp: r.sp.map((types) => types.map((ty) => ty.l ?? [])) as WireDrillLevelsFile['rows'][number]['sp'],
+    })),
+  }
+  const main: WireDrillFile = {
+    ...file,
+    rows: file.rows.map((r) => ({
+      ...r,
+      sp: r.sp.map((types) => types.map((ty) => ({ p: ty.p, s: ty.s, b: ty.b, bs: ty.bs, u: ty.u }))) as WireDrillRow['sp'],
+    })),
+  }
+  return { main, levels }
 }

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { StaticData } from './cdragon.ts'
 import type { ParticipantRecord } from '../shared/types.ts'
-import { createDrillBuilder, DRILL_TYPE_LIMIT, levelKeyOf } from './drill-core.ts'
+import { createDrillBuilder, DRILL_TYPE_LIMIT, levelKeyOf, splitDrillLevels } from './drill-core.ts'
 
 // TraitA [2,4] / TraitB [2,4] / TraitC [2,3] / Solo [1]（Dee だけが持つ固有特性）。紋章A は TraitA。
 function makeStaticData(extraTraits = 0): StaticData {
@@ -77,20 +77,20 @@ test('分割（全体・紋章あり・紋章なし）、駒の採用と星3、�
   // 最頻の盤面は紋章なしの2人の盤面（コスト順）
   assert.deepEqual(all[0].b.map(name), ['Ann', 'Bob', 'Cid'])
   assert.deepEqual(all[0].bs, [2, 4])
-  // レベル区分ごとの最頻盤面（rec の既定 lv の区分に全員が入る）
-  assert.deepEqual(
-    all[0].bl!.map(([lv, board, n, place]) => [lv, board.map(name), n, place]),
-    [[levelKeyOf(rec({}).lv), ['Ann', 'Bob', 'Cid'], 2, 4]],
-  )
+  // レベル区分ごとの内訳（rec の既定 lv の区分に全員が入るので、型全体と同じ）
+  assert.equal(all[0].l!.length, 1)
+  const { k, ...slice } = all[0].l![0]
+  assert.equal(k, levelKeyOf(rec({}).lv))
+  assert.deepEqual(slice, { s: all[0].s, b: all[0].b, bs: all[0].bs, u: all[0].u })
   // 辞書には使った駒だけが入る
   assert.deepEqual(out.units.map((u) => u.api).sort(), ['U1', 'U2', 'U3', 'U4'])
 })
 
-test('レベル区分ごとの最頻盤面は、そのレベルのプレイヤーの盤面だけで選ぶ', () => {
+test('レベル区分ごとの内訳は、人数・駒・最頻盤面をそのレベルのプレイヤーだけで数える', () => {
   const b = createDrillBuilder(makeStaticData())
   const t = { TraitA: 3, TraitB: 1 }
   const tc = { TraitA: 4, TraitB: 2 }
-  // Lv9 の3人は4体盤面、Lv8 の2人は3体盤面。全体の最多は4体盤面
+  // Lv9 の3人は Dee を足した4体盤面、Lv8 の2人は3体盤面。全体の最多は4体盤面
   for (const p of [1, 2, 3]) b.add(rec({ p, lv: 9, t, tc, u: ['U1', 'U2', 'U3', 'U4'] }))
   for (const p of [4, 6]) b.add(rec({ p, lv: 8, t, tc, u: ['U1', 'U2', 'U3'] }))
   b.add(rec({ p: 8, lv: 11, t, tc, u: ['U4'] }))
@@ -99,13 +99,19 @@ test('レベル区分ごとの最頻盤面は、そのレベルのプレイヤ�
   const name = (u: number) => out.units[u].name
   assert.equal(ty.b.length, 4)
   assert.deepEqual(
-    ty.bl!.map(([lv, board, n, place]) => [lv, board.map(name), n, place]),
+    ty.l!.map((l) => [l.k, l.s[0], l.s[1], l.b.map(name), l.bs]),
     [
-      ['8', ['Ann', 'Bob', 'Cid'], 2, 10],
-      ['9', ['Ann', 'Dee', 'Bob', 'Cid'], 3, 6],
-      ['10', ['Dee'], 1, 8],
+      ['8', 2, 10, ['Ann', 'Bob', 'Cid'], [2, 10]],
+      ['9', 3, 6, ['Ann', 'Dee', 'Bob', 'Cid'], [3, 6]],
+      ['10', 1, 8, ['Dee'], [1, 8]],
     ],
   )
+  // Lv8 の駒に、Lv9 以上だけが使う Dee は混ざらない（全体では 4/6 人が採用）
+  assert.ok(ty.u.some((u) => name(u[0]) === 'Dee'))
+  const lv8 = ty.l!.find((l) => l.k === '8')!
+  assert.deepEqual(lv8.u.map((u) => [name(u[0]), u[1]]).sort(), [['Ann', 2], ['Bob', 2], ['Cid', 2]])
+  // 旧形式の bl は書き出さない
+  assert.equal(ty.bl, undefined)
 })
 
 test('levelKeyOf: 7以下と10以上をまとめる', () => {
@@ -127,4 +133,26 @@ test('型の数の上限を超えた分は、まとめ行（p = -2）に寄せ�
   assert.equal(rest.s[0], 3)
   assert.deepEqual(rest.u, [])
   assert.deepEqual(rest.b, [])
+  // まとめ行もレベル区分ごとの人数を持つ（rec の既定 lv）
+  assert.deepEqual(rest.l, [{ k: levelKeyOf(rec({}).lv), s: rest.s, b: [], bs: [0, 0], u: [] }])
+})
+
+test('splitDrillLevels: 内訳は別ファイルへ同じ並びで分け、本体には残さない', () => {
+  const b = createDrillBuilder(makeStaticData())
+  b.add(rec({ p: 2, lv: 9, t: { TraitA: 3, TraitB: 1 }, tc: { TraitA: 4, TraitB: 2 }, u: ['U1'] }))
+  b.add(rec({ p: 4, lv: 8, t: { TraitA: 3, TraitC: 1 }, tc: { TraitA: 4, TraitC: 2 }, u: ['U2'] }))
+  const full = b.finish('v', 'g')
+  const { main, levels } = splitDrillLevels(full)
+  assert.equal(levels.generatedAt, 'g')
+  assert.equal(levels.rows.length, main.rows.length)
+  main.rows.forEach((r, i) => {
+    assert.deepEqual([levels.rows[i].t, levels.rows[i].m], [r.t, r.m])
+    r.sp.forEach((types, k) => {
+      assert.equal(levels.rows[i].sp[k].length, types.length)
+      types.forEach((ty, j) => {
+        assert.equal(ty.l, undefined)
+        assert.deepEqual(levels.rows[i].sp[k][j], full.rows[i].sp[k][j].l)
+      })
+    })
+  })
 })
