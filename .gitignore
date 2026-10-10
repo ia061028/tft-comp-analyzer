@@ -24,6 +24,8 @@ dist-ssr
 # デザイン: ソース(html/css/prompt.md)は追跡し、スクリーンショットは追跡しない。
 # guidelines 配下の png は実装から撮り直せる生成物（22枚 / 約13MB）。
 design/**/*.png
+# アイコンの元絵は撮り直せないので追跡する
+!design/brand/*.png
 
 # Editor directories and files
 .vscode/*
