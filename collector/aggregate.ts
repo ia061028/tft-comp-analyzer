@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url'
 import { config, KNOWN_ROUTES } from './config.ts'
 import { compareVersions, resolvePatch, planPatchViews, planRecentViews, platformOf, retentionFloor } from './patches.ts'
 import { getStaticData, type StaticData } from './cdragon.ts'
-import type { ParticipantRecord, WireDrillFile, WireStatsFile, WireSummaryFile, PatchIndexEntry } from '../shared/types.ts'
+import type { ParticipantRecord, WireDrillFile, WireDrillLevelsFile, WireStatsFile, WireSummaryFile, PatchIndexEntry } from '../shared/types.ts'
 import {
   classifyRecord,
   createGranterCounter,
@@ -45,7 +45,7 @@ import {
   summaryDictionaries,
   type SummaryBuilder,
 } from './summary-core.ts'
-import { createDrillBuilder, type DrillBuilder } from './drill-core.ts'
+import { createDrillBuilder, splitDrillLevels, type DrillBuilder } from './drill-core.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(here, '..')
@@ -58,6 +58,8 @@ const VIEW_FILE_RE = /^stats-[^/\\]+\.json$/
 /** 統計ページの掘り下げ（ビューごと、特性行を押したときに読む） */
 const DRILL_FILE_RE = /^drill-[^/\\]+\.json$/
 const drillFileName = (key: string): string => `drill-${key}.json`
+/** 掘り下げのレベル区分の内訳（レベルを選んだときだけ読む） */
+const drillLevelsFileName = (key: string): string => `drill-${key}-lv.json`
 
 function viewFileName(key: string, defaultKey: string): string {
   return key === defaultKey ? DEFAULT_FILE : `stats-${key}.json`
@@ -75,10 +77,10 @@ function tftLabelOf(patch: string): string | undefined {
  * 集計は純関数で、出力は generatedAt を除き入力レコードのみに決定的に依存する。
  * 一致すれば書き換えをスキップし、generatedAt だけが変わる無意味な main コミット/デプロイを防ぐ。
  */
-function isUnchanged(path: string, out: WireStatsFile | WireSummaryFile | WireDrillFile): boolean {
+function isUnchanged(path: string, out: WireStatsFile | WireSummaryFile | WireDrillFile | WireDrillLevelsFile): boolean {
   if (!existsSync(path)) return false
   try {
-    const prev = JSON.parse(readFileSync(path, 'utf8')) as WireStatsFile | WireSummaryFile | WireDrillFile
+    const prev = JSON.parse(readFileSync(path, 'utf8')) as { generatedAt: string }
     return JSON.stringify({ ...prev, generatedAt: '' }) === JSON.stringify({ ...out, generatedAt: '' })
   } catch {
     // 既存ファイルが壊れている等でパース不能なら比較を諦め、通常どおり書き直す。
@@ -365,11 +367,16 @@ async function main(): Promise<void> {
     )
   }
 
-  const drillOuts = drillBuilders.map(({ key, builder }) => ({ file: drillFileName(key), out: builder.finish(key, generatedAt) }))
+  const drillOuts: { file: string; out: WireDrillFile | WireDrillLevelsFile }[] = []
+  for (const { key, builder } of drillBuilders) {
+    const { main, levels } = splitDrillLevels(builder.finish(key, generatedAt))
+    drillOuts.push({ file: drillFileName(key), out: main }, { file: drillLevelsFileName(key), out: levels })
+  }
   for (const { file, out } of drillOuts) {
     const body = JSON.stringify(out)
+    const units = 'units' in out ? ` / 駒 ${out.units.length}` : ''
     console.log(
-      `[${out.key}] 掘り下げ: 特性×段 ${out.rows.length} 行 / 駒 ${out.units.length} → ${file} ` +
+      `[${out.key}] 掘り下げ: 特性×段 ${out.rows.length} 行${units} → ${file} ` +
         `(${(Buffer.byteLength(body) / 1024).toFixed(1)} KB, gzip ${(gzipSync(body).length / 1024).toFixed(1)} KB)`,
     )
   }

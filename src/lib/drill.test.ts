@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { WireDrillFile, WireSummaryFile } from '../../shared/types'
-import { drillTypes } from './drill'
+import type { WireDrillFile, WireDrillLevelsFile, WireSummaryFile } from '../../shared/types'
+import { drillTypes, withDrillLevels } from './drill'
 
 const summary: WireSummaryFile = {
   schemaVersion: 1,
@@ -79,7 +79,7 @@ test('drillTypes: まとめ行は partner = null、行が無ければ空', () =>
   assert.deepEqual(drillTypes(drill, summary, 'B', 2, 'all', 'en'), [])
 })
 
-test('drillTypes: レベルを選ぶと型を平均Lvでふるい分け、盤面はそのレベルのものを出す', () => {
+test('drillTypes: 内訳の無い古いファイルは、レベルを選ぶと型を平均Lvでふるい分け、盤面はそのレベルのものを出す', () => {
   // 型の平均Lv: 相方ブラボー 8.5（区分9）、相方なし 8.0（区分8）
   const lv9 = drillTypes(drill, summary, 'A', 4, 'all', 'ja', '9')
   assert.equal(lv9.length, 1)
@@ -100,4 +100,66 @@ test('drillTypes: レベル別の盤面があってもその区分に人が居�
   only.rows[0].sp[0][0].s[4] = 64 // 平均Lv 8.0
   const [ty] = drillTypes(only, summary, 'A', 4, 'all', 'ja', '8')
   assert.deepEqual(ty.board, [])
+})
+
+test('drillTypes: レベル別の内訳があれば、型の数字・駒・盤面をそのレベルのプレイヤーだけで出す', () => {
+  const lv = structuredClone(drill)
+  const [bravo, solo] = lv.rows[0].sp[0]
+  // ブラボー型: Lv8 は1人で Ann だけ、Lv9 は7人で Bob を採用（全体の駒には Bob が居る）
+  bravo.l = [
+    { k: '8', s: [1, 5, 0, 0, 8], b: [0], bs: [1, 5], u: [[0, 1, 0, 0, 5]] },
+    { k: '9', s: [7, 19, 5, 2, 60], b: [0, 1], bs: [4, 10], u: [[1, 7, 6, 15, 4]] },
+  ]
+  solo.l = [{ k: '8', s: [2, 14, 0, 0, 16], b: [0], bs: [2, 14], u: [[0, 2, 0, 0, 14]] }]
+  // まとめ行は人数だけ
+  lv.rows[0].sp[2][0].l = [{ k: '8', s: [3, 12, 1, 0, 24], b: [], bs: [0, 0], u: [] }]
+
+  const lv8 = drillTypes(lv, summary, 'A', 4, 'all', 'ja', '8')
+  // 人数の多い順（相方なし 2人 → ブラボー 1人）。割合の母数はこのレベルの人数
+  assert.deepEqual(lv8.map((ty) => [ty.partner?.name, ty.n, ty.share.toFixed(1)]), [
+    [undefined, 2, '66.7'],
+    ['ブラボー', 1, '33.3'],
+  ])
+  const b8 = lv8[1]
+  assert.equal(b8.avg, 5)
+  assert.equal(b8.lv, 8)
+  assert.deepEqual(b8.board.map((u) => u.name), ['アン'])
+  // 盤面に居ない Bob（Lv9 だけが採用）は駒の一覧にも出ない
+  assert.deepEqual(b8.units.map((u) => [u.name, u.share]), [['アン', 100]])
+
+  // その区分に人が居ない型は出さない
+  const lv9 = drillTypes(lv, summary, 'A', 4, 'all', 'ja', '9')
+  assert.deepEqual(lv9.map((ty) => ty.partner?.name), ['ブラボー'])
+  assert.equal(lv9[0].share, 100)
+  assert.deepEqual(drillTypes(lv, summary, 'A', 4, 'all', 'ja', '10'), [])
+
+  const [rest] = drillTypes(lv, summary, 'A', 4, 'without', 'ja', '8')
+  assert.equal(rest.partner, null)
+  assert.equal(rest.n, 3)
+})
+
+test('withDrillLevels: 同じ集計回の内訳だけを型に付ける', () => {
+  const levels: WireDrillLevelsFile = {
+    schemaVersion: 1,
+    generatedAt: drill.generatedAt,
+    key: drill.key,
+    rows: [
+      {
+        t: 0,
+        m: 4,
+        sp: [
+          [[{ k: '8', s: [1, 5, 0, 0, 8], b: [0], bs: [1, 5], u: [] }], []],
+          [],
+          [[]],
+        ],
+      },
+    ],
+  }
+  const merged = withDrillLevels(drill, levels)
+  assert.equal(merged.rows[0].sp[0][0].l![0].k, '8')
+  assert.deepEqual(merged.rows[0].sp[0][1].l, [])
+  // 集計回が違えば付けない
+  assert.equal(withDrillLevels(drill, { ...levels, generatedAt: 'other' }), drill)
+  // 型の数が合わなければ付けない
+  assert.equal(withDrillLevels(drill, { ...levels, rows: [{ ...levels.rows[0], sp: [[], [], [[]]] }] }), drill)
 })

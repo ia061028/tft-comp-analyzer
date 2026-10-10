@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { LevelKey, WireDrillFile, WireSummaryFile, WireSummaryView } from '../shared/types'
+import type { LevelKey, WireDrillFile, WireDrillLevelsFile, WireSummaryFile, WireSummaryView } from '../shared/types'
 import { pickName, t, type Lang } from './lib/i18n'
 import { viewOptionLabel } from './lib/data'
 import {
@@ -18,7 +18,7 @@ import {
   type StatSortKey,
   type TraitSplit,
 } from './lib/summary'
-import { drillTypes, loadDrill, type DrillType } from './lib/drill'
+import { drillHasLevels, drillTypes, loadDrill, loadDrillLevels, withDrillLevels, type DrillType } from './lib/drill'
 import { costBorder, styleClasses } from './lib/format'
 import { SegmentedControl } from './components/SegmentedControl'
 import { SiteNav } from './components/SiteNav'
@@ -33,7 +33,8 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'missing' }
   | { status: 'ready'; file: WireSummaryFile }
-type DrillState = { status: 'loading' } | { status: 'error' } | { status: 'missing' } | { status: 'ready'; file: WireDrillFile }
+type FileState<F> = { status: 'loading' } | { status: 'error' } | { status: 'missing' } | { status: 'ready'; file: F }
+type DrillState = FileState<WireDrillFile>
 
 /** 「採用1%以上」で残す、表示中の参加者に対する採用の割合の下限。 */
 const MIN_SHARE = 0.01
@@ -73,6 +74,7 @@ export default function StatsPage() {
   const [openRow, setOpenRow] = useState<string | null>(null)
   /** ビュー key → 掘り下げファイル。行を初めて開いたときに読む。 */
   const [drills, setDrills] = useState<Record<string, DrillState>>({})
+  const [drillLevels, setDrillLevels] = useState<Record<string, FileState<WireDrillLevelsFile>>>({})
   const [sortKey, setSortKey] = useState<StatSortKey>('avg')
   const [sortDir, setSortDir] = useState<1 | -1>(1)
 
@@ -135,6 +137,29 @@ export default function StatsPage() {
       .then((f) => setDrills((d) => ({ ...d, [key]: f ? { status: 'ready', file: f } : { status: 'missing' } })))
       .catch(() => setDrills((d) => ({ ...d, [key]: { status: 'error' } })))
   }
+  const levelsState = drillKey ? drillLevels[drillKey] : undefined
+  // レベルを選んで型を開いている間は、型のレベル区分の内訳（drill-<key>-lv.json）も読む。
+  // 読み終わるまで levelsState は無く、型の欄は読み込み中の表示になる。
+  const needLevels = drillable && openRow !== null && level !== 'all' && drillKey !== null && !levelsState
+  useEffect(() => {
+    if (!needLevels || !drillKey) return
+    let live = true
+    const done = (st: FileState<WireDrillLevelsFile>) => {
+      if (live) setDrillLevels((d) => ({ ...d, [drillKey]: st }))
+    }
+    loadDrillLevels(drillKey)
+      .then((f) => done(f ? { status: 'ready', file: f } : { status: 'missing' }))
+      .catch(() => done({ status: 'error' }))
+    return () => {
+      live = false
+    }
+  }, [needLevels, drillKey])
+  const drillFile = useMemo(() => {
+    if (drill?.status !== 'ready') return null
+    // 内訳が読めない（古い集計・失敗）ときは本体だけで出す（型を平均Lvでふるい分ける旧来の表示）。
+    return level !== 'all' && levelsState?.status === 'ready' ? withDrillLevels(drill.file, levelsState.file) : drill.file
+  }, [drill, level, levelsState])
+
   const toggleRow = (key: string) => {
     setOpenRow((k) => (k === key ? null : key))
     ensureDrill(drillKey)
@@ -152,9 +177,15 @@ export default function StatsPage() {
   const renderDrill = (r: StatRow): ReactNode => {
     if (!drill || drill.status === 'loading') return <p className="text-xs text-faint">{t(lang, 'loading')}</p>
     if (drill.status === 'error') return <p className="text-xs text-red-400/80">{t(lang, 'loadFailed')}</p>
-    if (drill.status === 'missing') return <p className="text-xs text-faint">{t(lang, 'drillNotReady')}</p>
+    if (drill.status === 'missing' || !drillFile) return <p className="text-xs text-faint">{t(lang, 'drillNotReady')}</p>
+    if (level !== 'all' && !levelsState)
+      return <p className="text-xs text-faint">{t(lang, 'loading')}</p>
     const [api] = r.key.split('|')
-    return <DrillPanel types={drillTypes(drill.file, file!, api, r.min!, split, lang, level)} lang={lang} />
+    const note =
+      level !== 'all' && drillHasLevels(drillFile)
+        ? t(lang, 'drillLevelNote', { lv: level === '7' ? t(lang, 'statsLevelLow') : level })
+        : null
+    return <DrillPanel types={drillTypes(drillFile, file!, api, r.min!, split, lang, level)} note={note} lang={lang} />
   }
   const refRow = tab === 'emblems' && view ? noEmblemRow(view, t(lang, 'statsNoEmblem')) : null
 
@@ -264,7 +295,7 @@ export default function StatsPage() {
                 })}
               </div>
             )}
-            {/* 行の平均Lvでふるい分ける（数字は全員分のまま。levelBucketOf）。 */}
+            {/* 表の行は平均Lvでふるい分ける（数字は全員分のまま。levelBucketOf）。構成の型はそのレベルの人だけで数える。 */}
             <SegmentedControl<'all' | LevelKey>
               ariaLabel={t(lang, 'statsLevel')}
               value={level}
@@ -500,11 +531,12 @@ function ToggleButton({ pressed, onClick, children }: { pressed: boolean; onClic
  * 特性の段の「構成の型」。相方特性ごとに、人数・平均順位・平均Lv・最多の盤面を並べ、
  * 押すと駒ごとの採用率と星3率を開く。並びは人数順（型は採用の多さで探すので）。
  */
-function DrillPanel({ types, lang }: { types: DrillType[]; lang: Lang }) {
+function DrillPanel({ types, note, lang }: { types: DrillType[]; note: string | null; lang: Lang }) {
   const [open, setOpen] = useState<string | null>(null)
   if (types.length === 0) return <p className="text-xs text-faint">{t(lang, 'statsEmpty')}</p>
   return (
     <ul className="flex flex-col gap-1.5">
+      {note && <li className="text-[11px] text-faint">{note}</li>}
       {types.map((ty) => (
         <li key={ty.key} className="rounded-md border border-line bg-surface">
           <button
