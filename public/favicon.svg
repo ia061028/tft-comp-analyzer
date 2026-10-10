@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- TFTailor: 黒鉛の地に金の六角枠、それを針が貫く。ホーム画面用アイコン（design/brand/icon-source.png）を16pxでも読める形に単純化したもの -->
-  <rect width="64" height="64" rx="14" fill="#131417"/>
-  <path fill="none" stroke="#e8b75c" stroke-width="7" stroke-linejoin="round" d="M32 10 51 21v22L32 54 13 43V21Z"/>
-  <path stroke="#d4d7dc" stroke-width="3.5" stroke-linecap="round" d="M13 52 52 11"/>
-  <circle cx="11" cy="54" r="3" fill="#ff5c6c"/>
-</svg>
