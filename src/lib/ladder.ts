@@ -33,6 +33,8 @@ export interface LadderOptions {
   maxCost?: number
   /** 選択式の付与（カ＝ジックスの進化など）を数えるか。既定 true。 */
   useChoices?: boolean
+  /** 選択式の付与を数えない駒（units の idx）。画面の入／切スイッチ。 */
+  choosersOff?: number[]
 }
 
 export interface LadderBoard {
@@ -101,24 +103,36 @@ interface Ctx {
   min: number[]
 }
 
-function makeCtx(data: LadderData): Ctx {
+function makeCtx(data: LadderData, choosersOff: readonly number[]): Ctx {
   const { fixed, choice } = splitGranters(data.granters)
+  for (const u of choosersOff) choice.delete(u)
   return { data, fixed, choice, min: data.traits.map((t) => minUnits(t)) }
 }
 
-const ctxCache = new WeakMap<LadderData, Ctx>()
-function ctxOf(data: LadderData): Ctx {
-  let c = ctxCache.get(data)
-  if (!c) ctxCache.set(data, (c = makeCtx(data)))
+/** data ごと、切った選択駒の組ごとに1つ。 */
+const ctxCache = new WeakMap<LadderData, Map<string, Ctx>>()
+function ctxOf(data: LadderData, choosersOff: readonly number[] = []): Ctx {
+  let byOff = ctxCache.get(data)
+  if (!byOff) ctxCache.set(data, (byOff = new Map()))
+  const key = [...new Set(choosersOff)].sort((a, b) => a - b).join(',')
+  let c = byOff.get(key)
+  if (!c) byOff.set(key, (c = makeCtx(data, choosersOff)))
   return c
 }
 
 /**
  * 盤面を評価する。選択式の付与は、発動数が最大になる組を総当たりで選ぶ（候補は高々数十通り）。
  * useChoices が false なら選択式の付与は数えない（カ＝ジックスがまだ進化していない段階）。
+ * choosersOff の駒は選択式の付与を持たないものとして数える（画面の入／切スイッチ）。
  */
-export function evaluateBoard(board: number[], data: LadderData, emblems: number[], useChoices = true): LadderBoard {
-  const ctx = ctxOf(data)
+export function evaluateBoard(
+  board: number[],
+  data: LadderData,
+  emblems: number[],
+  useChoices = true,
+  choosersOff: readonly number[] = [],
+): LadderBoard {
+  const ctx = ctxOf(data, choosersOff)
   const { units } = data
   const T = data.traits.length
   const base = new Int16Array(T)
@@ -206,7 +220,12 @@ interface Node {
  * 種類数と「あと1体」の数。紋章は持たせる駒が居る限り足し、選択式の付与は駒ごとに
  * 一番得な特性を選ぶ（駒どうしの干渉は無視する。最後に evaluateBoard で厳密に数え直す）。
  */
-function quickScore(ctx: Ctx, n: Pick<Node, 'units' | 'counts' | 'raw'>, emblems: number[], useChoices: boolean): [number, number] {
+function quickScore(
+  ctx: Ctx,
+  n: Pick<Node, 'units' | 'counts' | 'raw'>,
+  emblems: number[],
+  useChoices: boolean,
+): [number, number] {
   // 紋章も選択式の付与も無ければ、配列を写さずにそのまま数える（探索の大半はこの場合）。
   const needsCopy = emblems.length > 0 || (useChoices && n.units.some((u) => ctx.choice.has(u)))
   const c = needsCopy ? n.counts.slice() : n.counts
@@ -323,6 +342,7 @@ class Search {
   private lastMaxCost = -1
   /** 候補をこの駒だけに絞る（選んだ駒が枠より多いとき、その中から選ぶ）。コスト上限は掛けない。 */
   private pool: Set<number> | undefined
+  private choosersOff: readonly number[]
 
   constructor(
     data: LadderData,
@@ -331,13 +351,15 @@ class Search {
     excluded: Set<number>,
     allowFive: boolean,
     pool?: Set<number>,
+    choosersOff: readonly number[] = [],
   ) {
     this.data = data
     this.pool = pool
     this.emblems = emblems
     this.excluded = excluded
     this.allowFive = allowFive
-    this.ctx = ctxOf(data)
+    this.choosersOff = choosersOff
+    this.ctx = ctxOf(data, choosersOff)
     this.lockedSet = new Set(locked)
     const T = data.traits.length
     let root: Partial = { units: [], counts: new Int16Array(T), raw: new Int16Array(T), cost: 0 }
@@ -431,7 +453,7 @@ class Search {
     }
     // 山登りで見つけた盤面も次のレベルの出発点に入れる。
     if (!this.beam.includes(best)) this.beam = [best, ...this.beam].slice(0, BEAM)
-    return evaluateBoard(best.units, this.data, this.emblems, useChoices)
+    return evaluateBoard(best.units, this.data, this.emblems, useChoices, this.choosersOff)
   }
 }
 
@@ -443,10 +465,13 @@ class Searches {
   private lockedSearch: Search | undefined
   private poolSearch: Search | undefined
   private data: LadderData
-  private opts: Pick<LadderOptions, 'emblems' | 'excluded' | 'allowFive'>
+  private opts: Pick<LadderOptions, 'emblems' | 'excluded' | 'allowFive' | 'choosersOff'>
   private locked: number[]
 
-  constructor(data: LadderData, opts: Pick<LadderOptions, 'emblems' | 'excluded' | 'allowFive' | 'locked'>) {
+  constructor(
+    data: LadderData,
+    opts: Pick<LadderOptions, 'emblems' | 'excluded' | 'allowFive' | 'locked' | 'choosersOff'>,
+  ) {
     this.data = data
     this.opts = opts
     this.locked = [...new Set(opts.locked ?? [])].filter((i) => data.units[i])
@@ -455,10 +480,26 @@ class Searches {
   next(size: number, maxCost: number, useChoices: boolean, prev: number[] | undefined): LadderBoard {
     const excluded = new Set(this.opts.excluded ?? [])
     if (this.locked.length > size) {
-      this.poolSearch ??= new Search(this.data, this.opts.emblems, [], excluded, this.opts.allowFive, new Set(this.locked))
+      this.poolSearch ??= new Search(
+        this.data,
+        this.opts.emblems,
+        [],
+        excluded,
+        this.opts.allowFive,
+        new Set(this.locked),
+        this.opts.choosersOff,
+      )
       return this.poolSearch.next(size, maxCost, useChoices, prev)
     }
-    this.lockedSearch ??= new Search(this.data, this.opts.emblems, this.locked, excluded, this.opts.allowFive)
+    this.lockedSearch ??= new Search(
+      this.data,
+      this.opts.emblems,
+      this.locked,
+      excluded,
+      this.opts.allowFive,
+      undefined,
+      this.opts.choosersOff,
+    )
     return this.lockedSearch.next(size, maxCost, useChoices, prev)
   }
 }
@@ -512,12 +553,7 @@ export function buildRoute(
   const out: RouteStep[] = []
   let prev: number[] | undefined
   for (const level of levels) {
-    const board = search.next(
-      level + opts.bonus,
-      maxCostAt(level, opts.allowFive),
-      level >= CHOICE_FROM_LEVEL,
-      prev,
-    )
+    const board = search.next(level + opts.bonus, maxCostAt(level, opts.allowFive), level >= CHOICE_FROM_LEVEL, prev)
     const p = new Set(prev ?? [])
     const now = new Set(board.units)
     const step = {
@@ -534,7 +570,12 @@ export function buildRoute(
 }
 
 /** 紋章の判定。使うと何種類増えるか（0 なら再合成を勧める）。 */
-export function emblemGain(data: LadderData, opts: Omit<LadderOptions, 'emblems'>, emblem: number, others: number[] = []) {
+export function emblemGain(
+  data: LadderData,
+  opts: Omit<LadderOptions, 'emblems'>,
+  emblem: number,
+  others: number[] = [],
+) {
   const withIt = bestBoard(data, { ...opts, emblems: [...others, emblem] })
   const without = bestBoard(data, { ...opts, emblems: others })
   return { gain: withIt.active - without.active, withIt, without }
@@ -544,7 +585,12 @@ export function emblemGain(data: LadderData, opts: Omit<LadderOptions, 'emblems'
  * 選択式の付与元（カ＝ジックス）の選択肢ごとの種類数。盤面は固定して、選ぶ特性だけを変える。
  * 多い順。同数なら元の並び。
  */
-export function choiceRanking(board: LadderBoard, unit: number, data: LadderData, emblems: number[]): { trait: number; active: number }[] {
+export function choiceRanking(
+  board: LadderBoard,
+  unit: number,
+  data: LadderData,
+  emblems: number[],
+): { trait: number; active: number }[] {
   const { choice } = splitGranters(data.granters)
   const opts = choice.get(unit)
   if (!opts || !board.units.includes(unit)) return []

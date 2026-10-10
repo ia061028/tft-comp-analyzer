@@ -18,6 +18,7 @@ import {
   slotExtraOf,
   MAX_SLOT_EXTRA,
   GRANTER_MIN_RECORDS,
+  createGranterCounter,
   type LoadedRecord,
 } from './aggregate-core.ts'
 
@@ -747,4 +748,40 @@ test('buildStats: 上乗せのシェアが GRANT_MIN_SHARE 未満なら出力し
   })
   assert.equal(out.comps[0].x, undefined)
   assert.equal(out.comps[0].s, undefined)
+})
+
+test('createGranterCounter: 同席率が同点なら、他の特性も付与している選択駒を採る', () => {
+  // 進化で A/B/C を付与する K と、元から C を持つ D。C の上乗せが乗る盤面には K も D も毎回居る。
+  const gc = createGranterCounter()
+  const n = GRANTER_MIN_RECORDS
+  for (let i = 0; i < n; i++) {
+    gc.add(new Map([['A', 1]]), new Set(['K', 'X']))
+    gc.add(new Map([['B', 1]]), new Set(['K', 'Y']))
+    gc.add(new Map([['C', 1]]), new Set(['K', 'D']))
+    // D は居るが上乗せが無いレコード（D 単独では C を上乗せしない）。
+    gc.add(new Map(), new Set(['D', 'Z']))
+  }
+  const got = gc
+    .finish()
+    .filter((g) => g.confident)
+    .map((g) => [g.unitApi, g.traitApi, g.delta])
+  got.sort((a, b) => String(a).localeCompare(String(b)))
+  assert.deepEqual(got, [
+    ['K', 'A', 1],
+    ['K', 'B', 1],
+    ['K', 'C', 1],
+  ])
+})
+
+test('createGranterCounter: 選択駒の同席率が閾値を下回る組は元の推定のまま', () => {
+  // E が1特性 R を+1。選択駒 K は同席率が低いので R は E のまま。
+  const gc = createGranterCounter()
+  const n = GRANTER_MIN_RECORDS
+  for (let i = 0; i < n; i++) {
+    gc.add(new Map([['A', 1]]), new Set(['K']))
+    gc.add(new Map([['B', 1]]), new Set(['K']))
+    gc.add(new Map([['R', 1]]), new Set(i % 2 === 0 ? ['E', 'K'] : ['E']))
+  }
+  const r = gc.finish().find((g) => g.traitApi === 'R')
+  assert.deepEqual([r?.unitApi, r?.confident], ['E', true])
 })

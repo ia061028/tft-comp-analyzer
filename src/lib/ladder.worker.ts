@@ -14,6 +14,8 @@ export interface LadderRequest {
   allowFive: boolean
   locked: number[]
   excluded: number[]
+  /** 選択式の付与を数えない駒（units の idx）。 */
+  choosersOff: number[]
   /** 紋章の判定に使うレベル（このレベルで紋章あり／なしを比べる）。 */
   judgeLevel: number
 }
@@ -39,7 +41,16 @@ const CACHE_MAX = 64
 self.onmessage = (e: MessageEvent<LadderRequest>) => {
   const req = e.data
   const post = (r: LadderResponse) => (self as unknown as DedicatedWorkerGlobalScope).postMessage(r)
-  const key = JSON.stringify([req.levels, req.bonus, req.emblems, req.allowFive, req.locked, req.excluded, req.judgeLevel])
+  const key = JSON.stringify([
+    req.levels,
+    req.bonus,
+    req.emblems,
+    req.allowFive,
+    req.locked,
+    req.excluded,
+    req.choosersOff,
+    req.judgeLevel,
+  ])
   const hit = cache.get(key)
   if (hit) {
     for (const r of hit) post({ ...r, id: req.id })
@@ -50,7 +61,13 @@ self.onmessage = (e: MessageEvent<LadderRequest>) => {
     out.push(r)
     post(r)
   }
-  const common = { emblems: req.emblems, allowFive: req.allowFive, locked: req.locked, excluded: req.excluded }
+  const common = {
+    emblems: req.emblems,
+    allowFive: req.allowFive,
+    locked: req.locked,
+    excluded: req.excluded,
+    choosersOff: req.choosersOff,
+  }
   // ルートはレベルが1つ決まるたびに返す（画面は上から埋まる）。
   buildRoute(req.data, { ...common, levels: req.levels, bonus: req.bonus }, (step) =>
     send({ id: req.id, kind: 'step', step: { ...step, board: wire(step.board) } }),
@@ -61,6 +78,7 @@ self.onmessage = (e: MessageEvent<LadderRequest>) => {
       allowFive: req.allowFive,
       locked: req.locked,
       excluded: req.excluded,
+      choosersOff: req.choosersOff,
       size: req.judgeLevel + req.bonus,
       maxCost: maxCostAt(req.judgeLevel, req.allowFive),
     }
