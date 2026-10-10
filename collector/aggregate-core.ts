@@ -295,7 +295,10 @@ export function parseGranterKey(key: string): { traitApi: string; delta: number 
   return { traitApi: key.slice(0, i), delta }
 }
 
-/** 付与元の推定結果。「トレイト＋上乗せ数」ごとに、同席していた割合が最も高いユニット。 */
+/**
+ * 付与元の推定結果。「トレイト＋上乗せ数」ごとに、同席していた割合が最も高いユニット。
+ * ただし付与元と言い切れる特性が2つ以上あるユニット（選択駒）が閾値を満たすなら、そちらを採る。
+ */
 export interface GranterGuess {
   traitApi: string
   delta: number
@@ -334,7 +337,9 @@ export function createGranterCounter(): GranterCounter {
       }
     },
     finish() {
-      const out: GranterGuess[] = []
+      // 1回目: 組ごとに同席率が最大のユニット（同数なら apiName 昇順）。
+      type Pick = GranterGuess & { cands: Map<string, number> }
+      const picks: Pick[] = []
       for (const [gKey, c] of co) {
         const parsed = parseGranterKey(gKey)
         if (!parsed) continue
@@ -349,7 +354,39 @@ export function createGranterCounter(): GranterCounter {
           }
         }
         if (bestApi === undefined) continue
-        out.push({ ...parsed, unitApi: bestApi, total, confident: bestCo / total >= GRANTER_MIN_COVERAGE })
+        picks.push({ ...parsed, unitApi: bestApi, total, confident: bestCo / total >= GRANTER_MIN_COVERAGE, cands: c })
+      }
+      // 2回目: 付与元と言い切れる特性が2つ以上あるユニット（選択駒）は、閾値を満たす別の組でも本命とみなす。
+      // 選択駒の選択肢のうち1つが元からその特性を持つ別のユニットと同席率で同点になると、
+      // 1回目はそのユニット（特性が発動している盤面に当然居る）を選んでしまう。
+      // 実データ（セット18）: ラヴィジャー +1 はカ＝ジックスとダイアナが共に 96% で同点だった。
+      const multi = new Map<string, Set<string>>()
+      for (const p of picks) {
+        if (!p.confident) continue
+        let set = multi.get(p.unitApi)
+        if (!set) multi.set(p.unitApi, (set = new Set()))
+        set.add(p.traitApi)
+      }
+      const choosers = new Set([...multi].filter(([, traits]) => traits.size >= 2).map(([api]) => api))
+      const out: GranterGuess[] = []
+      for (const { cands, ...p } of picks) {
+        if (!choosers.has(p.unitApi)) {
+          let bestApi: string | undefined
+          let bestCo = -1
+          for (const api of choosers) {
+            const n = cands.get(api) ?? 0
+            if (n / p.total < GRANTER_MIN_COVERAGE) continue
+            if (n > bestCo || (n === bestCo && bestApi !== undefined && api < bestApi)) {
+              bestCo = n
+              bestApi = api
+            }
+          }
+          if (bestApi !== undefined) {
+            out.push({ ...p, unitApi: bestApi, confident: true })
+            continue
+          }
+        }
+        out.push(p)
       }
       return out
     },

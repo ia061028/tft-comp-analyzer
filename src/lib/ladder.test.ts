@@ -17,7 +17,10 @@ const tr = (api: string, tiers: [number, number][]): TraitInfo => ({ api, name: 
 // 0=A(2), 1=B(2), 2=C(2), 3=D(3), 4=固有U(1), 5=E(2)
 const traits: TraitInfo[] = [
   tr('A', [[2, 1]]),
-  tr('B', [[2, 1], [4, 3]]),
+  tr('B', [
+    [2, 1],
+    [4, 3],
+  ]),
   tr('C', [[2, 1]]),
   tr('D', [[3, 1]]),
   tr('U', [[1, 4]]),
@@ -92,6 +95,18 @@ test('evaluateBoard: 選択式の付与は種類数が最大になる特性を�
   assert.equal(b.active, 1)
   // useChoices=false なら数えない
   assert.equal(evaluateBoard([0, 8], data, [], false).active, 0)
+})
+
+test('evaluateBoard / bestBoard: choosersOff の駒は選択式の付与を持たないものとして数える', () => {
+  const off = evaluateBoard([0, 8], data, [], true, [8])
+  assert.equal(off.active, 0)
+  assert.equal(off.choices.size, 0)
+  // 切っても他の駒の評価は変わらない（切った状態と、付与元が無いデータでの結果が一致する）。
+  const noGranters = { ...data, granters: data.granters.filter((g) => g[0] !== 8) }
+  const size = 3
+  const withOff = bestBoard(data, { size, allowFive: false, emblems: [], choosersOff: [8] })
+  const without = bestBoard(noGranters, { size, allowFive: false, emblems: [] })
+  assert.equal(withOff.active, without.active)
 })
 
 /** 小さい例なので総当たりの最大値と比べる。 */
@@ -169,8 +184,14 @@ test('buildRoute: 足す駒・外す駒が直前のレベルとの差になっ�
   for (let i = 1; i < route.length; i++) {
     const prev = new Set(route[i - 1].board.units)
     const now = new Set(route[i].board.units)
-    assert.deepEqual(route[i].added, route[i].board.units.filter((u) => !prev.has(u)))
-    assert.deepEqual(route[i].removed, [...prev].filter((u) => !now.has(u)))
+    assert.deepEqual(
+      route[i].added,
+      route[i].board.units.filter((u) => !prev.has(u)),
+    )
+    assert.deepEqual(
+      route[i].removed,
+      [...prev].filter((u) => !now.has(u)),
+    )
   }
   // 選択式の付与は CHOICE_FROM_LEVEL 未満では数えない
   for (const s of route) if (s.level < CHOICE_FROM_LEVEL) assert.equal(s.board.choices.size, 0)

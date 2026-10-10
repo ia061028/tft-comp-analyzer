@@ -51,6 +51,8 @@ export default function LadderPage() {
   const [picked, setPicked] = useState<number[]>([])
   const [allowFive, setAllowFive] = useState(false)
   const [bonus, setBonus] = useState(0)
+  /** 進化・選択を数えない駒（units の idx）。カ＝ジックスなど選択式の付与元ごとの入／切。 */
+  const [choosersOff, setChoosersOff] = useState<number[]>([])
   /** 手持ちの駒（units の idx、押した順）。枠に収まれば全員入れ、枠より多ければこの中から選ぶ。 */
   const [hand, setHand] = useState<number[]>([])
   const [unitsOpen, setUnitsOpen] = useState(false)
@@ -92,6 +94,16 @@ export default function LadderPage() {
     [stats],
   )
   const emblemTraits = useMemo(() => (stats ? picked.map((i) => stats.emblems[i].trait) : []), [stats, picked])
+  /** 選択式の付与元（カ＝ジックス・ラックス）。入／切スイッチを1つずつ出す。コストの高い順。 */
+  const chooserUnits = useMemo(
+    () =>
+      stats
+        ? [...splitGranters(stats.granters).choice.keys()].sort(
+            (a, b) => stats.units[b].cost - stats.units[a].cost || a - b,
+          )
+        : [],
+    [stats],
+  )
   // 選べるのは盤面に置ける駒だけ（チームプランナーに無い変種は出さない）。コストごとの段に分け、名前順。
   const pickableByCost = useMemo(() => {
     const rows = new Map<number, number[]>()
@@ -142,10 +154,11 @@ export default function LadderPage() {
       allowFive,
       locked,
       excluded,
+      choosersOff,
       judgeLevel: JUDGE_LEVEL,
     }
     workerRef.current.postMessage(req)
-  }, [data, emblemTraits, allowFive, bonus, locked, excluded])
+  }, [data, emblemTraits, allowFive, bonus, locked, excluded, choosersOff])
 
   // 同じ紋章も何枚でも持てる。一覧を押すと1枚足し、選んだ列の紋章を押すとその1枚を外す。
   const addEmblem = (i: number) => setPicked((p) => [...p, i])
@@ -304,6 +317,23 @@ export default function LadderPage() {
                 <Toggle on={bonus > 0} onClick={() => setBonus((b) => (b ? 0 : 1))} title={t(lang, 'ladderBonusHint')}>
                   {t(lang, 'ladderBonus')}
                 </Toggle>
+                {/* 選択式の付与元の入／切。切ると、その駒は進化・選択の特性を持たないものとして数える。 */}
+                {chooserUnits.map((ui) => {
+                  const unit = stats.units[ui]
+                  const name = pickName(lang, unit)
+                  const on = !choosersOff.includes(ui)
+                  return (
+                    <Toggle
+                      key={ui}
+                      on={on}
+                      onClick={() => setChoosersOff((off) => (on ? [...off, ui] : off.filter((i) => i !== ui)))}
+                      title={t(lang, on ? 'ladderChooserOnHint' : 'ladderChooserOffHint', { unit: name })}
+                    >
+                      <img src={unit.icon} alt="" className="h-5 w-5 rounded-sm object-cover" aria-hidden />
+                      {name}
+                    </Toggle>
+                  )
+                })}
               </div>
             </div>
 
