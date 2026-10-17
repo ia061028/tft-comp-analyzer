@@ -84,7 +84,7 @@ const ja = {
   utilizationLabel: '活用紋章',
   utilizationTitle: '選択した紋章のうち、この構成が活用している数',
   ladderMode: '特性ラダー',
-  ladderModeTitle: 'ゲーム内の特性ラダー用。発動している特性の種類数（固有特性も数える）が多い順にまとめ、同じ種類数の中は選んだ指標（既定は Tier）で並べる',
+  ladderModeTitle: 'ゲーム内の特性ラダー用。発動している特性の種類数（固有特性は数えない）が多い順にまとめ、同じ種類数の中は選んだ指標（既定は Tier）で並べる',
   bronzeMode: '生涯ブロンズ',
   bronzeModeTitle: 'ブロンズ特性（固有特性を除く、最小ティアで発動中の特性）が多い順に構成を表示',
   bronzeBadge: 'ブロンズ {n}',
@@ -140,6 +140,7 @@ const ja = {
   ladderBonus: '+1枠',
   ladderBonusHint: '押すとチームサイズ +1（11段の報酬など）で計算します',
   ladderChooserOnHint: '{unit}の進化・選択を数えています。押すと数えません',
+  ladderUniqueTitle: '{name}（固有特性。特性ラダーでは数えない）',
   ladderChooserOffHint: '{unit}の進化・選択を数えていません。押すと数えます',
   ladderUnits: '手持ちの駒',
   ladderUnitsHint: '持っている駒を入れる。枠に収まれば全員を盤面に入れ、枠より多ければこの中から一番いい組み合わせを選ぶ',
@@ -166,7 +167,7 @@ const ja = {
   ladderChoice: '{unit}の進化',
   ladderReward: '{n}段の報酬',
   ladderRewards: '段ごとの報酬',
-  ladderNote: '各レベルの盤面で発動できる特性の種類数が最大になる組み合わせを、駒と特性のデータから計算しています。Lv5までは3コストまで、Lv6・7は4コストまで、5コストはLv8から（選んだときだけ）。カ＝ジックスなど選べる付与はLv7から1回ぶんを数えます。',
+  ladderNote: '各レベルの盤面で発動できる特性の種類数が最大になる組み合わせを、駒と特性のデータから計算しています。Lv5までは3コストまで、Lv6・7は4コストまで、5コストはLv8から（選んだときだけ）。カ＝ジックスなど選べる付与はLv7から1回ぶんを数えます。固有特性（1人だけが持つ特性）はオーグメントの対象外なので数えません。',
   legal: "TFTailor isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 }
 
@@ -250,7 +251,7 @@ const en: Record<UIKey, string> = {
   utilizationLabel: 'Emblems used',
   utilizationTitle: 'How many of the selected emblems this comp uses',
   ladderMode: 'Trait Ladder',
-  ladderModeTitle: 'For the in-game Trait Ladder. Groups comps by how many distinct traits they activate (unique traits included), highest first, and orders each group by the selected metric (Tier by default)',
+  ladderModeTitle: 'For the in-game Trait Ladder. Groups comps by how many distinct traits they activate (unique traits excluded, as the augment counts only non-unique traits), highest first, and orders each group by the selected metric (Tier by default)',
   bronzeMode: 'Lifelong Bronze',
   bronzeModeTitle: 'Rank comps by number of bronze traits (non-unique traits active at their lowest tier)',
   bronzeBadge: 'Bronze {n}',
@@ -306,6 +307,7 @@ const en: Record<UIKey, string> = {
   ladderBonus: '+1 slot',
   ladderBonusHint: 'When on, computes with team size +1 (e.g. the step 11 reward)',
   ladderChooserOnHint: 'Counting {unit}’s evolution/choice. Press to leave it out',
+  ladderUniqueTitle: '{name} (unique trait, not counted by the Trait Ladder)',
   ladderChooserOffHint: 'Not counting {unit}’s evolution/choice. Press to count it',
   ladderUnits: 'Your units',
   ladderUnitsHint: 'Units you hold. If they fit the board all are used; with more than the slots, the best set among them is picked',
@@ -332,7 +334,7 @@ const en: Record<UIKey, string> = {
   ladderChoice: '{unit} evolution',
   ladderReward: 'Step {n} reward',
   ladderRewards: 'Rewards by step',
-  ladderNote: 'For each level, the board that activates the most distinct traits, computed from unit and trait data. Up to 3-costs through Lv5, 4-costs at Lv6–7, 5-costs from Lv8 only when enabled. Choice grants such as Kha’Zix evolutions count once from Lv7.',
+  ladderNote: 'For each level, the board that activates the most distinct traits, computed from unit and trait data. Up to 3-costs through Lv5, 4-costs at Lv6–7, 5-costs from Lv8 only when enabled. Choice grants such as Kha’Zix evolutions count once from Lv7. Unique traits (held by a single champion) are not counted, as the augment only counts non-unique traits.',
   legal: "TFTailor isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
 }
 

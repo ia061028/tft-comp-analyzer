@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { StatsFile, TraitInfo } from '../shared/types'
 import { pickName, t, type Lang } from './lib/i18n'
 import { DEFAULT_STATS_FILE, loadStatsHead } from './lib/data'
-import { activeTier, buildPlannerCode, styleClasses } from './lib/format'
+import { activeTier, buildPlannerCode, isUniqueTrait, styleClasses } from './lib/format'
 import { LADDER_REWARDS, TEAM_SIZE_STEP, candidateUnits, splitGranters, type LadderData } from './lib/ladder'
 import type { LadderRequest, LadderResponse, WireStep } from './lib/ladder.worker'
 import { SiteNav } from './components/SiteNav'
@@ -531,12 +531,16 @@ function RouteRow({
       stats.units[a].cost - stats.units[b].cost ||
       pickName(lang, stats.units[a]).localeCompare(pickName(lang, stats.units[b]), lang),
   )
-  const allTraits = board.counts.map(([ti, n]) => ({
-    ti,
-    n,
-    min: stats.traits[ti]?.tiers[0]?.[0] ?? 0,
-    tier: activeTier(n, stats.traits[ti]?.tiers ?? []),
-  }))
+  // 固有特性（1人だけが持つ特性）はラダーで数えないので、発動にも未発動にも入れず薄く別に出す。
+  const unique = board.counts.map(([ti]) => ti).filter((ti) => stats.traits[ti] && isUniqueTrait(stats.traits[ti]))
+  const allTraits = board.counts
+    .filter(([ti]) => !unique.includes(ti))
+    .map(([ti, n]) => ({
+      ti,
+      n,
+      min: stats.traits[ti]?.tiers[0]?.[0] ?? 0,
+      tier: activeTier(n, stats.traits[ti]?.tiers ?? []),
+    }))
   const traits = allTraits.filter((x) => x.tier).sort((a, b) => b.tier!.style - a.tier!.style || b.n - a.n)
   // 未発動は発動に近い順（1/2 → 1/3 → 2/4 …）。
   const inactive = allTraits
@@ -674,6 +678,18 @@ function RouteRow({
             {n}/{min}
           </TraitPill>
         ))}
+        {/* 固有特性は数に入らない。薄く、数字なしで置く（持っていることは分かるように）。 */}
+        {unique.map((ti) => (
+          <TraitPill
+            key={ti}
+            trait={stats.traits[ti]}
+            lang={lang}
+            className="border-dashed border-line text-faint opacity-60"
+            title={t(lang, 'ladderUniqueTitle', { name: pickName(lang, stats.traits[ti]) })}
+          >
+            –
+          </TraitPill>
+        ))}
       </div>
     </li>
   )
@@ -683,16 +699,18 @@ function TraitPill({
   trait,
   lang,
   className,
+  title,
   children,
 }: {
   trait: TraitInfo
   lang: Lang
   className: string
+  title?: string
   children: ReactNode
 }) {
   return (
     <span
-      title={pickName(lang, trait)}
+      title={title ?? pickName(lang, trait)}
       className={`inline-flex h-[22px] items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold tabular-nums ${className}`}
     >
       <img src={trait.icon} alt="" className="h-3.5 w-3.5 object-contain" />
