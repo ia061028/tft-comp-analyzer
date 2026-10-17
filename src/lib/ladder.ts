@@ -1,4 +1,5 @@
 import type { TraitGranter, TraitInfo, UnitInfo } from '../../shared/types'
+import { isUniqueTrait } from './format'
 
 /**
  * 特性ラダー（セット18のオーグメント）の計算機。
@@ -52,9 +53,10 @@ export interface LadderBoard {
   cost: number
 }
 
-/** 段の最小体数。 */
+/** 段の最小体数。固有特性は特性ラダーで数えないので、届かない値にして発動扱いにしない。 */
 function minUnits(tr: TraitInfo | undefined): number {
-  return tr && tr.tiers.length > 0 ? tr.tiers[0][0] : Infinity
+  if (!tr || tr.tiers.length === 0 || isUniqueTrait(tr)) return Infinity
+  return tr.tiers[0][0]
 }
 
 /**

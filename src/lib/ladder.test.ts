@@ -41,7 +41,7 @@ const units: UnitInfo[] = [
   un('bc', 2, [1, 2]), // 2
   un('d1', 1, [3]), // 3
   un('d2', 1, [3]), // 4
-  un('solo', 3, [4]), // 5: 固有特性だけ（いるだけで1種類）
+  un('solo', 3, [4]), // 5: 固有特性だけ（ラダーでは数えない）
   un('five', 5, [4, 5]), // 6
   un('variant', 1, [0, 1, 2], 0), // 7: プランナーに無い変種
   un('chooser', 3, []), // 8: 選択式の付与元（A/C/E のどれか +1）
@@ -164,11 +164,20 @@ test('buildRoute: 固定した駒が枠を超える低いレベルは選んだ�
 
 test('bestBoard: 同じ種類数なら直前の盤面と重なる方を選ぶ', () => {
   // 2枠の最大は1種類で、該当する盤面はいくつもある。直前が無ければ安い [ab, ac]、
-  // 直前に solo が居れば solo を残す盤面が選ばれる。
-  assert.ok(!bestBoard(data, { size: 2, emblems: [], allowFive: false }).units.includes(5))
-  const b = bestBoard(data, { size: 2, emblems: [], allowFive: false, prev: [5] })
+  // 直前に bc が居れば bc を残す盤面（[ab, bc] か [ac, bc]）が選ばれる。
+  assert.ok(!bestBoard(data, { size: 2, emblems: [], allowFive: false }).units.includes(2))
+  const b = bestBoard(data, { size: 2, emblems: [], allowFive: false, prev: [2] })
   assert.equal(b.active, 1)
-  assert.ok(b.units.includes(5))
+  assert.ok(b.units.includes(2))
+})
+
+test('evaluateBoard / bestBoard: 固有特性は数えない（あと1体にもならない）', () => {
+  // オーグメントの原文は「non-unique traits」。固有特性だけの solo は居ても 0 種類。
+  const b = evaluateBoard([5], data, [])
+  assert.equal(b.active, 0)
+  assert.equal(b.near, 0)
+  // 3枠の最大は A=2,B=2,C=2 の3種類。solo を入れる理由が無い。
+  assert.ok(!bestBoard(data, { size: 3, emblems: [], allowFive: false }).units.includes(5))
 })
 
 test('maxCostAt: Lv5 まで3コスト、Lv6・7 は4コスト、5コストは Lv8 から選んだときだけ', () => {

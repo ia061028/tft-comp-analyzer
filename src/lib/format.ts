@@ -227,20 +227,29 @@ export function bronzeTraitCount(counts: Map<number, number>, traits: TraitInfo[
 }
 
 /**
- * 発動している特性の種類数（固有特性も数える）。
+ * 固有特性（1人だけが持ち、その1人で発動する特性）か。段が1つで、1体で発動するもの。
+ * セット18 では 原生林・翠の父・モノリス・ソーンメイデン・腐敗・エメラルドの神髄・
+ * バウンティーシーカー・同調・アバター・捕食者の頂点 の10個。ソーラーは段が1つでも3体要るので違う。
+ */
+export function isUniqueTrait(tr: TraitInfo): boolean {
+  return tr.tiers.length === 1 && tr.tiers[0][0] === 1
+}
+
+/**
+ * 特性ラダーで数える「発動している特性の種類数」。固有特性は数えない。
  *
- * ゲーム内の「特性ラダー」は**重複しない特性を何種類発動させたか**で報酬が決まり、必要数は
- * 段を追うごとに増える。数えるのは種類であって発動段の高さではないので、ブロンズ1段でも
- * プリズムでも1種類は1種類。
+ * ゲーム内の「特性ラダー」は**固有でない特性（non-unique traits）を何種類発動させたか**で
+ * 報酬が決まり、必要数は段を追うごとに増える。数えるのは種類であって発動段の高さではないので、
+ * ブロンズ1段でもプリズムでも1種類は1種類。固有特性はオーグメントの原文どおり数えない
+ * （解説動画の数字とも一致: 定型6体で6、Lv8 でアルーン無しは10まで）。
  *
- * 生涯ブロンズ（`bronzeTraitCount`）とは別物。あちらは「最小ティアで発動している非固有特性」
- * を数えるので、固有特性を除外し、段が上がった特性も落とす。ラダーはどちらも数える。
+ * 生涯ブロンズ（`bronzeTraitCount`）とは別物。あちらは段が上がった特性も落とす。
  */
 export function activeTraitTotal(counts: Map<number, number>, traits: TraitInfo[]): number {
   let c = 0
   for (const [ti, n] of counts) {
     const tr = traits[ti]
-    if (!tr) continue
+    if (!tr || isUniqueTrait(tr)) continue
     if (activeTier(n, tr.tiers)) c++
   }
   return c
