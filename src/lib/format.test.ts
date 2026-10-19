@@ -47,8 +47,9 @@ test('activeTraitTotal: 発動していない特性は数えない', () => {
   assert.equal(activeTraitTotal(counts({ 0: 2 }), traits), 1)
 })
 
-test('activeTraitTotal: 固有特性も数える（生涯ブロンズとの決定的な違い）', () => {
-  assert.equal(activeTraitTotal(counts({ 1: 1 }), traits), 1)
+test('activeTraitTotal: 固有特性は数えない（オーグメントの原文は non-unique traits）', () => {
+  assert.equal(activeTraitTotal(counts({ 1: 1 }), traits), 0)
+  assert.equal(activeTraitTotal(counts({ 1: 1, 0: 2 }), traits), 1)
   assert.equal(bronzeTraitCount(counts({ 1: 1 }), traits), 0)
 })
 
@@ -59,8 +60,8 @@ test('activeTraitTotal: 段が上がっても1種類は1種類', () => {
 })
 
 test('activeTraitTotal: 発動している種類を数え上げる', () => {
-  assert.equal(activeTraitTotal(counts({ 0: 4, 1: 1, 2: 3 }), traits), 3)
-  assert.equal(activeTraitTotal(counts({ 0: 1, 1: 1, 2: 3 }), traits), 2) // Brawler 1 は未発動
+  assert.equal(activeTraitTotal(counts({ 0: 4, 1: 1, 2: 3 }), traits), 2) // 固有は数えない
+  assert.equal(activeTraitTotal(counts({ 0: 1, 1: 1, 2: 3 }), traits), 1) // Brawler 1 は未発動
 })
 
 test('activeTraitTotal: 未知の trait idx は無視する', () => {
