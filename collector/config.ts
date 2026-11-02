@@ -232,5 +232,14 @@ export const config = {
     // レコードに入らず、メンテナンスの空白も採用率の段差も無い。18.2b・18.3b と
     // 同じ 17:00Z を採った（IPPEI 了承済み）。実時刻が分かったら直す。
     { patch: '18.5b', since: '2026-10-22T17:00:00Z' },
+    // 18.5c は 10/27 配信（topmeta / tft.ninja / pivottft / gamewave）。Kha'Zix のスキル
+    // ダメージ、Brambleback の防具無視、Hand of Justice のオムニヴァンプが下げられた。
+    // メンテナンスの空白はどの地域にも無く、サーバー側だけの修正。根拠はナーフされた3つの
+    // 採用率が asia / sea / europe / americas の4ルートとも 10/27 18Z→19Z で同時に落ちたこと
+    // （Brambleback は americas 19.4%→15.7%、全地域で 19%→13%。Kha'Zix 4.7%→2.5%、
+    // Hand of Justice 26.5%→19%）。採用率は人の行動なので実際の配信は 18:00〜19:00Z の
+    // どこかで、それ以上は絞れない。前パッチの試合を混ぜないよう段差直後の丸時刻を採った。
+    // 全ルート同時なので sinceByPlatform は要らない。
+    { patch: '18.5c', since: '2026-10-27T19:00:00Z' },
   ] as PatchScheduleEntry[],
 }
